@@ -1,4 +1,8 @@
-﻿import Link from "next/link";
+﻿"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
 const featureCards = [
   {
@@ -34,6 +38,46 @@ const featureCards = [
 ];
 
 export default function Home() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  useEffect(() => {
+    async function loadSessionState() {
+      if (!isSupabaseConfigured()) {
+        setIsLoadingSession(false);
+        return;
+      }
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user.id;
+
+        setIsLoggedIn(Boolean(userId));
+
+        if (!userId) return;
+
+        const { data } = await supabase
+          .from("profiles")
+          .select("terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at, age_confirmed_at")
+          .eq("id", userId)
+          .maybeSingle();
+
+        setHasCompletedOnboarding(Boolean(
+          data?.terms_accepted_at &&
+            data?.privacy_accepted_at &&
+            data?.community_guidelines_accepted_at &&
+            data?.age_confirmed_at
+        ));
+      } finally {
+        setIsLoadingSession(false);
+      }
+    }
+
+    void loadSessionState();
+  }, []);
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-10">
       <section className="rounded-2xl border p-8">
@@ -46,12 +90,24 @@ export default function Home() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white" href="/signup">
-            Create account
-          </Link>
-          <Link className="rounded-lg border px-4 py-2 text-sm font-medium" href="/onboarding">
-            Continue onboarding
-          </Link>
+          {!isLoadingSession && !isLoggedIn && (
+            <Link className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white" href="/signup">
+              Create account
+            </Link>
+          )}
+
+          {!isLoadingSession && isLoggedIn && !hasCompletedOnboarding && (
+            <Link className="rounded-lg border px-4 py-2 text-sm font-medium" href="/onboarding">
+              Continue onboarding
+            </Link>
+          )}
+
+          {!isLoadingSession && isLoggedIn && hasCompletedOnboarding && (
+            <Link className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white" href="/timeline">
+              Go to timeline
+            </Link>
+          )}
+
           <Link className="rounded-lg border px-4 py-2 text-sm font-medium" href="/connections">
             Find connections
           </Link>
