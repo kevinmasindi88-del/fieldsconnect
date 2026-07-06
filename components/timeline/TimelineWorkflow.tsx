@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 
 type Profile = {
   id: string;
   display_name: string;
   role_type: string;
   field: string | null;
+  avatar_url: string | null;
 };
 
 type Post = {
@@ -83,7 +85,7 @@ export function TimelineWorkflow() {
       ] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, display_name, role_type, field")
+          .select("id, display_name, role_type, field, avatar_url")
           .is("deleted_at", null),
         supabase
           .from("posts")
@@ -283,11 +285,14 @@ export function TimelineWorkflow() {
             <article key={post.id} className="flex flex-col gap-4 rounded-xl border p-4">
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                  <div>
-                    <h2 className="font-semibold">{author?.display_name ?? "Unknown profile"}</h2>
-                    <p className="text-sm text-gray-600">
-                      {[author?.role_type, author?.field].filter(Boolean).join(" - ") || "Profile"}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <ProfileAvatar avatarPath={author?.avatar_url} displayName={author?.display_name} size={40} />
+                    <div>
+                      <h2 className="font-semibold">{author?.display_name ?? "Unknown profile"}</h2>
+                      <p className="text-sm text-gray-600">
+                        {[author?.role_type, author?.field].filter(Boolean).join(" - ") || "Profile"}
+                      </p>
+                    </div>
                   </div>
                   <span className="w-fit rounded-full border px-3 py-1 text-xs">
                     {post.visibility === "public" ? "Public" : "Connections"}
@@ -314,9 +319,12 @@ export function TimelineWorkflow() {
                   const commenter = profileById.get(comment.author_id);
 
                   return (
-                    <div key={comment.id} className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                    <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
+                      <ProfileAvatar avatarPath={commenter?.avatar_url} displayName={commenter?.display_name} size={28} />
+                      <div>
+                        <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                      </div>
                     </div>
                   );
                 })}
@@ -346,3 +354,4 @@ export function TimelineWorkflow() {
     </section>
   );
 }
+

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 
 type Profile = {
   id: string;
@@ -9,6 +10,7 @@ type Profile = {
   username: string | null;
   role_type: string;
   field: string | null;
+  avatar_url: string | null;
 };
 
 type Connection = {
@@ -88,7 +90,7 @@ export function MessagingWorkflow() {
             .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
           supabase
             .from("profiles")
-            .select("id, display_name, username, role_type, field")
+            .select("id, display_name, username, role_type, field, avatar_url")
             .is("deleted_at", null),
         ]);
 
@@ -263,9 +265,14 @@ export function MessagingWorkflow() {
                   disabled={isWorking}
                   onClick={() => openConversation(connection)}
                 >
-                  <span className="block font-semibold">{profile?.display_name ?? "Unknown profile"}</span>
-                  <span className="text-gray-600">
-                    {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "Accepted connection"}
+                  <span className="flex items-center gap-3">
+                    <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={32} />
+                    <span>
+                      <span className="block font-semibold">{profile?.display_name ?? "Unknown profile"}</span>
+                      <span className="text-gray-600">
+                        {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "Accepted connection"}
+                      </span>
+                    </span>
                   </span>
                 </button>
               );
@@ -275,15 +282,20 @@ export function MessagingWorkflow() {
       </aside>
 
       <main className="flex min-h-[520px] flex-col rounded-xl border">
-        <div className="border-b p-4">
-          <h2 className="text-xl font-semibold">
-            {activeProfile ? activeProfile.display_name : "Select an accepted connection"}
-          </h2>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="flex items-center gap-3 border-b p-4">
+          {activeProfile && (
+            <ProfileAvatar avatarPath={activeProfile.avatar_url} displayName={activeProfile.display_name} size={40} />
+          )}
+          <div>
+            <h2 className="text-xl font-semibold">
+              {activeProfile ? activeProfile.display_name : "Select an accepted connection"}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
             {activeProfile
               ? "This is a controlled 1:1 MVP conversation."
               : "Only accepted connections can be opened here."}
-          </p>
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -303,10 +315,13 @@ export function MessagingWorkflow() {
               return (
                 <article
                   key={item.id}
-                  className={`max-w-2xl rounded-xl border p-3 text-sm ${isOwn ? "self-end bg-gray-100" : "self-start"}`}
+                  className={`flex max-w-2xl gap-3 rounded-xl border p-3 text-sm ${isOwn ? "self-end bg-gray-100" : "self-start"}`}
                 >
-                  <p className="font-medium">{isOwn ? "You" : sender?.display_name ?? "Connection"}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
+                  <ProfileAvatar avatarPath={sender?.avatar_url} displayName={isOwn ? "You" : sender?.display_name} size={28} />
+                  <div>
+                    <p className="font-medium">{isOwn ? "You" : sender?.display_name ?? "Connection"}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
+                  </div>
                 </article>
               );
             })
@@ -333,3 +348,4 @@ export function MessagingWorkflow() {
     </section>
   );
 }
+
