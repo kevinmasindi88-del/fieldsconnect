@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 
 type Profile = {
   id: string;
@@ -11,6 +12,7 @@ type Profile = {
   field: string | null;
   bio: string | null;
   mentor_available: boolean;
+  avatar_url: string | null;
 };
 
 type Connection = {
@@ -86,7 +88,7 @@ export function ConnectionWorkflow() {
         await Promise.all([
           supabase
             .from("profiles")
-            .select("id, display_name, username, role_type, field, bio, mentor_available")
+            .select("id, display_name, username, role_type, field, bio, mentor_available, avatar_url")
             .is("deleted_at", null)
             .order("display_name", { ascending: true }),
           supabase
@@ -273,13 +275,16 @@ function ConnectionSection({ title, children }: { title: string; children: React
 function ConnectionCard({ profile, children }: { profile?: Profile; children: React.ReactNode }) {
   return (
     <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center">
-      <div>
-        <h3 className="font-semibold">{profile?.display_name ?? "Unknown profile"}</h3>
-        <p className="text-sm text-gray-600">
-          {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
-        </p>
-        {profile?.bio && <p className="mt-2 max-w-2xl text-sm text-gray-700">{profile.bio}</p>}
-        {profile?.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
+      <div className="flex gap-3">
+        <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={40} />
+        <div>
+          <h3 className="font-semibold">{profile?.display_name ?? "Unknown profile"}</h3>
+          <p className="text-sm text-gray-600">
+            {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
+          </p>
+          {profile?.bio && <p className="mt-2 max-w-2xl text-sm text-gray-700">{profile.bio}</p>}
+          {profile?.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
+        </div>
       </div>
       <div>{children}</div>
     </article>
@@ -289,4 +294,5 @@ function ConnectionCard({ profile, children }: { profile?: Profile; children: Re
 function EmptyState({ text }: { text: string }) {
   return <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">{text}</p>;
 }
+
 
