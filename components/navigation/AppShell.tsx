@@ -1,7 +1,10 @@
 ﻿"use client";
 
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
 const authRoutes = new Set(["/login", "/signup", "/reset-password"]);
 
@@ -19,6 +22,39 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldHideNavigation = authRoutes.has(pathname);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setIsLoadingAuth(false);
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setIsLoadingAuth(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoadingAuth(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleLogout() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
 
   if (shouldHideNavigation) {
     return <>{children}</>;
@@ -33,13 +69,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               FieldsConnect
             </Link>
 
-            <div className="flex flex-wrap gap-2">
-              <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/login">
-                Login
-              </Link>
-              <Link className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white" href="/signup">
-                Sign up
-              </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {isLoadingAuth ? (
+                <span className="text-sm text-gray-500">Checking session...</span>
+              ) : user ? (
+                <>
+                  <span className="rounded-lg border px-3 py-2 text-sm text-gray-700">
+                    Signed in
+                  </span>
+                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/profile">
+                    Profile
+                  </Link>
+                  <button
+                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
+                    type="button"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/login">
+                    Login
+                  </Link>
+                  <Link className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white" href="/signup">
+                    Sign up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -70,7 +70,7 @@ export function AcceptanceForm() {
 
       if (error) throw error;
 
-      setMessage("Onboarding acceptance recorded.");
+      setMessage("Onboarding acceptance recorded."); window.location.href = "/timeline";
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
     } finally {
@@ -123,3 +123,4 @@ export function AcceptanceForm() {
     </form>
   );
 }
+
