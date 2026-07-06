@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -283,19 +284,20 @@ export function MessagingWorkflow() {
 
       <main className="flex min-h-[520px] flex-col rounded-xl border">
         <div className="flex items-center gap-3 border-b p-4">
-          {activeProfile && (
-            <ProfileAvatar avatarPath={activeProfile.avatar_url} displayName={activeProfile.display_name} size={40} />
+          {activeProfile ? (
+            <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${activeProfile.id}`}>
+              <ProfileAvatar avatarPath={activeProfile.avatar_url} displayName={activeProfile.display_name} size={40} />
+              <div>
+                <h2 className="text-xl font-semibold">{activeProfile.display_name}</h2>
+                <p className="mt-1 text-sm text-gray-600">This is a controlled 1:1 MVP conversation.</p>
+              </div>
+            </Link>
+          ) : (
+            <div>
+              <h2 className="text-xl font-semibold">Select an accepted connection</h2>
+              <p className="mt-1 text-sm text-gray-600">Only accepted connections can be opened here.</p>
+            </div>
           )}
-          <div>
-            <h2 className="text-xl font-semibold">
-              {activeProfile ? activeProfile.display_name : "Select an accepted connection"}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-            {activeProfile
-              ? "This is a controlled 1:1 MVP conversation."
-              : "Only accepted connections can be opened here."}
-            </p>
-          </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -317,9 +319,21 @@ export function MessagingWorkflow() {
                   key={item.id}
                   className={`flex max-w-2xl gap-3 rounded-xl border p-3 text-sm ${isOwn ? "self-end bg-gray-100" : "self-start"}`}
                 >
-                  <ProfileAvatar avatarPath={sender?.avatar_url} displayName={isOwn ? "You" : sender?.display_name} size={28} />
+                  {sender ? (
+                    <Link className="shrink-0 rounded-full" href={`/profile/${sender.id}`}>
+                      <ProfileAvatar avatarPath={sender.avatar_url} displayName={isOwn ? "You" : sender.display_name} size={28} />
+                    </Link>
+                  ) : (
+                    <ProfileAvatar avatarPath={null} displayName="Connection" size={28} />
+                  )}
                   <div>
-                    <p className="font-medium">{isOwn ? "You" : sender?.display_name ?? "Connection"}</p>
+                    {sender ? (
+                      <Link className="font-medium hover:underline" href={`/profile/${sender.id}`}>
+                        {isOwn ? "You" : sender.display_name}
+                      </Link>
+                    ) : (
+                      <p className="font-medium">Connection</p>
+                    )}
                     <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
                   </div>
                 </article>
@@ -348,4 +362,5 @@ export function MessagingWorkflow() {
     </section>
   );
 }
+
 

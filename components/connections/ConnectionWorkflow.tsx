@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -273,26 +274,36 @@ function ConnectionSection({ title, children }: { title: string; children: React
 }
 
 function ConnectionCard({ profile, children }: { profile?: Profile; children: React.ReactNode }) {
+  const identity = (
+    <>
+      <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={40} />
+      <div>
+        <h3 className="font-semibold">{profile?.display_name ?? "Unknown profile"}</h3>
+        <p className="text-sm text-gray-600">
+          {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
+        </p>
+        {profile?.bio && <p className="mt-2 max-w-2xl text-sm text-gray-700">{profile.bio}</p>}
+        {profile?.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
+      </div>
+    </>
+  );
+
   return (
     <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center">
-      <div className="flex gap-3">
-        <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={40} />
-        <div>
-          <h3 className="font-semibold">{profile?.display_name ?? "Unknown profile"}</h3>
-          <p className="text-sm text-gray-600">
-            {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
-          </p>
-          {profile?.bio && <p className="mt-2 max-w-2xl text-sm text-gray-700">{profile.bio}</p>}
-          {profile?.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
-        </div>
-      </div>
+      {profile ? (
+        <Link className="flex gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
+          {identity}
+        </Link>
+      ) : (
+        <div className="flex gap-3">{identity}</div>
+      )}
       <div>{children}</div>
     </article>
   );
 }
-
 function EmptyState({ text }: { text: string }) {
   return <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">{text}</p>;
 }
+
 
 

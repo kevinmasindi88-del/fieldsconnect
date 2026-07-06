@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -285,15 +286,25 @@ export function TimelineWorkflow() {
             <article key={post.id} className="flex flex-col gap-4 rounded-xl border p-4">
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                  <div className="flex items-center gap-3">
-                    <ProfileAvatar avatarPath={author?.avatar_url} displayName={author?.display_name} size={40} />
-                    <div>
-                      <h2 className="font-semibold">{author?.display_name ?? "Unknown profile"}</h2>
-                      <p className="text-sm text-gray-600">
-                        {[author?.role_type, author?.field].filter(Boolean).join(" - ") || "Profile"}
-                      </p>
+                  {author ? (
+                    <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${author.id}`}>
+                      <ProfileAvatar avatarPath={author.avatar_url} displayName={author.display_name} size={40} />
+                      <div>
+                        <h2 className="font-semibold">{author.display_name}</h2>
+                        <p className="text-sm text-gray-600">
+                          {[author.role_type, author.field].filter(Boolean).join(" - ") || "Profile"}
+                        </p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar avatarPath={null} displayName={null} size={40} />
+                      <div>
+                        <h2 className="font-semibold">Unknown profile</h2>
+                        <p className="text-sm text-gray-600">Profile</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <span className="w-fit rounded-full border px-3 py-1 text-xs">
                     {post.visibility === "public" ? "Public" : "Connections"}
                   </span>
@@ -320,9 +331,21 @@ export function TimelineWorkflow() {
 
                   return (
                     <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
-                      <ProfileAvatar avatarPath={commenter?.avatar_url} displayName={commenter?.display_name} size={28} />
+                      {commenter ? (
+                        <Link className="shrink-0 rounded-full" href={`/profile/${commenter.id}`}>
+                          <ProfileAvatar avatarPath={commenter.avatar_url} displayName={commenter.display_name} size={28} />
+                        </Link>
+                      ) : (
+                        <ProfileAvatar avatarPath={null} displayName={null} size={28} />
+                      )}
                       <div>
-                        <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
+                        {commenter ? (
+                          <Link className="text-sm font-medium hover:underline" href={`/profile/${commenter.id}`}>
+                            {commenter.display_name}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-medium">Unknown profile</p>
+                        )}
                         <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
                       </div>
                     </div>
@@ -354,4 +377,5 @@ export function TimelineWorkflow() {
     </section>
   );
 }
+
 
