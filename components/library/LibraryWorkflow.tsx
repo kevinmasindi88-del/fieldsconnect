@@ -235,6 +235,39 @@ export function LibraryWorkflow() {
     }
   }
 
+  async function deleteDocument(document: LibraryDocument) {
+    const shouldDelete = window.confirm(`Delete "${document.title}" from the library?`);
+
+    if (!shouldDelete) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error: storageError } = await supabase.storage
+        .from(document.storage_bucket)
+        .remove([document.storage_path]);
+
+      if (storageError) throw storageError;
+
+      const { error: deleteError } = await supabase
+        .from("library_documents")
+        .delete()
+        .eq("id", document.id);
+
+      if (deleteError) throw deleteError;
+
+      setMessage("Document deleted.");
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete document.");
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
       <div>
@@ -344,6 +377,14 @@ export function LibraryWorkflow() {
                   >
                     Make {document.visibility === "public" ? "connections only" : "public"}
                   </button>
+                  <button
+                    className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    disabled={isWorking}
+                    onClick={() => deleteDocument(document)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
                 </DocumentCard>
               ))
             )}
@@ -441,3 +482,4 @@ function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
