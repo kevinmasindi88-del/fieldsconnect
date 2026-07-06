@@ -1,4 +1,4 @@
-@'
+
 -- FieldsConnect RLS Baseline
 -- Scope: enable RLS and add conservative MVP access policies.
 -- This migration intentionally avoids broad public write access.
@@ -335,4 +335,3 @@ using (reporter_id = auth.uid());
 
 -- Moderation and audit logs are locked down at RLS level for now.
 -- Admin/moderator access will be added through protected role management later.
-'@ | Set-Content ".\supabase\migrations\0002_rls_baseline.sql"
