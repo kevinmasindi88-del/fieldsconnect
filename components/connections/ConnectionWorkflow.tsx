@@ -124,13 +124,33 @@ export function ConnectionWorkflow() {
     try {
       const supabase = getSupabaseBrowserClient();
 
-      const { error } = await supabase.from("connections").insert({
-        requester_id: currentUserId,
-        recipient_id: profileId,
-        status: "pending",
-      });
+      const { data: connection, error } = await supabase
+        .from("connections")
+        .insert({
+          requester_id: currentUserId,
+          recipient_id: profileId,
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
+
+      const actor = profileById.get(currentUserId);
+
+      const { error: notificationError } = await supabase.from("notifications").insert({
+        recipient_id: profileId,
+        actor_id: currentUserId,
+        notification_type: "connection_request",
+        entity_type: "connection",
+        entity_id: connection.id,
+        title: "New connection request",
+        body: `${actor?.display_name ?? "Someone"} sent you a connection request.`,
+      });
+
+      if (notificationError) {
+        console.error("Unable to create connection request notification:", notificationError);
+      }
 
       setMessage("Connection request sent.");
       await loadData();
@@ -147,6 +167,7 @@ export function ConnectionWorkflow() {
 
     try {
       const supabase = getSupabaseBrowserClient();
+      const connection = connections.find((item) => item.id === connectionId);
 
       const { error } = await supabase
         .from("connections")
@@ -157,6 +178,24 @@ export function ConnectionWorkflow() {
         .eq("id", connectionId);
 
       if (error) throw error;
+
+      if (status === "accepted" && connection && currentUserId) {
+        const actor = profileById.get(currentUserId);
+
+        const { error: notificationError } = await supabase.from("notifications").insert({
+          recipient_id: connection.requester_id,
+          actor_id: currentUserId,
+          notification_type: "connection_accepted",
+          entity_type: "connection",
+          entity_id: connection.id,
+          title: "Connection request accepted",
+          body: `${actor?.display_name ?? "Someone"} accepted your connection request.`,
+        });
+
+        if (notificationError) {
+          console.error("Unable to create connection accepted notification:", notificationError);
+        }
+      }
 
       setMessage(status === "accepted" ? "Connection accepted." : "Connection declined.");
       await loadData();

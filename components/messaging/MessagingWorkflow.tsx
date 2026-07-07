@@ -217,13 +217,46 @@ export function MessagingWorkflow() {
     try {
       const supabase = getSupabaseBrowserClient();
 
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: activeConversationId,
-        sender_id: currentUserId,
-        body: draftMessage.trim(),
-      });
+      const messageBody = draftMessage.trim();
+
+      const { data: createdMessage, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: activeConversationId,
+          sender_id: currentUserId,
+          body: messageBody,
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
+
+      const activeConnection = connections.find(
+        (connection) => connection.id === activeConnectionId
+      );
+
+      if (activeConnection) {
+        const recipientId =
+          activeConnection.requester_id === currentUserId
+            ? activeConnection.recipient_id
+            : activeConnection.requester_id;
+
+        const actor = profiles.find((profile) => profile.id === currentUserId);
+
+        const { error: notificationError } = await supabase.from("notifications").insert({
+          recipient_id: recipientId,
+          actor_id: currentUserId,
+          notification_type: "new_message",
+          entity_type: "message",
+          entity_id: createdMessage.id,
+          title: "New message",
+          body: `${actor?.display_name ?? "Someone"} sent you a message.`,
+        });
+
+        if (notificationError) {
+          console.error("Unable to create new message notification:", notificationError);
+        }
+      }
 
       setDraftMessage("");
       await loadData();

@@ -174,7 +174,28 @@ export function TimelineWorkflow() {
           profile_id: currentUserId,
           reaction_type: "like",
         });
+
         if (error) throw error;
+
+        const post = posts.find((item) => item.id === postId);
+
+        if (post && post.author_id !== currentUserId) {
+          const actor = profileById.get(currentUserId);
+
+          const { error: notificationError } = await supabase.from("notifications").insert({
+            recipient_id: post.author_id,
+            actor_id: currentUserId,
+            notification_type: "post_liked",
+            entity_type: "post",
+            entity_id: post.id,
+            title: "Someone liked your post",
+            body: `${actor?.display_name ?? "Someone"} liked your post.`,
+          });
+
+          if (notificationError) {
+            console.error("Unable to create post-like notification:", notificationError);
+          }
+        }
       }
 
       await loadData();
@@ -198,13 +219,37 @@ export function TimelineWorkflow() {
     try {
       const supabase = getSupabaseBrowserClient();
 
-      const { error } = await supabase.from("comments").insert({
-        post_id: postId,
-        author_id: currentUserId,
-        body,
-      });
+      const { data: createdComment, error } = await supabase
+        .from("comments")
+        .insert({
+          post_id: postId,
+          author_id: currentUserId,
+          body,
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
+
+      const post = posts.find((item) => item.id === postId);
+
+      if (post && post.author_id !== currentUserId) {
+        const actor = profileById.get(currentUserId);
+
+        const { error: notificationError } = await supabase.from("notifications").insert({
+          recipient_id: post.author_id,
+          actor_id: currentUserId,
+          notification_type: "post_commented",
+          entity_type: "comment",
+          entity_id: createdComment.id,
+          title: "New comment on your post",
+          body: `${actor?.display_name ?? "Someone"} commented on your post.`,
+        });
+
+        if (notificationError) {
+          console.error("Unable to create post-comment notification:", notificationError);
+        }
+      }
 
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
       await loadData();
