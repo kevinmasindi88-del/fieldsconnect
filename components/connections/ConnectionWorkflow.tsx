@@ -206,6 +206,38 @@ export function ConnectionWorkflow() {
     }
   }
 
+  async function disconnectConnection(connectionId: string) {
+    const confirmed = window.confirm(
+      "Disconnect from this person? Your previous conversation history will be preserved."
+    );
+
+    if (!confirmed || !isSupabaseConfigured()) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase
+        .from("connections")
+        .update({
+          status: "cancelled",
+          responded_at: new Date().toISOString(),
+        })
+        .eq("id", connectionId);
+
+      if (error) throw error;
+
+      setMessage("Connection removed.");
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to remove connection.");
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   function getOtherProfile(connection: Connection) {
     const otherId = connection.requester_id === currentUserId ? connection.recipient_id : connection.requester_id;
     return profileById.get(otherId);
@@ -262,7 +294,14 @@ export function ConnectionWorkflow() {
             ) : (
               acceptedConnections.map((connection) => (
                 <ConnectionCard key={connection.id} profile={getOtherProfile(connection)}>
-                  <span className="text-sm font-medium text-gray-700">Connected</span>
+                  <button
+                    className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    disabled={isWorking}
+                    onClick={() => disconnectConnection(connection.id)}
+                    type="button"
+                  >
+                    Disconnect
+                  </button>
                 </ConnectionCard>
               ))
             )}
