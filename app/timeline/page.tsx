@@ -1,9 +1,5 @@
-﻿import { TimelineWorkflow } from "@/components/timeline/TimelineWorkflow";
+import { redirect } from "next/navigation";
 
 export default function TimelinePage() {
-  return (
-    <main className="min-h-screen">
-      <TimelineWorkflow />
-    </main>
-  );
+  redirect("/");
 }
