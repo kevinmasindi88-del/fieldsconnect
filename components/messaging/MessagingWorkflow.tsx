@@ -34,6 +34,12 @@ type Message = {
   created_at: string;
 };
 
+type UnreadMessageNotification = {
+  id: string;
+  actor_id: string | null;
+  read_at: string | null;
+};
+
 export function MessagingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -41,7 +47,7 @@ export function MessagingWorkflow() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadMessageNotifications, setUnreadMessageNotifications] =
-  useState<UnreadMessageNotification[]>([]);
+    useState<UnreadMessageNotification[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
@@ -58,6 +64,21 @@ export function MessagingWorkflow() {
   }, [conversations]);
 
   const activeMessages = messages.filter((item) => item.conversation_id === activeConversationId);
+
+  const unreadMessagesBySender = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    unreadMessageNotifications.forEach((notification) => {
+      if (!notification.actor_id || notification.read_at) return;
+
+      counts.set(
+        notification.actor_id,
+        (counts.get(notification.actor_id) ?? 0) + 1
+      );
+    });
+
+    return counts;
+  }, [unreadMessageNotifications]);
 
   async function loadData() {
     setMessage(null);
@@ -84,25 +105,37 @@ export function MessagingWorkflow() {
 
       setCurrentUserId(userId);
 
-      const [{ data: connectionData, error: connectionError }, { data: profileData, error: profileError }] =
-        await Promise.all([
-          supabase
-            .from("connections")
-            .select("id, requester_id, recipient_id, status")
-            .eq("status", "accepted")
-            .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
-          supabase
-            .from("profiles")
-            .select("id, display_name, username, role_type, field, avatar_url")
-            .is("deleted_at", null),
-        ]);
+      const [
+        { data: connectionData, error: connectionError },
+        { data: profileData, error: profileError },
+        { data: unreadNotificationData, error: unreadNotificationError },
+      ] = await Promise.all([
+        supabase
+          .from("connections")
+          .select("id, requester_id, recipient_id, status")
+          .eq("status", "accepted")
+          .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
+        supabase
+          .from("profiles")
+          .select("id, display_name, username, role_type, field, avatar_url")
+          .is("deleted_at", null),
+        supabase
+          .from("notifications")
+          .select("id, actor_id, read_at")
+          .eq("notification_type", "new_message")
+          .is("read_at", null),
+      ]);
 
       if (connectionError) throw connectionError;
       if (profileError) throw profileError;
+      if (unreadNotificationError) throw unreadNotificationError;
 
       const acceptedConnections = (connectionData ?? []) as Connection[];
       setConnections(acceptedConnections);
       setProfiles((profileData ?? []) as Profile[]);
+      setUnreadMessageNotifications(
+        (unreadNotificationData ?? []) as UnreadMessageNotification[]
+      );
 
       const connectionIds = acceptedConnections.map((connection) => connection.id);
 
@@ -151,60 +184,106 @@ export function MessagingWorkflow() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`messages-page-notifications:${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${currentUserId}`,
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   function getOtherProfile(connection: Connection) {
     const otherId = connection.requester_id === currentUserId ? connection.recipient_id : connection.requester_id;
     return profileById.get(otherId);
   }
 
-async function openConversation(connection: Connection) {
-  if (!currentUserId || !isSupabaseConfigured()) return;
+  async function openConversation(connection: Connection) {
+    if (!currentUserId || !isSupabaseConfigured()) return;
 
-  setIsWorking(true);
-  setMessage(null);
+    setIsWorking(true);
+    setMessage(null);
 
-  try {
-    const existing = conversationByConnectionId.get(connection.id);
+    const otherUserId =
+      connection.requester_id === currentUserId
+        ? connection.recipient_id
+        : connection.requester_id;
 
-    if (existing) {
-      setActiveConnectionId(connection.id);
-      setActiveConversationId(existing.id);
-      return;
-    }
+    try {
+      const supabase = getSupabaseBrowserClient();
 
-    const supabase = getSupabaseBrowserClient();
+      const { error: readError } = await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .eq("notification_type", "new_message")
+        .eq("actor_id", otherUserId)
+        .is("read_at", null);
 
-    const { data: conversationId, error } = await supabase.rpc(
-      "get_or_create_conversation",
-      {
-        p_connection_id: connection.id,
+      if (readError) {
+        console.error("Unable to mark message notifications as read:", readError);
       }
-    );
 
-    if (error) throw new Error(error.message);
+      setUnreadMessageNotifications((current) =>
+        current.filter((notification) => notification.actor_id !== otherUserId)
+      );
 
-    if (!conversationId) {
-      throw new Error("The conversation could not be created.");
+      const existing = conversationByConnectionId.get(connection.id);
+
+      if (existing) {
+        setActiveConnectionId(connection.id);
+        setActiveConversationId(existing.id);
+        return;
+      }
+
+      const { data: conversationId, error } = await supabase.rpc(
+        "get_or_create_conversation",
+        {
+          p_connection_id: connection.id,
+        }
+      );
+
+      if (error) throw new Error(error.message);
+
+      if (!conversationId) {
+        throw new Error("The conversation could not be created.");
+      }
+
+      setActiveConnectionId(connection.id);
+      setActiveConversationId(conversationId);
+
+      await loadData();
+
+      setActiveConnectionId(connection.id);
+      setActiveConversationId(conversationId);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to open conversation."
+      );
+    } finally {
+      setIsWorking(false);
     }
-
-    setActiveConnectionId(connection.id);
-    setActiveConversationId(conversationId);
-
-    await loadData();
-
-    setActiveConnectionId(connection.id);
-    setActiveConversationId(conversationId);
-  } catch (error) {
-    setMessage(
-      error instanceof Error
-        ? error.message
-        : "Unable to open conversation."
-    );
-  } finally {
-    setIsWorking(false);
   }
-}
 
-    async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
+  async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!currentUserId || !activeConversationId || !draftMessage.trim() || !isSupabaseConfigured()) return;
@@ -214,7 +293,6 @@ async function openConversation(connection: Connection) {
 
     try {
       const supabase = getSupabaseBrowserClient();
-
       const messageBody = draftMessage.trim();
 
       const { data: createdMessage, error } = await supabase
@@ -289,6 +367,11 @@ async function openConversation(connection: Connection) {
             connections.map((connection) => {
               const profile = getOtherProfile(connection);
               const isActive = activeConnectionId === connection.id;
+              const otherUserId =
+                connection.requester_id === currentUserId
+                  ? connection.recipient_id
+                  : connection.requester_id;
+              const unreadCount = unreadMessagesBySender.get(otherUserId) ?? 0;
 
               return (
                 <button
@@ -297,7 +380,7 @@ async function openConversation(connection: Connection) {
                   disabled={isWorking}
                   onClick={() => openConversation(connection)}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex w-full items-center gap-3">
                     <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={32} />
                     <span>
                       <span className="block font-semibold">{profile?.display_name ?? "Unknown profile"}</span>
@@ -305,6 +388,11 @@ async function openConversation(connection: Connection) {
                         {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "Accepted connection"}
                       </span>
                     </span>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -393,5 +481,3 @@ async function openConversation(connection: Connection) {
     </section>
   );
 }
-
-
