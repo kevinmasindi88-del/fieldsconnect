@@ -37,14 +37,18 @@ export function ConnectionWorkflow() {
   }, [profiles]);
 
   const discoverableProfiles = profiles.filter((profile) => {
-    if (!currentUserId || profile.id === currentUserId) return false;
+  if (!currentUserId || profile.id === currentUserId) return false;
 
-    return !connections.some(
-      (connection) =>
-        (connection.requester_id === currentUserId && connection.recipient_id === profile.id) ||
-        (connection.requester_id === profile.id && connection.recipient_id === currentUserId)
-    );
-  });
+  return !connections.some(
+    (connection) =>
+      (connection.status === "pending" ||
+        connection.status === "accepted") &&
+      ((connection.requester_id === currentUserId &&
+        connection.recipient_id === profile.id) ||
+        (connection.requester_id === profile.id &&
+          connection.recipient_id === currentUserId))
+  );
+});
 
   const incomingRequests = connections.filter(
     (connection) => connection.recipient_id === currentUserId && connection.status === "pending"
@@ -116,14 +120,46 @@ export function ConnectionWorkflow() {
   }, []);
 
   async function sendRequest(profileId: string) {
-    if (!currentUserId || !isSupabaseConfigured()) return;
+  if (!currentUserId || !isSupabaseConfigured()) return;
 
-    setIsWorking(true);
-    setMessage(null);
+  setIsWorking(true);
+  setMessage(null);
 
-    try {
-      const supabase = getSupabaseBrowserClient();
+  try {
+    const supabase = getSupabaseBrowserClient();
 
+    const existingConnection = connections.find(
+      (connection) =>
+        (connection.requester_id === currentUserId &&
+          connection.recipient_id === profileId) ||
+        (connection.requester_id === profileId &&
+          connection.recipient_id === currentUserId)
+    );
+
+    let connectionId: string;
+
+    if (
+      existingConnection &&
+      (existingConnection.status === "cancelled" ||
+        existingConnection.status === "declined")
+    ) {
+      const { data: connection, error } = await supabase
+        .from("connections")
+        .update({
+          requester_id: currentUserId,
+          recipient_id: profileId,
+          status: "pending",
+          responded_at: null,
+          created_at: new Date().toISOString(),
+        })
+        .eq("id", existingConnection.id)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      connectionId = connection.id;
+    } else {
       const { data: connection, error } = await supabase
         .from("connections")
         .insert({
@@ -136,30 +172,42 @@ export function ConnectionWorkflow() {
 
       if (error) throw error;
 
-      const actor = profileById.get(currentUserId);
+      connectionId = connection.id;
+    }
 
-      const { error: notificationError } = await supabase.from("notifications").insert({
+    const actor = profileById.get(currentUserId);
+
+    const { error: notificationError } = await supabase
+      .from("notifications")
+      .insert({
         recipient_id: profileId,
         actor_id: currentUserId,
         notification_type: "connection_request",
         entity_type: "connection",
-        entity_id: connection.id,
+        entity_id: connectionId,
         title: "New connection request",
         body: `${actor?.display_name ?? "Someone"} sent you a connection request.`,
       });
 
-      if (notificationError) {
-        console.error("Unable to create connection request notification:", notificationError);
-      }
-
-      setMessage("Connection request sent.");
-      await loadData();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to send connection request.");
-    } finally {
-      setIsWorking(false);
+    if (notificationError) {
+      console.error(
+        "Unable to create connection request notification:",
+        notificationError
+      );
     }
+
+    setMessage("Connection request sent.");
+    await loadData();
+  } catch (error) {
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to send connection request."
+    );
+  } finally {
+    setIsWorking(false);
   }
+}
 
   async function updateRequest(connectionId: string, status: "accepted" | "declined") {
     setIsWorking(true);

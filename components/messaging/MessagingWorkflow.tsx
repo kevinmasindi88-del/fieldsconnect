@@ -40,6 +40,8 @@ export function MessagingWorkflow() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadMessageNotifications, setUnreadMessageNotifications] =
+  useState<UnreadMessageNotification[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
@@ -154,59 +156,55 @@ export function MessagingWorkflow() {
     return profileById.get(otherId);
   }
 
-  async function openConversation(connection: Connection) {
-    if (!currentUserId || !isSupabaseConfigured()) return;
+async function openConversation(connection: Connection) {
+  if (!currentUserId || !isSupabaseConfigured()) return;
 
-    setIsWorking(true);
-    setMessage(null);
+  setIsWorking(true);
+  setMessage(null);
 
-    try {
-      const existing = conversationByConnectionId.get(connection.id);
+  try {
+    const existing = conversationByConnectionId.get(connection.id);
 
-      if (existing) {
-        setActiveConnectionId(connection.id);
-        setActiveConversationId(existing.id);
-        return;
-      }
-
-      const supabase = getSupabaseBrowserClient();
-
-      const { data: createdConversation, error: conversationError } = await supabase
-        .from("conversations")
-        .insert({
-          connection_id: connection.id,
-        })
-        .select("id, connection_id")
-        .single();
-
-      if (conversationError) throw conversationError;
-
-      const memberRows = [
-        {
-          conversation_id: createdConversation.id,
-          profile_id: connection.requester_id,
-        },
-        {
-          conversation_id: createdConversation.id,
-          profile_id: connection.recipient_id,
-        },
-      ];
-
-      const { error: membersError } = await supabase.from("conversation_members").insert(memberRows);
-
-      if (membersError) throw membersError;
-
+    if (existing) {
       setActiveConnectionId(connection.id);
-      setActiveConversationId(createdConversation.id);
-      await loadData();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to open conversation.");
-    } finally {
-      setIsWorking(false);
+      setActiveConversationId(existing.id);
+      return;
     }
-  }
 
-  async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
+    const supabase = getSupabaseBrowserClient();
+
+    const { data: conversationId, error } = await supabase.rpc(
+      "get_or_create_conversation",
+      {
+        p_connection_id: connection.id,
+      }
+    );
+
+    if (error) throw new Error(error.message);
+
+    if (!conversationId) {
+      throw new Error("The conversation could not be created.");
+    }
+
+    setActiveConnectionId(connection.id);
+    setActiveConversationId(conversationId);
+
+    await loadData();
+
+    setActiveConnectionId(connection.id);
+    setActiveConversationId(conversationId);
+  } catch (error) {
+    setMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to open conversation."
+    );
+  } finally {
+    setIsWorking(false);
+  }
+}
+
+    async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!currentUserId || !activeConversationId || !draftMessage.trim() || !isSupabaseConfigured()) return;

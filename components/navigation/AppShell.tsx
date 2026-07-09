@@ -26,6 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -50,48 +51,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!user || !isSupabaseConfigured()) {
-      setUnreadNotificationCount(0);
-      return;
-    }
+useEffect(() => {
+  if (!user || !isSupabaseConfigured()) {
+    setUnreadNotificationCount(0);
+    setUnreadMessageCount(0);
+    return;
+  }
 
-    const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabaseBrowserClient();
 
-    async function loadUnreadCount() {
-      const { count, error } = await supabase
+  async function loadUnreadCounts() {
+    const [
+      { count: notificationCount, error: notificationError },
+      { count: messageCount, error: messageError },
+    ] = await Promise.all([
+      supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
-        .is("read_at", null);
+        .is("read_at", null),
 
-      if (!error) {
-        setUnreadNotificationCount(count ?? 0);
-      }
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("notification_type", "new_message")
+        .is("read_at", null),
+    ]);
+
+    if (!notificationError) {
+      setUnreadNotificationCount(notificationCount ?? 0);
     }
 
-    void loadUnreadCount();
+    if (!messageError) {
+      setUnreadMessageCount(messageCount ?? 0);
+    }
+  }
 
-    const channel = supabase
-      .channel(`notifications:${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `recipient_id=eq.${user.id}`,
-        },
-        () => {
-          void loadUnreadCount();
-        }
-      )
-      .subscribe();
+  void loadUnreadCounts();
 
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [user, pathname]);
+  const channel = supabase
+    .channel(`notifications:${user.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "notifications",
+        filter: `recipient_id=eq.${user.id}`,
+      },
+      () => {
+        void loadUnreadCounts();
+      }
+    )
+    .subscribe();
 
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}, [user, pathname]);
+  
   async function handleLogout() {
     if (!isSupabaseConfigured()) return;
 
@@ -173,6 +190,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                 >
                   {item.label}
+{item.href === "/messages" && unreadMessageCount > 0 && (
+  <span
+    className={[
+      "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
+      isActive ? "bg-white text-black" : "bg-black text-white",
+    ].join(" ")}
+  >
+    {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+  </span>
+)}
 
                   {item.href === "/notifications" && unreadNotificationCount > 0 && (
                     <span
