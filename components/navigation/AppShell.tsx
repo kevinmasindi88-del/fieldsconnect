@@ -51,64 +51,63 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-useEffect(() => {
-  if (!user || !isSupabaseConfigured()) {
-    setUnreadNotificationCount(0);
-    setUnreadMessageCount(0);
-    return;
-  }
-
-  const supabase = getSupabaseBrowserClient();
-
-  async function loadUnreadCounts() {
-    const [
-      { count: notificationCount, error: notificationError },
-      { count: messageCount, error: messageError },
-    ] = await Promise.all([
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .is("read_at", null),
-
-      supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("notification_type", "new_message")
-        .is("read_at", null),
-    ]);
-
-    if (!notificationError) {
-      setUnreadNotificationCount(notificationCount ?? 0);
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      setUnreadNotificationCount(0);
+      setUnreadMessageCount(0);
+      return;
     }
 
-    if (!messageError) {
-      setUnreadMessageCount(messageCount ?? 0);
-    }
-  }
+    const supabase = getSupabaseBrowserClient();
 
-  void loadUnreadCounts();
+    async function loadUnreadCounts() {
+      const [
+        { count: notificationCount, error: notificationError },
+        { count: messageCount, error: messageError },
+      ] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .is("read_at", null),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("notification_type", "new_message")
+          .is("read_at", null),
+      ]);
 
-  const channel = supabase
-    .channel(`notifications:${user.id}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "notifications",
-        filter: `recipient_id=eq.${user.id}`,
-      },
-      () => {
-        void loadUnreadCounts();
+      if (!notificationError) {
+        setUnreadNotificationCount(notificationCount ?? 0);
       }
-    )
-    .subscribe();
 
-  return () => {
-    void supabase.removeChannel(channel);
-  };
-}, [user, pathname]);
-  
+      if (!messageError) {
+        setUnreadMessageCount(messageCount ?? 0);
+      }
+    }
+
+    void loadUnreadCounts();
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          void loadUnreadCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user, pathname]);
+
   async function handleLogout() {
     if (!isSupabaseConfigured()) return;
 
@@ -134,35 +133,13 @@ useEffect(() => {
               {isLoadingAuth ? (
                 <span className="text-sm text-gray-500">Checking session...</span>
               ) : user ? (
-                <>
-                  <span className="rounded-lg border px-3 py-2 text-sm text-gray-700">
-                    Signed in
-                  </span>
-
-                  <Link
-                    className="relative rounded-lg border px-3 py-2 text-sm font-medium"
-                    href="/notifications"
-                  >
-                    Notifications
-                    {unreadNotificationCount > 0 && (
-                      <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-black px-1.5 py-0.5 text-xs font-semibold text-white">
-                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/profile">
-                    Profile
-                  </Link>
-
-                  <button
-                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
-                    type="button"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </button>
-                </>
+                <button
+                  className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
+                  type="button"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
               ) : (
                 <>
                   <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/login">
@@ -190,16 +167,17 @@ useEffect(() => {
                   href={item.href}
                 >
                   {item.label}
-{item.href === "/messages" && unreadMessageCount > 0 && (
-  <span
-    className={[
-      "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
-      isActive ? "bg-white text-black" : "bg-black text-white",
-    ].join(" ")}
-  >
-    {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
-  </span>
-)}
+
+                  {item.href === "/messages" && unreadMessageCount > 0 && (
+                    <span
+                      className={[
+                        "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
+                        isActive ? "bg-white text-black" : "bg-black text-white",
+                      ].join(" ")}
+                    >
+                      {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                    </span>
+                  )}
 
                   {item.href === "/notifications" && unreadNotificationCount > 0 && (
                     <span
