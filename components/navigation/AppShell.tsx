@@ -14,7 +14,6 @@ const navItems = [
   { href: "/connections", label: "Connections" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
-  { href: "/timeline", label: "Timeline" },
   { href: "/skills", label: "Skills" },
   { href: "/library", label: "Library" },
   { href: "/moderation", label: "Moderation" },
