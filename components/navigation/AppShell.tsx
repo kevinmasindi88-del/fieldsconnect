@@ -23,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldHideNavigation = authRoutes.has(pathname);
   const [user, setUser] = useState<User | null>(null);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -49,6 +50,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      setWelcomeName(null);
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    async function loadWelcomeName() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!error && data?.display_name?.trim()) {
+        setWelcomeName(data.display_name.trim());
+        return;
+      }
+
+      const metadataName =
+        typeof user.user_metadata?.display_name === "string"
+          ? user.user_metadata.display_name
+          : typeof user.user_metadata?.full_name === "string"
+            ? user.user_metadata.full_name
+            : null;
+
+      setWelcomeName(metadataName?.trim() || user.email?.split("@")[0] || "there");
+    }
+
+    void loadWelcomeName();
+  }, [user]);
 
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
@@ -128,17 +162,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               FieldsConnect
             </Link>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               {isLoadingAuth ? (
                 <span className="text-sm text-gray-500">Checking session...</span>
               ) : user ? (
-                <button
-                  className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
-                  type="button"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </button>
+                <>
+                  <span className="text-sm font-medium text-gray-700">
+                    Welcome, {welcomeName ?? "..."}
+                  </span>
+                  <button
+                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
+                    type="button"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
+                </>
               ) : (
                 <>
                   <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/login">
