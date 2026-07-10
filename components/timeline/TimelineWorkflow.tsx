@@ -19,6 +19,7 @@ type Post = {
   body: string;
   visibility: "public" | "connections";
   created_at: string;
+  edited_at: string | null;
 };
 
 type Comment = {
@@ -36,15 +37,25 @@ type Reaction = {
   reaction_type: string;
 };
 
+type CommentReaction = {
+  id: string;
+  comment_id: string;
+  profile_id: string;
+  reaction_type: string;
+};
+
 export function TimelineWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [postBody, setPostBody] = useState("");
   const [visibility, setVisibility] = useState<"public" | "connections">("public");
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingPostBody, setEditingPostBody] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -83,6 +94,7 @@ export function TimelineWorkflow() {
         { data: postData, error: postError },
         { data: commentData, error: commentError },
         { data: reactionData, error: reactionError },
+        { data: commentReactionData, error: commentReactionError },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -90,7 +102,7 @@ export function TimelineWorkflow() {
           .is("deleted_at", null),
         supabase
           .from("posts")
-          .select("id, author_id, body, visibility, created_at")
+          .select("id, author_id, body, visibility, created_at, edited_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }),
         supabase
@@ -101,17 +113,22 @@ export function TimelineWorkflow() {
         supabase
           .from("reactions")
           .select("id, post_id, profile_id, reaction_type"),
+        supabase
+          .from("comment_reactions")
+          .select("id, comment_id, profile_id, reaction_type"),
       ]);
 
       if (profileError) throw profileError;
       if (postError) throw postError;
       if (commentError) throw commentError;
       if (reactionError) throw reactionError;
+      if (commentReactionError) throw commentReactionError;
 
       setProfiles((profileData ?? []) as Profile[]);
       setPosts((postData ?? []) as Post[]);
       setComments((commentData ?? []) as Comment[]);
       setReactions((reactionData ?? []) as Reaction[]);
+      setCommentReactions((commentReactionData ?? []) as CommentReaction[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load timeline.");
     } finally {
@@ -206,6 +223,39 @@ export function TimelineWorkflow() {
     }
   }
 
+  async function toggleCommentLike(commentId: string) {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const existing = commentReactions.find(
+        (reaction) => reaction.comment_id === commentId && reaction.profile_id === currentUserId
+      );
+
+      if (existing) {
+        const { error } = await supabase.from("comment_reactions").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("comment_reactions").insert({
+          comment_id: commentId,
+          profile_id: currentUserId,
+          reaction_type: "like",
+        });
+
+        if (error) throw error;
+      }
+
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to update comment reaction.");
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   async function addComment(event: React.FormEvent<HTMLFormElement>, postId: string) {
     event.preventDefault();
 
@@ -260,6 +310,45 @@ export function TimelineWorkflow() {
     }
   }
 
+  function startEditingPost(post: Post) {
+    setEditingPostId(post.id);
+    setEditingPostBody(post.body);
+    setMessage(null);
+  }
+
+  function cancelEditingPost() {
+    setEditingPostId(null);
+    setEditingPostBody("");
+  }
+
+  async function saveEditedPost(postId: string) {
+    if (!currentUserId || !editingPostBody.trim() || !isSupabaseConfigured()) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase
+        .from("posts")
+        .update({
+          body: editingPostBody.trim(),
+          edited_at: new Date().toISOString(),
+        })
+        .eq("id", postId)
+        .eq("author_id", currentUserId);
+
+      if (error) throw error;
+
+      cancelEditingPost();
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to edit post.");
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   function getPostComments(postId: string) {
     return comments.filter((comment) => comment.post_id === postId);
   }
@@ -272,12 +361,22 @@ export function TimelineWorkflow() {
     return reactions.some((reaction) => reaction.post_id === postId && reaction.profile_id === currentUserId);
   }
 
+  function getCommentLikeCount(commentId: string) {
+    return commentReactions.filter((reaction) => reaction.comment_id === commentId).length;
+  }
+
+  function hasLikedComment(commentId: string) {
+    return commentReactions.some(
+      (reaction) => reaction.comment_id === commentId && reaction.profile_id === currentUserId
+    );
+  }
+
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
       <div>
         <h1 className="text-3xl font-semibold">Timeline</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Share simple text posts, comment, and like posts. Image uploads and ranking are out of scope for this baseline.
+          Share updates, comment, and react to posts and replies.
         </p>
       </div>
 
@@ -326,6 +425,8 @@ export function TimelineWorkflow() {
           const author = profileById.get(post.author_id);
           const postComments = getPostComments(post.id);
           const liked = hasLiked(post.id);
+          const isOwnPost = post.author_id === currentUserId;
+          const isEditing = editingPostId === post.id;
 
           return (
             <article key={post.id} className="flex flex-col gap-4 rounded-xl border p-4">
@@ -350,12 +451,56 @@ export function TimelineWorkflow() {
                       </div>
                     </div>
                   )}
-                  <span className="w-fit rounded-full border px-3 py-1 text-xs">
-                    {post.visibility === "public" ? "Public" : "Connections"}
-                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <span className="w-fit rounded-full border px-3 py-1 text-xs">
+                      {post.visibility === "public" ? "Public" : "Connections"}
+                    </span>
+                    {isOwnPost && !isEditing && (
+                      <button
+                        className="rounded-lg border px-3 py-1 text-xs font-medium"
+                        disabled={isWorking}
+                        onClick={() => startEditingPost(post)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <p className="mt-4 whitespace-pre-wrap text-sm text-gray-800">{post.body}</p>
+                {isEditing ? (
+                  <div className="mt-4 flex flex-col gap-3">
+                    <textarea
+                      className="min-h-28 rounded-lg border px-3 py-2 text-sm"
+                      value={editingPostBody}
+                      onChange={(event) => setEditingPostBody(event.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        disabled={!editingPostBody.trim() || isWorking}
+                        onClick={() => saveEditedPost(post.id)}
+                        type="button"
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="rounded-lg border px-3 py-2 text-sm font-medium"
+                        disabled={isWorking}
+                        onClick={cancelEditingPost}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-4 whitespace-pre-wrap text-sm text-gray-800">{post.body}</p>
+                    {post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
+                  </>
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -373,6 +518,7 @@ export function TimelineWorkflow() {
               <div className="flex flex-col gap-3 border-t pt-4">
                 {postComments.map((comment) => {
                   const commenter = profileById.get(comment.author_id);
+                  const commentLiked = hasLikedComment(comment.id);
 
                   return (
                     <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
@@ -383,7 +529,7 @@ export function TimelineWorkflow() {
                       ) : (
                         <ProfileAvatar avatarPath={null} displayName={null} size={28} />
                       )}
-                      <div>
+                      <div className="min-w-0 flex-1">
                         {commenter ? (
                           <Link className="text-sm font-medium hover:underline" href={`/profile/${commenter.id}`}>
                             {commenter.display_name}
@@ -392,6 +538,14 @@ export function TimelineWorkflow() {
                           <p className="text-sm font-medium">Unknown profile</p>
                         )}
                         <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                        <button
+                          className="mt-2 rounded-lg border px-2 py-1 text-xs font-medium disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() => toggleCommentLike(comment.id)}
+                          type="button"
+                        >
+                          {commentLiked ? "Unlike" : "Like"} ({getCommentLikeCount(comment.id)})
+                        </button>
                       </div>
                     </div>
                   );
@@ -422,5 +576,3 @@ export function TimelineWorkflow() {
     </section>
   );
 }
-
-
