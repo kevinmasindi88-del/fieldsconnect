@@ -174,6 +174,13 @@ export function LibraryDiscoveryFilters() {
     setRecency("all");
   }
 
+  function viewResources() {
+    const publishedHeading = Array.from(document.querySelectorAll("h2")).find(
+      (heading) => heading.textContent?.trim() === "Published library"
+    );
+    publishedHeading?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <section className="mx-auto mt-6 flex w-full max-w-5xl flex-col gap-4 rounded-xl border p-4">
       <div>
@@ -231,9 +238,20 @@ export function LibraryDiscoveryFilters() {
         <p className="text-sm text-gray-600">
           {filteredDocuments.length} {filteredDocuments.length === 1 ? "resource" : "resources"} found
         </p>
-        <button className="rounded-lg border px-3 py-2 text-sm font-medium" onClick={clearFilters} type="button">
-          Clear filters
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {filteredDocuments.length > 0 && (
+            <button
+              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
+              onClick={viewResources}
+              type="button"
+            >
+              View {filteredDocuments.length === 1 ? "resource" : "resources"}
+            </button>
+          )}
+          <button className="rounded-lg border px-3 py-2 text-sm font-medium" onClick={clearFilters} type="button">
+            Clear filters
+          </button>
+        </div>
       </div>
     </section>
   );
