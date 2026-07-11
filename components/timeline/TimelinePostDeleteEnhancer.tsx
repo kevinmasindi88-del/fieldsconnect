@@ -95,23 +95,19 @@ export function TimelinePostDeleteEnhancer() {
       button.textContent = "Deleting...";
 
       const supabase = getSupabaseBrowserClient();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
+      const { data, error } = await supabase.rpc("soft_delete_own_post", {
+        target_post_id: postId,
+      });
 
-      if (!userId) {
+      if (error) {
+        window.alert(error.message || "Unable to delete the post.");
         button.disabled = false;
         button.textContent = "Delete";
         return;
       }
 
-      const { error } = await supabase
-        .from("posts")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", postId)
-        .eq("author_id", userId);
-
-      if (error) {
-        window.alert(error.message || "Unable to delete the post.");
+      if (!data) {
+        window.alert("The post could not be deleted. It may no longer exist or may not belong to this account.");
         button.disabled = false;
         button.textContent = "Delete";
         return;
