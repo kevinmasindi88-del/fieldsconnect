@@ -11,7 +11,10 @@ export default function LibraryPage() {
       );
 
       if (!heading) return;
-      heading.textContent = "Public Library";
+
+      if (heading.textContent?.trim() !== "Public Library") {
+        heading.textContent = "Public Library";
+      }
 
       const section = heading.closest<HTMLElement>("section");
       if (!section) return;
@@ -37,7 +40,7 @@ export default function LibraryPage() {
               candidate.textContent?.trim().startsWith("View resource list")
             );
 
-            if (viewButton && !viewButton.disabled && viewButton.getAttribute("aria-expanded") !== "true") {
+            if (viewButton && !viewButton.disabled) {
               viewButton.click();
             }
 
@@ -64,12 +67,19 @@ export default function LibraryPage() {
       }
 
       const recencySelect = Array.from(section.querySelectorAll<HTMLSelectElement>("select")).find((select) =>
-        Array.from(select.options).some((option) => option.textContent?.trim() === "Last 90 days")
+        Array.from(select.options).some((option) =>
+          ["Last 90 days", "90 days or longer"].includes(option.textContent?.trim() ?? "")
+        )
       );
 
       if (recencySelect) {
-        const lastOption = Array.from(recencySelect.options).find((option) => option.textContent?.trim() === "Last 90 days");
-        if (lastOption) lastOption.textContent = "90 days or longer";
+        const lastOption = Array.from(recencySelect.options).find((option) =>
+          ["Last 90 days", "90 days or longer"].includes(option.textContent?.trim() ?? "")
+        );
+
+        if (lastOption && lastOption.textContent?.trim() !== "90 days or longer") {
+          lastOption.textContent = "90 days or longer";
+        }
       }
     }
 
