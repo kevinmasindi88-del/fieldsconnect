@@ -29,7 +29,7 @@ type DiscoveryDocument = LibraryDocument & {
 export function LibraryDiscoveryFilters() {
   const [documents, setDocuments] = useState<DiscoveryDocument[]>([]);
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
   const [field, setField] = useState("all");
   const [roleType, setRoleType] = useState("all");
   const [recency, setRecency] = useState("all");
@@ -82,7 +82,7 @@ export function LibraryDiscoveryFilters() {
   );
 
   const filteredDocuments = useMemo(() => {
-    const normalizedSearch = appliedSearch.trim().toLowerCase();
+    const normalizedSearch = submittedSearch.trim().toLowerCase();
     const now = Date.now();
 
     return documents.filter((document) => {
@@ -111,7 +111,7 @@ export function LibraryDiscoveryFilters() {
 
       return matchesSearch && matchesField && matchesRole && matchesRecency;
     });
-  }, [appliedSearch, documents, field, recency, roleType]);
+  }, [documents, field, recency, roleType, submittedSearch]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -121,18 +121,13 @@ export function LibraryDiscoveryFilters() {
     );
 
     function applyFilters() {
-      const publicHeading = Array.from(document.querySelectorAll("h2")).find((heading) => {
-        const text = heading.textContent?.trim();
-        return text === "Public Library" || text === "Published library";
-      });
-
-      if (publicHeading && publicHeading.textContent?.trim() !== "Public Library") {
-        publicHeading.textContent = "Public Library";
-      }
-
+      const publicHeading = Array.from(document.querySelectorAll("h2")).find(
+        (heading) => heading.textContent?.trim() === "Public Library"
+      );
       const section = publicHeading?.closest("section");
       if (!section) return;
 
+      const list = section.querySelector<HTMLElement>(":scope > div");
       const cards = Array.from(section.querySelectorAll<HTMLElement>("article"));
       let visibleCount = 0;
 
@@ -152,6 +147,12 @@ export function LibraryDiscoveryFilters() {
         if (shouldShow) visibleCount += 1;
       }
 
+      if (list) {
+        list.style.maxHeight = visibleCount > 1 ? "32rem" : "";
+        list.style.overflowY = visibleCount > 1 ? "auto" : "";
+        list.style.scrollBehavior = "smooth";
+      }
+
       let emptyState = section.querySelector<HTMLElement>("[data-library-filter-empty='true']");
       if (visibleCount === 0) {
         if (!emptyState) {
@@ -159,7 +160,7 @@ export function LibraryDiscoveryFilters() {
           emptyState.dataset.libraryFilterEmpty = "true";
           emptyState.className = "rounded-xl border border-dashed p-4 text-sm text-gray-600";
           emptyState.textContent = "No public resources match your search and filters.";
-          section.querySelector("div")?.appendChild(emptyState);
+          list?.appendChild(emptyState);
         }
         emptyState.style.display = "block";
       } else if (emptyState) {
@@ -176,27 +177,30 @@ export function LibraryDiscoveryFilters() {
 
   function clearFilters() {
     setSearch("");
-    setAppliedSearch("");
+    setSubmittedSearch("");
     setField("all");
     setRoleType("all");
     setRecency("all");
   }
 
-  function viewResources() {
-    const publicHeading = Array.from(document.querySelectorAll("h2")).find((heading) => {
-      const text = heading.textContent?.trim();
-      return text === "Public Library" || text === "Published library";
-    });
-    publicHeading?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  function runSearch(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setSubmittedSearch(search.trim());
   }
 
-  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setAppliedSearch(search.trim());
+  function viewResources() {
+    const publicHeading = Array.from(document.querySelectorAll("h2")).find(
+      (heading) => heading.textContent?.trim() === "Public Library"
+    );
+    const section = publicHeading?.closest<HTMLElement>("section");
+    if (!section) return;
 
-    window.requestAnimationFrame(() => {
-      viewResources();
-    });
+    const visibleCards = Array.from(section.querySelectorAll<HTMLElement>("article")).filter(
+      (card) => card.style.display !== "none"
+    );
+
+    const target = visibleCards.length === 1 ? visibleCards[0] : section;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -208,20 +212,20 @@ export function LibraryDiscoveryFilters() {
         </p>
       </div>
 
-      <form className="flex flex-col gap-2" onSubmit={submitSearch}>
-        <label className="text-sm font-medium" htmlFor="library-search">
+      <form className="flex flex-col gap-2" onSubmit={runSearch}>
+        <label className="text-sm font-medium" htmlFor="public-library-search">
           Search library
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
-            id="library-search"
-            className="min-w-0 flex-1 rounded-lg border px-3 py-2"
+            className="flex-1 rounded-lg border px-3 py-2"
+            id="public-library-search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search SOP templates, bursary guides, CV examples..."
             type="search"
           />
-          <button className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white" type="submit">
+          <button className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white" type="submit">
             Search
           </button>
         </div>
@@ -271,7 +275,7 @@ export function LibraryDiscoveryFilters() {
               onClick={viewResources}
               type="button"
             >
-              View {filteredDocuments.length === 1 ? "resource" : "resources"}
+              {filteredDocuments.length === 1 ? "View resource" : "View all"}
             </button>
           )}
           <button className="rounded-lg border px-3 py-2 text-sm font-medium" onClick={clearFilters} type="button">
