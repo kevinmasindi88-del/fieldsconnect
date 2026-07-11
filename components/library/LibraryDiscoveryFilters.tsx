@@ -29,6 +29,7 @@ type DiscoveryDocument = LibraryDocument & {
 export function LibraryDiscoveryFilters() {
   const [documents, setDocuments] = useState<DiscoveryDocument[]>([]);
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [field, setField] = useState("all");
   const [roleType, setRoleType] = useState("all");
   const [recency, setRecency] = useState("all");
@@ -81,7 +82,7 @@ export function LibraryDiscoveryFilters() {
   );
 
   const filteredDocuments = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = appliedSearch.trim().toLowerCase();
     const now = Date.now();
 
     return documents.filter((document) => {
@@ -110,7 +111,7 @@ export function LibraryDiscoveryFilters() {
 
       return matchesSearch && matchesField && matchesRole && matchesRecency;
     });
-  }, [documents, field, recency, roleType, search]);
+  }, [appliedSearch, documents, field, recency, roleType]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -120,10 +121,16 @@ export function LibraryDiscoveryFilters() {
     );
 
     function applyFilters() {
-      const publishedHeading = Array.from(document.querySelectorAll("h2")).find(
-        (heading) => heading.textContent?.trim() === "Published library"
-      );
-      const section = publishedHeading?.closest("section");
+      const publicHeading = Array.from(document.querySelectorAll("h2")).find((heading) => {
+        const text = heading.textContent?.trim();
+        return text === "Public Library" || text === "Published library";
+      });
+
+      if (publicHeading && publicHeading.textContent?.trim() !== "Public Library") {
+        publicHeading.textContent = "Public Library";
+      }
+
+      const section = publicHeading?.closest("section");
       if (!section) return;
 
       const cards = Array.from(section.querySelectorAll<HTMLElement>("article"));
@@ -151,7 +158,7 @@ export function LibraryDiscoveryFilters() {
           emptyState = document.createElement("p");
           emptyState.dataset.libraryFilterEmpty = "true";
           emptyState.className = "rounded-xl border border-dashed p-4 text-sm text-gray-600";
-          emptyState.textContent = "No published documents match your search and filters.";
+          emptyState.textContent = "No public resources match your search and filters.";
           section.querySelector("div")?.appendChild(emptyState);
         }
         emptyState.style.display = "block";
@@ -169,16 +176,27 @@ export function LibraryDiscoveryFilters() {
 
   function clearFilters() {
     setSearch("");
+    setAppliedSearch("");
     setField("all");
     setRoleType("all");
     setRecency("all");
   }
 
   function viewResources() {
-    const publishedHeading = Array.from(document.querySelectorAll("h2")).find(
-      (heading) => heading.textContent?.trim() === "Published library"
-    );
-    publishedHeading?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const publicHeading = Array.from(document.querySelectorAll("h2")).find((heading) => {
+      const text = heading.textContent?.trim();
+      return text === "Public Library" || text === "Published library";
+    });
+    publicHeading?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAppliedSearch(search.trim());
+
+    window.requestAnimationFrame(() => {
+      viewResources();
+    });
   }
 
   return (
@@ -190,16 +208,24 @@ export function LibraryDiscoveryFilters() {
         </p>
       </div>
 
-      <label className="flex flex-col gap-2 text-sm font-medium">
-        Search library
-        <input
-          className="rounded-lg border px-3 py-2"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search SOP templates, bursary guides, CV examples..."
-          type="search"
-        />
-      </label>
+      <form className="flex flex-col gap-2" onSubmit={submitSearch}>
+        <label className="text-sm font-medium" htmlFor="library-search">
+          Search library
+        </label>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            id="library-search"
+            className="min-w-0 flex-1 rounded-lg border px-3 py-2"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search SOP templates, bursary guides, CV examples..."
+            type="search"
+          />
+          <button className="rounded-lg bg-black px-5 py-2 text-sm font-medium text-white" type="submit">
+            Search
+          </button>
+        </div>
+      </form>
 
       <div className="grid gap-3 md:grid-cols-3">
         <label className="flex flex-col gap-2 text-sm font-medium">
