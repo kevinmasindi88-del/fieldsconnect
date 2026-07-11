@@ -192,10 +192,34 @@ export function NotificationsWorkflow() {
     return null;
   }
 
+  function getActorName(notification: Notification) {
+    if (!notification.actor_id) return "Someone";
+    return profileById.get(notification.actor_id)?.display_name ?? "Someone";
+  }
+
+  function getNotificationTitle(notification: Notification) {
+    const actorName = getActorName(notification);
+
+    switch (notification.notification_type) {
+      case "post_liked":
+        return `${actorName} liked your post`;
+      case "post_commented":
+        return `${actorName} commented on your post`;
+      case "comment_liked":
+        return `${actorName} liked your comment`;
+      case "connection_request":
+        return `${actorName} sent you a connection request`;
+      case "connection_accepted":
+        return `${actorName} accepted your connection request`;
+      case "new_message":
+        return `${actorName} sent you a message`;
+      default:
+        return notification.title;
+    }
+  }
+
   function renderNotificationBody(notification: Notification, postId: string | null) {
-    const actorName = notification.actor_id
-      ? profileById.get(notification.actor_id)?.display_name ?? "Someone"
-      : "Someone";
+    const actorName = getActorName(notification);
 
     if (!postId) {
       return notification.body;
@@ -304,7 +328,7 @@ export function NotificationsWorkflow() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{notification.title}</h2>
+                      <h2 className="font-semibold">{getNotificationTitle(notification)}</h2>
                       {isUnread && (
                         <span className="rounded-full border px-2 py-1 text-xs font-medium">
                           New
