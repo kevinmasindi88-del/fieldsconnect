@@ -52,10 +52,6 @@ export function ConnectionWorkflow() {
     });
   }, [profiles, connections, currentUserId]);
 
-  const availableRoleTypes = useMemo(() => {
-    return Array.from(new Set(discoverableProfiles.map((profile) => profile.role_type).filter(Boolean))).sort();
-  }, [discoverableProfiles]);
-
   const filteredDiscoverableProfiles = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -66,7 +62,8 @@ export function ConnectionWorkflow() {
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(normalizedSearch));
 
-      const matchesRole = roleFilter === "all" || profile.role_type === roleFilter;
+      const matchesRole =
+        roleFilter === "all" || profile.role_type.trim().toLowerCase() === roleFilter;
       const matchesMentor =
         mentorFilter === "all" ||
         (mentorFilter === "mentors" && profile.mentor_available) ||
@@ -409,11 +406,9 @@ export function ConnectionWorkflow() {
                     value={roleFilter}
                   >
                     <option value="all">All role types</option>
-                    {availableRoleTypes.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
+                    <option value="student">Student</option>
+                    <option value="professional">Professional</option>
+                    <option value="institution">Institution</option>
                   </select>
                 </label>
 
@@ -445,10 +440,8 @@ export function ConnectionWorkflow() {
               </p>
             </div>
 
-            {discoverableProfiles.length === 0 ? (
-              <EmptyState text="No additional visible profiles found." />
-            ) : filteredDiscoverableProfiles.length === 0 ? (
-              <EmptyState text="No people match your search or filters." />
+            {filteredDiscoverableProfiles.length === 0 ? (
+              <EmptyState text="No results available." />
             ) : (
               filteredDiscoverableProfiles.map((profile) => (
                 <ConnectionCard key={profile.id} profile={profile}>
