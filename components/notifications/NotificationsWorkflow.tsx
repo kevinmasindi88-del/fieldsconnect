@@ -137,7 +137,7 @@ export function NotificationsWorkflow() {
     }
   }
 
-  async function openNotification(notification: Notification, postId: string) {
+  async function openNotificationPath(notification: Notification, path: string) {
     setIsWorking(true);
     setMessage(null);
 
@@ -152,7 +152,7 @@ export function NotificationsWorkflow() {
         if (error) throw error;
       }
 
-      router.push(`/post/${postId}`);
+      router.push(path);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to open notification.");
       setIsWorking(false);
@@ -221,6 +221,23 @@ export function NotificationsWorkflow() {
   function renderNotificationBody(notification: Notification, postId: string | null) {
     const actorName = getActorName(notification);
 
+    if (notification.notification_type === "connection_request") {
+      return (
+        <>
+          {actorName} sent you a connection{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(notification, "/connections")}
+            type="button"
+          >
+            request
+          </button>
+          .
+        </>
+      );
+    }
+
     if (!postId) {
       return notification.body;
     }
@@ -232,7 +249,7 @@ export function NotificationsWorkflow() {
           <button
             className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
             disabled={isWorking}
-            onClick={() => openNotification(notification, postId)}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
             type="button"
           >
             post
@@ -249,7 +266,7 @@ export function NotificationsWorkflow() {
           <button
             className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
             disabled={isWorking}
-            onClick={() => openNotification(notification, postId)}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
             type="button"
           >
             post
@@ -266,7 +283,7 @@ export function NotificationsWorkflow() {
           <button
             className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
             disabled={isWorking}
-            onClick={() => openNotification(notification, postId)}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
             type="button"
           >
             comment
