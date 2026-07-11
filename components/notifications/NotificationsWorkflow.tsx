@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 
@@ -13,7 +14,8 @@ type Notification = {
     | "connection_accepted"
     | "new_message"
     | "post_liked"
-    | "post_commented";
+    | "post_commented"
+    | "comment_liked";
   entity_type: "connection" | "conversation" | "message" | "post" | "comment";
   entity_id: string | null;
   title: string;
@@ -28,9 +30,16 @@ type Profile = {
   avatar_url: string | null;
 };
 
+type CommentReference = {
+  id: string;
+  post_id: string;
+};
+
 export function NotificationsWorkflow() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [commentReferences, setCommentReferences] = useState<CommentReference[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -38,6 +47,10 @@ export function NotificationsWorkflow() {
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
+
+  const postIdByCommentId = useMemo(() => {
+    return new Map(commentReferences.map((comment) => [comment.id, comment.post_id]));
+  }, [commentReferences]);
 
   const unreadCount = notifications.filter((notification) => !notification.read_at).length;
 
@@ -67,6 +80,7 @@ export function NotificationsWorkflow() {
       const [
         { data: notificationData, error: notificationError },
         { data: profileData, error: profileError },
+        { data: commentData, error: commentError },
       ] = await Promise.all([
         supabase
           .from("notifications")
@@ -78,13 +92,19 @@ export function NotificationsWorkflow() {
           .from("profiles")
           .select("id, display_name, avatar_url")
           .is("deleted_at", null),
+        supabase
+          .from("comments")
+          .select("id, post_id")
+          .is("deleted_at", null),
       ]);
 
       if (notificationError) throw notificationError;
       if (profileError) throw profileError;
+      if (commentError) throw commentError;
 
       setNotifications((notificationData ?? []) as Notification[]);
       setProfiles((profileData ?? []) as Profile[]);
+      setCommentReferences((commentData ?? []) as CommentReference[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load notifications.");
     } finally {
@@ -117,6 +137,28 @@ export function NotificationsWorkflow() {
     }
   }
 
+  async function openNotification(notification: Notification, postId: string) {
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      if (!notification.read_at) {
+        const supabase = getSupabaseBrowserClient();
+        const { error } = await supabase
+          .from("notifications")
+          .update({ read_at: new Date().toISOString() })
+          .eq("id", notification.id);
+
+        if (error) throw error;
+      }
+
+      router.push(`/post/${postId}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to open notification.");
+      setIsWorking(false);
+    }
+  }
+
   async function markAllAsRead() {
     setIsWorking(true);
     setMessage(null);
@@ -136,6 +178,81 @@ export function NotificationsWorkflow() {
     } finally {
       setIsWorking(false);
     }
+  }
+
+  function getNotificationPostId(notification: Notification) {
+    if (notification.entity_type === "post") {
+      return notification.entity_id;
+    }
+
+    if (notification.entity_type === "comment" && notification.entity_id) {
+      return postIdByCommentId.get(notification.entity_id) ?? null;
+    }
+
+    return null;
+  }
+
+  function renderNotificationBody(notification: Notification, postId: string | null) {
+    const actorName = notification.actor_id
+      ? profileById.get(notification.actor_id)?.display_name ?? "Someone"
+      : "Someone";
+
+    if (!postId) {
+      return notification.body;
+    }
+
+    if (notification.notification_type === "post_liked") {
+      return (
+        <>
+          {actorName} liked your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotification(notification, postId)}
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "post_commented") {
+      return (
+        <>
+          {actorName} commented on your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotification(notification, postId)}
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "comment_liked") {
+      return (
+        <>
+          {actorName} liked your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotification(notification, postId)}
+            type="button"
+          >
+            comment
+          </button>
+          .
+        </>
+      );
+    }
+
+    return notification.body;
   }
 
   return (
@@ -171,6 +288,7 @@ export function NotificationsWorkflow() {
           {notifications.map((notification) => {
             const actor = notification.actor_id ? profileById.get(notification.actor_id) : null;
             const isUnread = !notification.read_at;
+            const postId = getNotificationPostId(notification);
 
             return (
               <article
@@ -195,7 +313,9 @@ export function NotificationsWorkflow() {
                     </div>
 
                     {notification.body && (
-                      <p className="mt-1 text-sm text-gray-700">{notification.body}</p>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {renderNotificationBody(notification, postId)}
+                      </p>
                     )}
 
                     <p className="mt-2 text-xs text-gray-500">
