@@ -15,21 +15,20 @@ export function PublicLibraryControls() {
       const section = heading?.closest<HTMLElement>("section");
       if (!heading || !section) return false;
 
-      heading.textContent = "Public Library";
+      if (heading.textContent?.trim() !== "Public Library") {
+        heading.textContent = "Public Library";
+      }
 
       const searchInput = Array.from(section.querySelectorAll<HTMLInputElement>("input")).find((input) =>
         input.placeholder?.toLowerCase().includes("search sop")
       );
 
-      if (searchInput && !section.querySelector("[data-public-library-search='true']")) {
+      if (searchInput && !section.querySelector("[data-public-library-search-button='true']")) {
         const label = searchInput.closest("label");
-        const wrapper = document.createElement("div");
-        wrapper.dataset.publicLibrarySearch = "true";
-        wrapper.className = "flex flex-col gap-2 sm:flex-row sm:items-end";
-
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "rounded-lg bg-black px-4 py-2 text-sm font-medium text-white";
+        button.dataset.publicLibrarySearchButton = "true";
+        button.className = "mt-2 w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white";
         button.textContent = "Search";
 
         const runSearch = () => {
@@ -53,24 +52,26 @@ export function PublicLibraryControls() {
           }
         });
 
-        if (label?.parentElement) {
-          label.parentElement.insertBefore(wrapper, label);
-          wrapper.append(label, button);
-          label.classList.add("flex-1");
+        if (label) {
+          label.appendChild(button);
         } else {
           searchInput.insertAdjacentElement("afterend", button);
         }
       }
 
       const recencySelect = Array.from(section.querySelectorAll<HTMLSelectElement>("select")).find((select) =>
-        Array.from(select.options).some((option) => option.textContent?.trim() === "Last 90 days")
+        Array.from(select.options).some((option) =>
+          ["Last 90 days", "90 days or longer"].includes(option.textContent?.trim() ?? "")
+        )
       );
 
       if (recencySelect) {
-        const option = Array.from(recencySelect.options).find(
-          (item) => item.textContent?.trim() === "Last 90 days"
+        const option = Array.from(recencySelect.options).find((item) =>
+          ["Last 90 days", "90 days or longer"].includes(item.textContent?.trim() ?? "")
         );
-        if (option) option.textContent = "90 days or longer";
+        if (option && option.textContent?.trim() !== "90 days or longer") {
+          option.textContent = "90 days or longer";
+        }
       }
 
       return true;
