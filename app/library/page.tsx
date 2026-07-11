@@ -5,16 +5,76 @@ import { LibraryWorkflow } from "@/components/library/LibraryWorkflow";
 
 export default function LibraryPage() {
   useEffect(() => {
-    function renameLibrarySection() {
+    function enhancePublicLibrary() {
       const heading = Array.from(document.querySelectorAll<HTMLHeadingElement>("h2")).find(
-        (item) => item.textContent?.trim() === "Published library"
+        (item) => ["Published library", "Public Library"].includes(item.textContent?.trim() ?? "")
       );
 
-      if (heading) heading.textContent = "Public Library";
+      if (!heading) return;
+      heading.textContent = "Public Library";
+
+      const section = heading.closest<HTMLElement>("section");
+      if (!section) return;
+
+      const searchInput = Array.from(section.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])')).find(
+        (input) => input.placeholder?.toLowerCase().includes("search sop")
+      );
+
+      if (searchInput && !section.querySelector("[data-public-library-search-button='true']")) {
+        const searchLabel = searchInput.closest("label");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.publicLibrarySearchButton = "true";
+        button.className = "rounded-lg bg-black px-4 py-2 text-sm font-medium text-white";
+        button.textContent = "Search";
+
+        button.addEventListener("click", () => {
+          searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+          searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+          window.requestAnimationFrame(() => {
+            const viewButton = Array.from(section.querySelectorAll<HTMLButtonElement>("button")).find((candidate) =>
+              candidate.textContent?.trim().startsWith("View resource list")
+            );
+
+            if (viewButton && !viewButton.disabled && viewButton.getAttribute("aria-expanded") !== "true") {
+              viewButton.click();
+            }
+
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+
+        searchInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            button.click();
+          }
+        });
+
+        if (searchLabel) {
+          const row = document.createElement("div");
+          row.className = "flex flex-col gap-2 sm:flex-row sm:items-end";
+          searchLabel.parentElement?.insertBefore(row, searchLabel);
+          row.append(searchLabel, button);
+          searchLabel.classList.add("flex-1");
+        } else {
+          searchInput.insertAdjacentElement("afterend", button);
+        }
+      }
+
+      const recencySelect = Array.from(section.querySelectorAll<HTMLSelectElement>("select")).find((select) =>
+        Array.from(select.options).some((option) => option.textContent?.trim() === "Last 90 days")
+      );
+
+      if (recencySelect) {
+        const lastOption = Array.from(recencySelect.options).find((option) => option.textContent?.trim() === "Last 90 days");
+        if (lastOption) lastOption.textContent = "90 days or longer";
+      }
     }
 
-    renameLibrarySection();
-    const observer = new MutationObserver(renameLibrarySection);
+    enhancePublicLibrary();
+    const observer = new MutationObserver(enhancePublicLibrary);
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => observer.disconnect();
