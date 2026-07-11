@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -28,6 +28,8 @@ type LibraryDocument = {
   created_at: string;
 };
 
+type RecencyFilter = "all" | "7" | "30" | "90";
+
 export function LibraryWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -37,6 +39,12 @@ export function LibraryWorkflow() {
   const [visibility, setVisibility] = useState<"public" | "connections">("connections");
   const [isPublished, setIsPublished] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [fieldFilter, setFieldFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [recencyFilter, setRecencyFilter] = useState<RecencyFilter>("all");
+  const [isResultListOpen, setIsResultListOpen] = useState(false);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -46,7 +54,62 @@ export function LibraryWorkflow() {
   }, [profiles]);
 
   const ownDocuments = documents.filter((document) => document.owner_id === currentUserId);
-  const networkDocuments = documents.filter((document) => document.owner_id !== currentUserId);
+  const publishedDocuments = documents.filter(
+    (document) => document.owner_id !== currentUserId && document.is_published && document.visibility === "public"
+  );
+
+  const availableFields = useMemo(() => {
+    const fields = new Set<string>();
+
+    for (const document of publishedDocuments) {
+      const field = profileById.get(document.owner_id)?.field;
+      if (field) fields.add(field);
+    }
+
+    return Array.from(fields).sort((left, right) => left.localeCompare(right));
+  }, [profileById, publishedDocuments]);
+
+  const availableRoles = useMemo(() => {
+    const roles = new Set<string>();
+
+    for (const document of publishedDocuments) {
+      const role = profileById.get(document.owner_id)?.role_type;
+      if (role) roles.add(role);
+    }
+
+    return Array.from(roles).sort((left, right) => left.localeCompare(right));
+  }, [profileById, publishedDocuments]);
+
+  const filteredPublishedDocuments = useMemo(() => {
+    const searchTerm = librarySearch.trim().toLowerCase();
+    const now = Date.now();
+
+    return publishedDocuments.filter((document) => {
+      const owner = profileById.get(document.owner_id);
+      const searchableText = [
+        document.title,
+        document.description,
+        document.file_name,
+        owner?.display_name,
+        owner?.field,
+        owner?.role_type,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = !searchTerm || searchableText.includes(searchTerm);
+      const matchesField = fieldFilter === "all" || owner?.field === fieldFilter;
+      const matchesRole = roleFilter === "all" || owner?.role_type === roleFilter;
+      const matchesRecency =
+        recencyFilter === "all" || now - new Date(document.created_at).getTime() <= Number(recencyFilter) * 24 * 60 * 60 * 1000;
+
+      return matchesSearch && matchesField && matchesRole && matchesRecency;
+    });
+  }, [fieldFilter, librarySearch, profileById, publishedDocuments, recencyFilter, roleFilter]);
+
+  const selectedResult =
+    filteredPublishedDocuments.find((document) => document.id === selectedResultId) ?? filteredPublishedDocuments[0] ?? null;
 
   async function loadData() {
     setMessage(null);
@@ -105,6 +168,10 @@ export function LibraryWorkflow() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    setSelectedResultId(null);
+  }, [fieldFilter, librarySearch, recencyFilter, roleFilter]);
 
   async function uploadDocument(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -268,6 +335,20 @@ export function LibraryWorkflow() {
     }
   }
 
+  function clearLibraryFilters() {
+    setLibrarySearch("");
+    setFieldFilter("all");
+    setRoleFilter("all");
+    setRecencyFilter("all");
+    setSelectedResultId(null);
+    setIsResultListOpen(false);
+  }
+
+  function selectLibraryResult(documentId: string) {
+    setSelectedResultId(documentId);
+    setIsResultListOpen(true);
+  }
+
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
       <div>
@@ -359,6 +440,7 @@ export function LibraryWorkflow() {
                   document={document}
                   owner={profileById.get(document.owner_id)}
                   isWorking={isWorking}
+                  isSelected={false}
                   onOpen={() => openDocument(document)}
                 >
                   <button
@@ -391,19 +473,136 @@ export function LibraryWorkflow() {
           </DocumentSection>
 
           <DocumentSection title="Published library">
-            {networkDocuments.length === 0 ? (
-              <EmptyState text="No published documents found yet." />
-            ) : (
-              networkDocuments.map((document) => (
-                <DocumentCard
-                  key={document.id}
-                  document={document}
-                  owner={profileById.get(document.owner_id)}
-                  isWorking={isWorking}
-                  onOpen={() => openDocument(document)}
-                />
-              ))
-            )}
+            <div className="flex flex-col gap-4 rounded-xl border p-4">
+              <div>
+                <h3 className="font-semibold">Find resources</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Search specific resources, then open the results list and select the item you want to view.
+                </p>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-4">
+                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
+                  Search
+                  <input
+                    className="rounded-lg border px-3 py-2"
+                    value={librarySearch}
+                    onChange={(event) => setLibrarySearch(event.target.value)}
+                    placeholder="Search SOP templates, bursary guide, CV..."
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Field
+                  <select
+                    className="rounded-lg border px-3 py-2"
+                    value={fieldFilter}
+                    onChange={(event) => setFieldFilter(event.target.value)}
+                  >
+                    <option value="all">All fields</option>
+                    {availableFields.map((field) => (
+                      <option key={field} value={field}>
+                        {field}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Role type
+                  <select
+                    className="rounded-lg border px-3 py-2"
+                    value={roleFilter}
+                    onChange={(event) => setRoleFilter(event.target.value)}
+                  >
+                    <option value="all">All roles</option>
+                    {availableRoles.map((role) => (
+                      <option key={role} value={role}>
+                        {formatRole(role)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Recency
+                  <select
+                    className="rounded-lg border px-3 py-2"
+                    value={recencyFilter}
+                    onChange={(event) => setRecencyFilter(event.target.value as RecencyFilter)}
+                  >
+                    <option value="all">Any time</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={filteredPublishedDocuments.length === 0}
+                  onClick={() => setIsResultListOpen((current) => !current)}
+                  type="button"
+                >
+                  {isResultListOpen ? "Hide resource list" : "View resource list"} ({filteredPublishedDocuments.length})
+                </button>
+                <button className="rounded-lg border px-4 py-2 text-sm font-medium" onClick={clearLibraryFilters} type="button">
+                  Clear filters
+                </button>
+                <span className="text-sm text-gray-600">
+                  {filteredPublishedDocuments.length} resource{filteredPublishedDocuments.length === 1 ? "" : "s"} found
+                </span>
+              </div>
+
+              {isResultListOpen && (
+                <div className="grid gap-2 rounded-xl border bg-gray-50 p-3">
+                  {filteredPublishedDocuments.length === 0 ? (
+                    <EmptyState text="No resources match this search yet." />
+                  ) : (
+                    filteredPublishedDocuments.map((document) => {
+                      const owner = profileById.get(document.owner_id);
+                      const isSelected = selectedResult?.id === document.id;
+
+                      return (
+                        <button
+                          key={document.id}
+                          className={`rounded-lg border bg-white p-3 text-left text-sm hover:border-black ${
+                            isSelected ? "border-black" : "border-gray-200"
+                          }`}
+                          onClick={() => selectLibraryResult(document.id)}
+                          type="button"
+                        >
+                          <span className="font-semibold">{document.title}</span>
+                          <span className="mt-1 block text-xs text-gray-600">
+                            {owner?.display_name ?? "Unknown profile"}
+                            {owner?.field ? ` - ${owner.field}` : ""}
+                            {owner?.role_type ? ` - ${formatRole(owner.role_type)}` : ""}
+                          </span>
+                          <span className="mt-1 block text-xs text-gray-500">
+                            {document.file_name} - {formatBytes(document.file_size_bytes)} - {formatDate(document.created_at)}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {selectedResult && (
+                <div className="rounded-xl border border-black p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Selected resource</p>
+                  <DocumentCard
+                    document={selectedResult}
+                    owner={profileById.get(selectedResult.owner_id)}
+                    isWorking={isWorking}
+                    isSelected
+                    onOpen={() => openDocument(selectedResult)}
+                  />
+                </div>
+              )}
+            </div>
           </DocumentSection>
         </>
       )}
@@ -424,17 +623,23 @@ function DocumentCard({
   document,
   owner,
   isWorking,
+  isSelected,
   onOpen,
   children,
 }: {
   document: LibraryDocument;
   owner?: Profile;
   isWorking: boolean;
+  isSelected: boolean;
   onOpen: () => void;
   children?: React.ReactNode;
 }) {
   return (
-    <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center">
+    <article
+      className={`flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center ${
+        isSelected ? "border-black" : ""
+      }`}
+    >
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold">{document.title}</h3>
@@ -444,6 +649,7 @@ function DocumentCard({
           <span className="rounded-full border px-2 py-1 text-xs">
             {document.visibility === "public" ? "Public" : "Connections"}
           </span>
+          {owner?.role_type && <span className="rounded-full border px-2 py-1 text-xs">{formatRole(owner.role_type)}</span>}
         </div>
 
         <p className="mt-2 text-sm text-gray-600">
@@ -454,7 +660,7 @@ function DocumentCard({
         {document.description && <p className="mt-2 max-w-2xl text-sm text-gray-700">{document.description}</p>}
 
         <p className="mt-2 text-xs text-gray-500">
-          {document.file_name} - {formatBytes(document.file_size_bytes)}
+          {document.file_name} - {formatBytes(document.file_size_bytes)} - {formatDate(document.created_at)}
         </p>
       </div>
 
@@ -483,3 +689,17 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatRole(role: string) {
+  return role
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("/");
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
