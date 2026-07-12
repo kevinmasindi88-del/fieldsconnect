@@ -1,29 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type ReportTargetType = "profile" | "post" | "comment" | "message" | "skill" | "library_document";
+type Profile = {
+  id: string;
+  display_name: string;
+  role_type: string;
+  field: string | null;
+};
 
 type Report = {
   id: string;
   reporter_id: string;
-  target_type: ReportTargetType;
+  target_type: "profile";
   target_id: string;
   reason: string;
   details: string | null;
   status: string;
   created_at: string;
 };
-
-const targetTypeOptions: { value: ReportTargetType; label: string }[] = [
-  { value: "profile", label: "Profile" },
-  { value: "post", label: "Post" },
-  { value: "comment", label: "Comment" },
-  { value: "message", label: "Message" },
-  { value: "skill", label: "Skill" },
-  { value: "library_document", label: "Library document" },
-];
 
 const reasonOptions = [
   "Harassment or bullying",
@@ -35,18 +31,29 @@ const reasonOptions = [
   "Other",
 ];
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export function ModerationReportingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
-  const [targetType, setTargetType] = useState<ReportTargetType>("profile");
-  const [targetId, setTargetId] = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState("");
   const [reason, setReason] = useState(reasonOptions[0]);
   const [details, setDetails] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+
+  const profileById = useMemo(
+    () => new Map(profiles.map((profile) => [profile.id, profile])),
+    [profiles]
+  );
+
+  const reportableProfiles = useMemo(
+    () =>
+      profiles
+        .filter((profile) => profile.id !== currentUserId)
+        .sort((left, right) => left.display_name.localeCompare(right.display_name)),
+    [currentUserId, profiles]
+  );
 
   async function loadData() {
     setMessage(null);
@@ -73,14 +80,26 @@ export function ModerationReportingWorkflow() {
 
       setCurrentUserId(userId);
 
-      const { data: reportData, error: reportError } = await supabase
-        .from("reports")
-        .select("id, reporter_id, target_type, target_id, reason, details, status, created_at")
-        .eq("reporter_id", userId)
-        .order("created_at", { ascending: false });
+      const [
+        { data: profileData, error: profileError },
+        { data: reportData, error: reportError },
+      ] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, display_name, role_type, field")
+          .is("deleted_at", null),
+        supabase
+          .from("reports")
+          .select("id, reporter_id, target_type, target_id, reason, details, status, created_at")
+          .eq("reporter_id", userId)
+          .eq("target_type", "profile")
+          .order("created_at", { ascending: false }),
+      ]);
 
+      if (profileError) throw profileError;
       if (reportError) throw reportError;
 
+      setProfiles((profileData ?? []) as Profile[]);
       setReports((reportData ?? []) as Report[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load reports.");
@@ -96,16 +115,7 @@ export function ModerationReportingWorkflow() {
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const normalizedTargetId = targetId.trim();
-
-    if (!currentUserId || !normalizedTargetId || !reason.trim() || !isSupabaseConfigured()) return;
-
-    if (!UUID_PATTERN.test(normalizedTargetId)) {
-      setMessage(
-        "Enter the target's UUID, not a profile name or content title. Contextual Report buttons will remove this manual step in the next moderation improvement."
-      );
-      return;
-    }
+    if (!currentUserId || !selectedProfileId || !reason.trim() || !isSupabaseConfigured()) return;
 
     setIsWorking(true);
     setMessage(null);
@@ -115,8 +125,8 @@ export function ModerationReportingWorkflow() {
 
       const { error } = await supabase.from("reports").insert({
         reporter_id: currentUserId,
-        target_type: targetType,
-        target_id: normalizedTargetId,
+        target_type: "profile",
+        target_id: selectedProfileId,
         reason,
         details: details.trim() || null,
         status: "submitted",
@@ -124,8 +134,7 @@ export function ModerationReportingWorkflow() {
 
       if (error) throw error;
 
-      setTargetType("profile");
-      setTargetId("");
+      setSelectedProfileId("");
       setReason(reasonOptions[0]);
       setDetails("");
       setMessage("Report submitted.");
@@ -142,7 +151,7 @@ export function ModerationReportingWorkflow() {
       <div>
         <h1 className="text-3xl font-semibold">Moderation</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Submit a report for content or behaviour that needs review. Admin review actions are out of scope for this baseline.
+          Report a profile for behaviour or content that needs review.
         </p>
       </div>
 
@@ -152,34 +161,23 @@ export function ModerationReportingWorkflow() {
         <h2 className="text-xl font-semibold">Submit report</h2>
 
         <label className="flex flex-col gap-2 text-sm font-medium">
-          Target type
+          Profile name
           <select
-            className="w-fit rounded-lg border px-3 py-2"
-            value={targetType}
-            onChange={(event) => setTargetType(event.target.value as ReportTargetType)}
+            className="rounded-lg border px-3 py-2"
+            value={selectedProfileId}
+            onChange={(event) => setSelectedProfileId(event.target.value)}
+            required
           >
-            {targetTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            <option value="">Select a profile</option>
+            {reportableProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.display_name}
+                {profile.field ? ` — ${profile.field}` : ""}
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          Target UUID
-          <input
-            className="rounded-lg border px-3 py-2"
-            value={targetId}
-            onChange={(event) => setTargetId(event.target.value)}
-            placeholder="Example: 59626f5c-57e6-428b-a9e3-d666624c48bb"
-            inputMode="text"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-          />
           <span className="text-xs text-gray-500">
-            Names and titles are not valid IDs. This baseline uses the target record's UUID; contextual Report buttons will be added next.
+            FieldsConnect keeps the profile ID internal. For a specific post, comment, message, skill, or document, contextual Report buttons will identify the exact item automatically.
           </span>
         </label>
 
@@ -204,13 +202,13 @@ export function ModerationReportingWorkflow() {
             className="min-h-28 rounded-lg border px-3 py-2"
             value={details}
             onChange={(event) => setDetails(event.target.value)}
-            placeholder="Add a brief explanation for the moderation team."
+            placeholder="Describe what happened and mention the relevant post or content."
           />
         </label>
 
         <button
           className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={!targetId.trim() || !reason.trim() || isWorking}
+          disabled={!selectedProfileId || !reason.trim() || isWorking}
           type="submit"
         >
           {isWorking ? "Submitting..." : "Submit report"}
@@ -228,29 +226,25 @@ export function ModerationReportingWorkflow() {
           </p>
         ) : (
           <div className="grid gap-3">
-            {reports.map((report) => (
-              <article key={report.id} className="rounded-xl border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{formatTargetType(report.target_type)}</h3>
-                  <span className="rounded-full border px-2 py-1 text-xs">{report.status}</span>
-                </div>
+            {reports.map((report) => {
+              const targetProfile = profileById.get(report.target_id);
 
-                <p className="mt-2 text-sm text-gray-600">Reason: {report.reason}</p>
-                <p className="mt-1 break-all text-xs text-gray-500">Target ID: {report.target_id}</p>
+              return (
+                <article key={report.id} className="rounded-xl border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold">{targetProfile?.display_name ?? "Reported profile"}</h3>
+                    <span className="rounded-full border px-2 py-1 text-xs">{report.status}</span>
+                  </div>
 
-                {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">{report.details}</p>}
-              </article>
-            ))}
+                  <p className="mt-2 text-sm text-gray-600">Reason: {report.reason}</p>
+                  {targetProfile?.field && <p className="mt-1 text-xs text-gray-500">Field: {targetProfile.field}</p>}
+                  {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">{report.details}</p>}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
     </section>
   );
-}
-
-function formatTargetType(targetType: ReportTargetType) {
-  return targetType
-    .split("_")
-    .map((word) => word[0]?.toUpperCase() + word.slice(1))
-    .join(" ");
 }
