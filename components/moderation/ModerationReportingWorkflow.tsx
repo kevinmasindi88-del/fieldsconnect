@@ -129,7 +129,6 @@ export function ModerationReportingWorkflow() {
         target_id: selectedProfileId,
         reason,
         details: details.trim() || null,
-        status: "submitted",
       });
 
       if (error) throw error;
