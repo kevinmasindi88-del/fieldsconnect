@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -34,6 +34,8 @@ const reasonOptions = [
   "Privacy concern",
   "Other",
 ];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function ModerationReportingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -94,7 +96,16 @@ export function ModerationReportingWorkflow() {
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!currentUserId || !targetId.trim() || !reason.trim() || !isSupabaseConfigured()) return;
+    const normalizedTargetId = targetId.trim();
+
+    if (!currentUserId || !normalizedTargetId || !reason.trim() || !isSupabaseConfigured()) return;
+
+    if (!UUID_PATTERN.test(normalizedTargetId)) {
+      setMessage(
+        "Enter the target's UUID, not a profile name or content title. Contextual Report buttons will remove this manual step in the next moderation improvement."
+      );
+      return;
+    }
 
     setIsWorking(true);
     setMessage(null);
@@ -105,7 +116,7 @@ export function ModerationReportingWorkflow() {
       const { error } = await supabase.from("reports").insert({
         reporter_id: currentUserId,
         target_type: targetType,
-        target_id: targetId.trim(),
+        target_id: normalizedTargetId,
         reason,
         details: details.trim() || null,
         status: "submitted",
@@ -156,16 +167,19 @@ export function ModerationReportingWorkflow() {
         </label>
 
         <label className="flex flex-col gap-2 text-sm font-medium">
-          Target ID
+          Target UUID
           <input
             className="rounded-lg border px-3 py-2"
             value={targetId}
             onChange={(event) => setTargetId(event.target.value)}
-            placeholder="Paste the ID of the profile, post, comment, message, skill, or document."
+            placeholder="Example: 59626f5c-57e6-428b-a9e3-d666624c48bb"
+            inputMode="text"
+            autoCapitalize="none"
+            spellCheck={false}
             required
           />
           <span className="text-xs text-gray-500">
-            Baseline version uses manual IDs. Contextual report buttons will be added later.
+            Names and titles are not valid IDs. This baseline uses the target record's UUID; contextual Report buttons will be added next.
           </span>
         </label>
 
@@ -199,7 +213,7 @@ export function ModerationReportingWorkflow() {
           disabled={!targetId.trim() || !reason.trim() || isWorking}
           type="submit"
         >
-          Submit report
+          {isWorking ? "Submitting..." : "Submit report"}
         </button>
       </form>
 
