@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ReportMenu } from "@/components/moderation/ReportMenu";
 
 type Profile = {
   id: string;
@@ -76,11 +77,9 @@ export function TimelineWorkflow() {
     try {
       const supabase = getSupabaseBrowserClient();
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
       if (sessionError) throw sessionError;
 
       const userId = sessionData.session?.user.id;
-
       if (!userId) {
         setMessage("Please log in before using the timeline.");
         setIsLoading(false);
@@ -110,12 +109,8 @@ export function TimelineWorkflow() {
           .select("id, post_id, author_id, body, created_at")
           .is("deleted_at", null)
           .order("created_at", { ascending: true }),
-        supabase
-          .from("reactions")
-          .select("id, post_id, profile_id, reaction_type"),
-        supabase
-          .from("comment_reactions")
-          .select("id, comment_id, profile_id, reaction_type"),
+        supabase.from("reactions").select("id, post_id, profile_id, reaction_type"),
+        supabase.from("comment_reactions").select("id, comment_id, profile_id, reaction_type"),
       ]);
 
       if (profileError) throw profileError;
@@ -142,7 +137,6 @@ export function TimelineWorkflow() {
 
   async function createPost(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!currentUserId || !postBody.trim() || !isSupabaseConfigured()) return;
 
     setIsWorking(true);
@@ -150,13 +144,11 @@ export function TimelineWorkflow() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-
       const { error } = await supabase.from("posts").insert({
         author_id: currentUserId,
         body: postBody.trim(),
         visibility,
       });
-
       if (error) throw error;
 
       setPostBody("");
@@ -177,7 +169,6 @@ export function TimelineWorkflow() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-
       const existing = reactions.find(
         (reaction) => reaction.post_id === postId && reaction.profile_id === currentUserId
       );
@@ -191,14 +182,11 @@ export function TimelineWorkflow() {
           profile_id: currentUserId,
           reaction_type: "like",
         });
-
         if (error) throw error;
 
         const post = posts.find((item) => item.id === postId);
-
         if (post && post.author_id !== currentUserId) {
           const actor = profileById.get(currentUserId);
-
           const { error: notificationError } = await supabase.from("notifications").insert({
             recipient_id: post.author_id,
             actor_id: currentUserId,
@@ -208,10 +196,7 @@ export function TimelineWorkflow() {
             title: "Someone liked your post",
             body: `${actor?.display_name ?? "Someone"} liked your post.`,
           });
-
-          if (notificationError) {
-            console.error("Unable to create post-like notification:", notificationError);
-          }
+          if (notificationError) console.error("Unable to create post-like notification:", notificationError);
         }
       }
 
@@ -244,7 +229,6 @@ export function TimelineWorkflow() {
           profile_id: currentUserId,
           reaction_type: "like",
         });
-
         if (error) throw error;
       }
 
@@ -258,9 +242,7 @@ export function TimelineWorkflow() {
 
   async function addComment(event: React.FormEvent<HTMLFormElement>, postId: string) {
     event.preventDefault();
-
     const body = commentDrafts[postId]?.trim();
-
     if (!currentUserId || !body || !isSupabaseConfigured()) return;
 
     setIsWorking(true);
@@ -268,24 +250,16 @@ export function TimelineWorkflow() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-
       const { data: createdComment, error } = await supabase
         .from("comments")
-        .insert({
-          post_id: postId,
-          author_id: currentUserId,
-          body,
-        })
+        .insert({ post_id: postId, author_id: currentUserId, body })
         .select("id")
         .single();
-
       if (error) throw error;
 
       const post = posts.find((item) => item.id === postId);
-
       if (post && post.author_id !== currentUserId) {
         const actor = profileById.get(currentUserId);
-
         const { error: notificationError } = await supabase.from("notifications").insert({
           recipient_id: post.author_id,
           actor_id: currentUserId,
@@ -295,10 +269,7 @@ export function TimelineWorkflow() {
           title: "New comment on your post",
           body: `${actor?.display_name ?? "Someone"} commented on your post.`,
         });
-
-        if (notificationError) {
-          console.error("Unable to create post-comment notification:", notificationError);
-        }
+        if (notificationError) console.error("Unable to create post-comment notification:", notificationError);
       }
 
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
@@ -331,13 +302,9 @@ export function TimelineWorkflow() {
       const supabase = getSupabaseBrowserClient();
       const { error } = await supabase
         .from("posts")
-        .update({
-          body: editingPostBody.trim(),
-          edited_at: new Date().toISOString(),
-        })
+        .update({ body: editingPostBody.trim(), edited_at: new Date().toISOString() })
         .eq("id", postId)
         .eq("author_id", currentUserId);
-
       if (error) throw error;
 
       cancelEditingPost();
@@ -375,9 +342,7 @@ export function TimelineWorkflow() {
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
       <div>
         <h1 className="text-3xl font-semibold">Timeline</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Share updates, comment, and react to posts and replies.
-        </p>
+        <p className="mt-2 text-sm text-gray-600">Share updates, comment, and react to posts and replies.</p>
       </div>
 
       {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
@@ -417,9 +382,7 @@ export function TimelineWorkflow() {
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading timeline...</p>
       ) : posts.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-          No posts yet. Create the first timeline post.
-        </p>
+        <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">No posts yet. Create the first timeline post.</p>
       ) : (
         posts.map((post) => {
           const author = profileById.get(post.author_id);
@@ -456,7 +419,7 @@ export function TimelineWorkflow() {
                     <span className="w-fit rounded-full border px-3 py-1 text-xs">
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
-                    {isOwnPost && !isEditing && (
+                    {isOwnPost && !isEditing ? (
                       <button
                         className="rounded-lg border px-3 py-1 text-xs font-medium"
                         disabled={isWorking}
@@ -465,6 +428,16 @@ export function TimelineWorkflow() {
                       >
                         Edit
                       </button>
+                    ) : (
+                      currentUserId && (
+                        <ReportMenu
+                          targetType="post"
+                          targetId={post.id}
+                          reportedUserId={post.author_id}
+                          label="post"
+                          disabled={isWorking}
+                        />
+                      )
                     )}
                   </div>
                 </div>
@@ -519,6 +492,7 @@ export function TimelineWorkflow() {
                 {postComments.map((comment) => {
                   const commenter = profileById.get(comment.author_id);
                   const commentLiked = hasLikedComment(comment.id);
+                  const isOwnComment = comment.author_id === currentUserId;
 
                   return (
                     <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
@@ -530,14 +504,27 @@ export function TimelineWorkflow() {
                         <ProfileAvatar avatarPath={null} displayName={null} size={28} />
                       )}
                       <div className="min-w-0 flex-1">
-                        {commenter ? (
-                          <Link className="text-sm font-medium hover:underline" href={`/profile/${commenter.id}`}>
-                            {commenter.display_name}
-                          </Link>
-                        ) : (
-                          <p className="text-sm font-medium">Unknown profile</p>
-                        )}
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            {commenter ? (
+                              <Link className="text-sm font-medium hover:underline" href={`/profile/${commenter.id}`}>
+                                {commenter.display_name}
+                              </Link>
+                            ) : (
+                              <p className="text-sm font-medium">Unknown profile</p>
+                            )}
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                          </div>
+                          {!isOwnComment && currentUserId && (
+                            <ReportMenu
+                              targetType="comment"
+                              targetId={comment.id}
+                              reportedUserId={comment.author_id}
+                              label="comment"
+                              disabled={isWorking}
+                            />
+                          )}
+                        </div>
                         <button
                           className="mt-2 rounded-lg border px-2 py-1 text-xs font-medium disabled:opacity-50"
                           disabled={isWorking}
