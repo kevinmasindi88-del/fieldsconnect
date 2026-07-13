@@ -55,6 +55,7 @@ export function ReportMenu({
   const [reason, setReason] = useState(reasons[0]);
   const [details, setDetails] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [submittedTicket, setSubmittedTicket] = useState<string | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +72,9 @@ export function ReportMenu({
 
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isWorking || submittedTicket) return;
+
     setIsWorking(true);
     setMessage(null);
 
@@ -86,13 +90,20 @@ export function ReportMenu({
 
       if (error) throw error;
 
-      setMessage(`Report submitted. Ticket: ${String(data)}`);
-      setDetails("");
+      const ticketNumber = String(data);
+      setSubmittedTicket(ticketNumber);
+      setMessage(`Report submitted. Ticket: ${ticketNumber}`);
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
       setIsWorking(false);
     }
+  }
+
+  function openDialog() {
+    setMenuOpen(false);
+    setDialogOpen(true);
+    setMessage(submittedTicket ? `Report submitted. Ticket: ${submittedTicket}` : null);
   }
 
   return (
@@ -111,14 +122,10 @@ export function ReportMenu({
         <div className="absolute right-0 top-10 z-20 min-w-44 rounded-xl border bg-white p-2 shadow-lg">
           <button
             className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50"
-            onClick={() => {
-              setMenuOpen(false);
-              setDialogOpen(true);
-              setMessage(null);
-            }}
+            onClick={openDialog}
             type="button"
           >
-            Report {label}
+            {submittedTicket ? `Reported (${submittedTicket})` : `Report ${label}`}
           </button>
         </div>
       )}
@@ -147,7 +154,8 @@ export function ReportMenu({
               <label className="grid gap-2 text-sm font-medium">
                 Why are you reporting this?
                 <select
-                  className="rounded-lg border px-3 py-2"
+                  className="rounded-lg border px-3 py-2 disabled:bg-gray-100"
+                  disabled={Boolean(submittedTicket)}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                 >
@@ -162,7 +170,8 @@ export function ReportMenu({
               <label className="grid gap-2 text-sm font-medium">
                 Additional details
                 <textarea
-                  className="min-h-28 rounded-lg border px-3 py-2"
+                  className="min-h-28 rounded-lg border px-3 py-2 disabled:bg-gray-100"
+                  disabled={Boolean(submittedTicket)}
                   value={details}
                   onChange={(event) => setDetails(event.target.value)}
                   placeholder="Optional explanation for the moderation team"
@@ -177,14 +186,14 @@ export function ReportMenu({
                   onClick={() => setDialogOpen(false)}
                   type="button"
                 >
-                  Cancel
+                  {submittedTicket ? "Close" : "Cancel"}
                 </button>
                 <button
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  disabled={isWorking}
+                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isWorking || Boolean(submittedTicket)}
                   type="submit"
                 >
-                  {isWorking ? "Submitting..." : "Submit report"}
+                  {submittedTicket ? "Report submitted" : isWorking ? "Submitting..." : "Submit report"}
                 </button>
               </div>
             </form>
