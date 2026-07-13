@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ReportMenu } from "@/components/moderation/ReportMenu";
 
 type Profile = {
   id: string;
@@ -445,14 +446,25 @@ export function MessagingWorkflow() {
                   ) : (
                     <ProfileAvatar avatarPath={null} displayName="Connection" size={28} />
                   )}
-                  <div>
-                    {sender ? (
-                      <Link className="font-medium hover:underline" href={`/profile/${sender.id}`}>
-                        {isOwn ? "You" : sender.display_name}
-                      </Link>
-                    ) : (
-                      <p className="font-medium">Connection</p>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      {sender ? (
+                        <Link className="font-medium hover:underline" href={`/profile/${sender.id}`}>
+                          {isOwn ? "You" : sender.display_name}
+                        </Link>
+                      ) : (
+                        <p className="font-medium">Connection</p>
+                      )}
+                      {!isOwn && (
+                        <ReportMenu
+                          targetType="message"
+                          targetId={item.id}
+                          reportedUserId={item.sender_id}
+                          label="message"
+                          disabled={isWorking}
+                        />
+                      )}
+                    </div>
                     <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
                   </div>
                 </article>
