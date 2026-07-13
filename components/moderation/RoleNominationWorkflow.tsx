@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
@@ -29,6 +30,8 @@ type RoleNomination = {
   expires_at: string;
   created_at: string;
 };
+
+const availabilityOptions = ["Daily", "Weekly", "Fortnightly", "Monthly"];
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
@@ -93,6 +96,8 @@ export function RoleNominationWorkflow() {
   );
 
   const canNominate = currentRole === "admin" || currentRole === "senior_moderator";
+  const justificationLength = justification.trim().length;
+  const nominationReady = Boolean(selectedNomineeId) && justificationLength >= 20 && Boolean(availability);
 
   async function loadData() {
     setMessage(null);
@@ -148,7 +153,21 @@ export function RoleNominationWorkflow() {
 
   async function submitNomination(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedNomineeId || justification.trim().length < 20) return;
+
+    if (!selectedNomineeId) {
+      setMessage("Select a candidate before sending the nomination.");
+      return;
+    }
+
+    if (justificationLength < 20) {
+      setMessage(`Justification requires at least 20 characters. ${justificationLength} entered.`);
+      return;
+    }
+
+    if (!availability) {
+      setMessage("Select the candidate's expected moderation availability.");
+      return;
+    }
 
     setIsWorking(true);
     setMessage(null);
@@ -160,7 +179,7 @@ export function RoleNominationWorkflow() {
         proposed: proposedRole,
         justification_text: justification.trim(),
         evidence_text: evidenceNotes.trim() || null,
-        availability_text: availability.trim() || null,
+        availability_text: availability,
         conflict_text: conflictNotes.trim() || null,
       });
 
@@ -284,6 +303,7 @@ export function RoleNominationWorkflow() {
                 </option>
               ))}
             </select>
+            {!selectedNomineeId && <span className="text-xs text-amber-700">Select a candidate to continue.</span>}
           </label>
 
           <label className="grid gap-2 text-sm font-medium">
@@ -309,6 +329,9 @@ export function RoleNominationWorkflow() {
               minLength={20}
               required
             />
+            <span className={justificationLength >= 20 ? "text-xs text-green-700" : "text-xs text-amber-700"}>
+              {justificationLength}/20 minimum characters
+            </span>
           </label>
 
           <label className="grid gap-2 text-sm font-medium">
@@ -324,12 +347,17 @@ export function RoleNominationWorkflow() {
           <div className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium">
               Expected availability
-              <input
+              <select
                 className="rounded-lg border px-3 py-2"
                 value={availability}
                 onChange={(event) => setAvailability(event.target.value)}
-                placeholder="Example: 3 hours per week"
-              />
+                required
+              >
+                <option value="">Select availability</option>
+                {availabilityOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
             </label>
 
             <label className="grid gap-2 text-sm font-medium">
@@ -343,9 +371,15 @@ export function RoleNominationWorkflow() {
             </label>
           </div>
 
+          {!nominationReady && (
+            <p className="text-xs text-gray-600">
+              Complete the candidate, 20-character justification, and expected availability fields to enable submission.
+            </p>
+          )}
+
           <button
             className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            disabled={isWorking || !selectedNomineeId || justification.trim().length < 20}
+            disabled={isWorking || !nominationReady}
             type="submit"
           >
             {isWorking ? "Sending..." : "Send nomination"}
@@ -362,6 +396,16 @@ export function RoleNominationWorkflow() {
             <p className="mt-2 text-sm text-gray-600">
               Moderators review reports, apply the FieldsConnect Code of Conduct fairly, protect confidentiality and document every decision.
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                className="rounded-lg border px-4 py-2 text-sm font-medium"
+                href="/code-of-conduct"
+                target="_blank"
+              >
+                Read the Code of Conduct
+              </Link>
+            </div>
 
             <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
               <p><span className="font-medium">Justification:</span> {nomination.justification}</p>
