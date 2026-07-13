@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { ReportMenu } from "@/components/moderation/ReportMenu";
 
 const STORAGE_BUCKET = "library-documents";
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
