@@ -206,7 +206,28 @@ export function ModerationDashboard() {
                 <dt className="font-medium">Target ID</dt>
                 <dd className="mt-1 break-all text-gray-700">{selectedTicket.target_id}</dd>
               </div>
-            </dl>
+            </dl>            <div className="flex flex-wrap items-center gap-3">
+              <button
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={isWorking || selectedTicket.assigned_to !== null}
+                onClick={() => assignToMe(selectedTicket.id)}
+                type="button"
+              >
+                {selectedTicket.assigned_to
+                  ? "Already assigned"
+                  : isWorking
+                    ? "Assigning..."
+                    : "Assign to me"}
+              </button>
+
+              <span className="text-sm text-gray-600">
+                {selectedTicket.assigned_to
+                  ? "This ticket already has an assignee."
+                  : "No moderator assigned yet."}
+              </span>
+            </div>
+
+
 
             <div>
               <h3 className="font-medium">Reporter details</h3>
