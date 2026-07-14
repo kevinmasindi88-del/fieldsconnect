@@ -44,6 +44,7 @@ export function ModerationDashboard() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWorking, setIsWorking] = useState(false);
 
   const profileById = useMemo(
     () => new Map(profiles.map((profile) => [profile.id, profile])),
@@ -92,6 +93,38 @@ export function ModerationDashboard() {
 
     void loadDashboard();
   }, []);
+
+  async function assignToMe(ticketId: string) {
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.rpc("assign_moderation_ticket_to_me", {
+        report_id: ticketId,
+      });
+
+      if (error) throw error;
+
+      setTickets((currentTickets) =>
+        currentTickets.map((ticket) =>
+          ticket.id === ticketId
+            ? {
+                ...ticket,
+                assigned_to: "current-user",
+                status: ticket.status === "open" ? "in_review" : ticket.status,
+              }
+            : ticket
+        )
+      );
+
+      setMessage("Ticket assigned to you.");
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
 
   if (isLoading) {
     return <p className="p-8 text-sm text-gray-600">Loading moderation dashboard...</p>;
