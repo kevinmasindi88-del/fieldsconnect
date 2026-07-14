@@ -600,7 +600,15 @@ export function LibraryWorkflow() {
                     isWorking={isWorking}
                     isSelected
                     onOpen={() => openDocument(selectedResult)}
-                  />
+                  >
+                    <ReportMenu
+                      targetType="library_document"
+                      targetId={selectedResult.id}
+                      reportedUserId={selectedResult.owner_id}
+                      label="resource"
+                      disabled={isWorking}
+                    />
+                  </DocumentCard>
                 </div>
               )}
             </div>
