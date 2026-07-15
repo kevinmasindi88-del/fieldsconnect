@@ -38,6 +38,8 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
   const [role, setRole] = useState<PlatformRole>("user");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [moderatorNotes, setModeratorNotes] = useState("");
+  const [isWorking, setIsWorking] = useState(false);
 
   useEffect(() => {
     async function loadReview() {
@@ -80,6 +82,54 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
     void loadReview();
   }, [ticketId]);
+
+  async function takeAction(action: "dismissed" | "warned" | "escalated") {
+    if (!ticket) return;
+
+    if (moderatorNotes.trim().length < 10) {
+      setMessage("Moderator notes must contain at least 10 characters.");
+      return;
+    }
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc("resolve_moderation_ticket", {
+        report_id: ticket.id,
+        moderation_action: action,
+        action_notes: moderatorNotes.trim(),
+      });
+
+      if (error) throw error;
+
+      const nextStatus =
+        action === "dismissed"
+          ? "dismissed"
+          : action === "warned"
+            ? "actioned"
+            : "reviewing";
+
+      setTicket({
+        ...ticket,
+        status: nextStatus,
+      });
+
+      setMessage(
+        action === "dismissed"
+          ? "Report dismissed."
+          : action === "warned"
+            ? "Warning action recorded."
+            : "Ticket escalated."
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -178,6 +228,56 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           </p>
         )}
       </div>
+      <div className="rounded-xl border p-4">
+        <h2 className="text-xl font-semibold">Moderation decision</h2>
+
+        <label className="mt-4 flex flex-col gap-2 text-sm font-medium">
+          Internal moderator notes
+          <textarea
+            className="min-h-32 rounded-lg border px-3 py-2"
+            value={moderatorNotes}
+            onChange={(event) => setModeratorNotes(event.target.value)}
+            placeholder="Record the review findings and justification. Minimum 10 characters."
+            disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
+          />
+        </label>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
+            onClick={() => takeAction("dismissed")}
+            type="button"
+          >
+            {isWorking ? "Working..." : "Dismiss report"}
+          </button>
+
+          <button
+            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
+            onClick={() => takeAction("warned")}
+            type="button"
+          >
+            {isWorking ? "Working..." : "Warn user"}
+          </button>
+
+          <button
+            className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
+            onClick={() => takeAction("escalated")}
+            type="button"
+          >
+            {isWorking ? "Working..." : "Escalate"}
+          </button>
+        </div>
+
+        {message && (
+          <p className="mt-4 rounded-lg border p-3 text-sm text-gray-700">
+            {message}
+          </p>
+        )}
+      </div>
+
     </section>
   );
 }
