@@ -40,6 +40,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [moderatorNotes, setModeratorNotes] = useState("");
   const [isWorking, setIsWorking] = useState(false);
+  const [contentRevision, setContentRevision] = useState(0);
 
   useEffect(() => {
     async function loadReview() {
@@ -83,8 +84,19 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     void loadReview();
   }, [ticketId]);
 
-  async function takeAction(action: "dismissed" | "warned" | "escalated") {
+  async function takeAction(
+    action: "dismissed" | "warned" | "escalated" | "redacted" | "removed"
+  ) {
     if (!ticket) return;
+
+    if (
+      action === "removed" &&
+      !window.confirm(
+        "Remove this post from FieldsConnect? The post will be hidden but retained for moderation records."
+      )
+    ) {
+      return;
+    }
 
     if (moderatorNotes.trim().length < 10) {
       setMessage("Moderator notes must contain at least 10 characters.");
@@ -108,21 +120,29 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       const nextStatus =
         action === "dismissed"
           ? "dismissed"
-          : action === "warned"
-            ? "actioned"
-            : "reviewing";
+          : action === "escalated"
+            ? "reviewing"
+            : "actioned";
 
       setTicket({
         ...ticket,
         status: nextStatus,
       });
 
+      if (action === "redacted" || action === "removed") {
+        setContentRevision((current) => current + 1);
+      }
+
       setMessage(
         action === "dismissed"
           ? "Report dismissed."
           : action === "warned"
-            ? "Warning action recorded."
-            : "Ticket escalated."
+            ? "Warning sent to the user."
+            : action === "escalated"
+              ? "Ticket escalated."
+              : action === "redacted"
+                ? "Post redacted and the user notified."
+                : "Post removed and the user notified."
       );
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -220,7 +240,10 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         <h2 className="mb-4 text-xl font-semibold">Reported content</h2>
 
         {ticket.target_type === "post" ? (
-          <PostDetailWorkflow postId={ticket.target_id} />
+          <PostDetailWorkflow
+            key={`${ticket.target_id}-${contentRevision}`}
+            postId={ticket.target_id}
+          />
         ) : (
           <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
             Review support for {ticket.target_type.replaceAll("_", " ")} will
@@ -263,12 +286,46 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
           <button
             className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
-            disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
+            disabled={
+              isWorking ||
+              ticket.status === "actioned" ||
+              ticket.status === "dismissed"
+            }
             onClick={() => takeAction("escalated")}
             type="button"
           >
             {isWorking ? "Working..." : "Escalate"}
           </button>
+
+          {ticket.target_type === "post" && (
+            <>
+              <button
+                className="rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+                disabled={
+                  isWorking ||
+                  ticket.status === "actioned" ||
+                  ticket.status === "dismissed"
+                }
+                onClick={() => takeAction("redacted")}
+                type="button"
+              >
+                {isWorking ? "Working..." : "Redact post"}
+              </button>
+
+              <button
+                className="rounded-lg border border-red-700 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                disabled={
+                  isWorking ||
+                  ticket.status === "actioned" ||
+                  ticket.status === "dismissed"
+                }
+                onClick={() => takeAction("removed")}
+                type="button"
+              >
+                {isWorking ? "Working..." : "Remove post"}
+              </button>
+            </>
+          )}
         </div>
 
         {message && (
