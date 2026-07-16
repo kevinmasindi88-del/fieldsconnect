@@ -15,8 +15,19 @@ type Notification = {
     | "new_message"
     | "post_liked"
     | "post_commented"
-    | "comment_liked";
-  entity_type: "connection" | "conversation" | "message" | "post" | "comment";
+    | "comment_liked"
+    | "moderation_warning"
+    | "moderation_action"
+    | "moderation_report"
+    | "moderation_assignment"
+    | "moderation_outcome";
+  entity_type:
+    | "connection"
+    | "conversation"
+    | "message"
+    | "post"
+    | "comment"
+    | "moderation_ticket";
   entity_id: string | null;
   title: string;
   body: string | null;
@@ -238,6 +249,32 @@ export function NotificationsWorkflow() {
       );
     }
 
+    if (
+      notification.entity_type === "moderation_ticket" &&
+      notification.entity_id &&
+      ["moderation_report", "moderation_assignment"].includes(
+        notification.notification_type
+      )
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/moderation/review/${notification.entity_id}`
+              )
+            }
+            type="button"
+          >
+            Open ticket
+          </button>
+        </>
+      );
+    }
     if (!postId) {
       return notification.body;
     }
