@@ -29,6 +29,24 @@ type ReportedComment = {
   deleted_at: string | null;
 };
 
+type ReportedLibraryDocument = {
+  id: string;
+  owner_id: string;
+  owner_name: string;
+  title: string;
+  description: string | null;
+  file_name: string;
+  file_size_bytes: number;
+  mime_type: string;
+  storage_bucket: string;
+  storage_path: string;
+  visibility: string;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
 type AuditEntry = {
   id: string;
   action: string;
@@ -37,6 +55,9 @@ type AuditEntry = {
   performed_at: string;
   target_snapshot: {
     body?: string;
+    title?: string;
+    description?: string | null;
+    file_name?: string;
     target_type?: string;
     target_id?: string;
   } | null;
@@ -71,6 +92,10 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
   const [reportedComment, setReportedComment] =
     useState<ReportedComment | null>(null);
   const [isCommentLoading, setIsCommentLoading] = useState(false);
+  const [reportedLibraryDocument, setReportedLibraryDocument] =
+    useState<ReportedLibraryDocument | null>(null);
+  const [isLibraryDocumentLoading, setIsLibraryDocumentLoading] =
+    useState(false);
 
   async function loadReportedComment(commentId: string) {
     setIsCommentLoading(true);
@@ -109,6 +134,73 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       setMessage(getErrorMessage(error));
     } finally {
       setIsCommentLoading(false);
+    }
+  }
+
+  async function loadReportedLibraryDocument(documentId: string) {
+    setIsLibraryDocumentLoading(true);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const documentResult = await supabase
+        .from("library_documents")
+        .select(
+          "id, owner_id, title, description, file_name, file_size_bytes, mime_type, storage_bucket, storage_path, visibility, is_published, created_at, updated_at, deleted_at"
+        )
+        .eq("id", documentId)
+        .maybeSingle();
+
+      if (documentResult.error) throw documentResult.error;
+
+      if (!documentResult.data) {
+        setReportedLibraryDocument(null);
+        return;
+      }
+
+      const profileResult = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", documentResult.data.owner_id)
+        .maybeSingle();
+
+      if (profileResult.error) throw profileResult.error;
+
+      setReportedLibraryDocument({
+        ...documentResult.data,
+        owner_name: profileResult.data?.display_name ?? "Unknown user",
+      } as ReportedLibraryDocument);
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsLibraryDocumentLoading(false);
+    }
+  }
+
+  async function openReportedLibraryDocument() {
+    if (!reportedLibraryDocument) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { data, error } = await supabase.storage
+        .from(reportedLibraryDocument.storage_bucket)
+        .createSignedUrl(reportedLibraryDocument.storage_path, 300);
+
+      if (error) throw error;
+
+      if (!data?.signedUrl) {
+        throw new Error("Unable to generate a secure resource link.");
+      }
+
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
     }
   }
 
@@ -208,7 +300,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           loadAuditHistory(ticketId),
           loadedTicket.target_type === "comment"
             ? loadReportedComment(loadedTicket.target_id)
-            : Promise.resolve(),
+            : loadedTicket.target_type === "library_document"
+              ? loadReportedLibraryDocument(loadedTicket.target_id)
+              : Promise.resolve(),
         ]);
       } catch (error) {
         setMessage(getErrorMessage(error));
@@ -270,6 +364,8 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
         if (ticket.target_type === "comment") {
           await loadReportedComment(ticket.target_id);
+        } else if (ticket.target_type === "library_document") {
+          await loadReportedLibraryDocument(ticket.target_id);
         }
       }
 
@@ -283,8 +379,16 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
             : action === "escalated"
               ? "Ticket escalated."
               : action === "redacted"
-                ? `${ticket.target_type === "comment" ? "Comment" : "Post"} redacted and the user notified.`
-                : `${ticket.target_type === "comment" ? "Comment" : "Post"} removed and the user notified.`
+                ? `${ticket.target_type === "comment"
+                    ? "Comment"
+                    : ticket.target_type === "library_document"
+                      ? "Library resource"
+                      : "Post"} redacted and the user notified.`
+                : `${ticket.target_type === "comment"
+                    ? "Comment"
+                    : ticket.target_type === "library_document"
+                      ? "Library resource"
+                      : "Post"} removed and the user notified.`
       );
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -427,6 +531,110 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               The reported comment could not be found.
             </p>
           )
+        ) : ticket.target_type === "library_document" ? (
+          isLibraryDocumentLoading ? (
+            <p className="rounded-xl border p-4 text-sm text-gray-600">
+              Loading reported library resource...
+            </p>
+          ) : reportedLibraryDocument ? (
+            <article className="rounded-xl border bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {reportedLibraryDocument.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Uploaded by {reportedLibraryDocument.owner_name}
+                  </p>
+                </div>
+
+                <time
+                  className="text-sm text-gray-500"
+                  dateTime={reportedLibraryDocument.created_at}
+                >
+                  {new Date(
+                    reportedLibraryDocument.created_at
+                  ).toLocaleString("en-ZA", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </time>
+              </div>
+
+              {reportedLibraryDocument.deleted_at ? (
+                <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-gray-600">
+                  This library resource was removed by FCModerators.
+                </p>
+              ) : (
+                <>
+                  {reportedLibraryDocument.description && (
+                    <p className="mt-4 whitespace-pre-wrap text-sm text-gray-700">
+                      {reportedLibraryDocument.description}
+                    </p>
+                  )}
+
+                  <dl className="mt-4 grid gap-3 rounded-lg bg-gray-50 p-3 text-sm md:grid-cols-2">
+                    <div>
+                      <dt className="font-medium">File name</dt>
+                      <dd className="mt-1 break-all">
+                        {reportedLibraryDocument.deleted_at ? (
+                          <span className="text-gray-500">
+                            {reportedLibraryDocument.file_name}
+                          </span>
+                        ) : (
+                          <button
+                            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+                            disabled={isWorking}
+                            onClick={openReportedLibraryDocument}
+                            type="button"
+                          >
+                            {reportedLibraryDocument.file_name}
+                          </button>
+                        )}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="font-medium">File size</dt>
+                      <dd className="mt-1 text-gray-700">
+                        {formatFileSize(
+                          reportedLibraryDocument.file_size_bytes
+                        )}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="font-medium">File type</dt>
+                      <dd className="mt-1 text-gray-700">
+                        {reportedLibraryDocument.mime_type}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="font-medium">Publication status</dt>
+                      <dd className="mt-1 text-gray-700">
+                        {reportedLibraryDocument.is_published
+                          ? "Published"
+                          : "Unpublished"}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt className="font-medium">Visibility</dt>
+                      <dd className="mt-1 capitalize text-gray-700">
+                        {reportedLibraryDocument.visibility}
+                      </dd>
+                    </div>
+                  </dl>
+                </>
+              )}
+            </article>
+          ) : (
+            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+              The reported library resource could not be found or is no longer
+              accessible.
+            </p>
+          )
         ) : (
           <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
             Review support for {ticket.target_type.replaceAll("_", " ")} will
@@ -480,7 +688,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
             {isWorking ? "Working..." : "Escalate"}
           </button>
 
-          {["post", "comment"].includes(ticket.target_type) && (
+          {["post", "comment", "library_document"].includes(ticket.target_type) && (
             <>
               <button
                 className="rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
@@ -492,7 +700,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 onClick={() => takeAction("redacted")}
                 type="button"
               >
-                {isWorking ? "Working..." : `Redact ${ticket.target_type}`}
+                {isWorking ? "Working..." : `Redact ${ticket.target_type === "library_document" ? "library resource" : ticket.target_type}`}
               </button>
 
               <button
@@ -505,7 +713,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 onClick={() => takeAction("removed")}
                 type="button"
               >
-                {isWorking ? "Working..." : `Remove ${ticket.target_type}`}
+                {isWorking ? "Working..." : `Remove ${ticket.target_type === "library_document" ? "library resource" : ticket.target_type}`}
               </button>
             </>
           )}
@@ -608,4 +816,10 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
     </section>
   );
+}
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
