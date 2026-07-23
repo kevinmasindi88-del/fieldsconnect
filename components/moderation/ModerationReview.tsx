@@ -47,6 +47,16 @@ type ReportedLibraryDocument = {
   deleted_at: string | null;
 };
 
+type ModerationMessageContext = {
+  message_id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_name: string;
+  body: string;
+  created_at: string;
+  is_reported_message: boolean;
+};
+
 type AuditEntry = {
   id: string;
   action: string;
@@ -96,6 +106,50 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     useState<ReportedLibraryDocument | null>(null);
   const [isLibraryDocumentLoading, setIsLibraryDocumentLoading] =
     useState(false);
+  const [messageContext, setMessageContext] =
+    useState<ModerationMessageContext[]>([]);
+  const [isMessageContextLoading, setIsMessageContextLoading] =
+    useState(false);
+  const [isMessageEvidenceUnavailable, setIsMessageEvidenceUnavailable] =
+    useState(false);
+
+  async function loadReportedMessageContext(reportId: string) {
+    setIsMessageContextLoading(true);
+    setIsMessageEvidenceUnavailable(false);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const contextResult = await supabase.rpc(
+        "get_moderation_message_context",
+        {
+          report_id: reportId,
+        }
+      );
+
+      if (contextResult.error) {
+        const errorMessage = getErrorMessage(contextResult.error);
+
+        if (
+          errorMessage.includes("Message evidence is no longer available")
+        ) {
+          setMessageContext([]);
+          setIsMessageEvidenceUnavailable(true);
+          return;
+        }
+
+        throw contextResult.error;
+      }
+
+      setMessageContext(
+        (contextResult.data ?? []) as ModerationMessageContext[]
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsMessageContextLoading(false);
+    }
+  }
 
   async function loadReportedComment(commentId: string) {
     setIsCommentLoading(true);
@@ -302,7 +356,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
             ? loadReportedComment(loadedTicket.target_id)
             : loadedTicket.target_type === "library_document"
               ? loadReportedLibraryDocument(loadedTicket.target_id)
-              : Promise.resolve(),
+              : loadedTicket.target_type === "message"
+                ? loadReportedMessageContext(ticketId)
+                : Promise.resolve(),
         ]);
       } catch (error) {
         setMessage(getErrorMessage(error));
@@ -359,6 +415,14 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         status: nextStatus,
       });
 
+      if (
+        ticket.target_type === "message" &&
+        nextStatus !== "reviewing"
+      ) {
+        setMessageContext([]);
+        setIsMessageEvidenceUnavailable(true);
+      }
+
       if (action === "redacted" || action === "removed") {
         setContentRevision((current) => current + 1);
 
@@ -383,12 +447,16 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                     ? "Comment"
                     : ticket.target_type === "library_document"
                       ? "Library resource"
-                      : "Post"} redacted and the user notified.`
+                      : ticket.target_type === "message"
+                        ? "Message"
+                        : "Post"} redacted and the user notified.`
                 : `${ticket.target_type === "comment"
                     ? "Comment"
                     : ticket.target_type === "library_document"
                       ? "Library resource"
-                      : "Post"} removed and the user notified.`
+                      : ticket.target_type === "message"
+                        ? "Message"
+                        : "Post"} removed and the user notified.`
       );
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -635,6 +703,86 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               accessible.
             </p>
           )
+        ) : ticket.target_type === "message" ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+              <h3 className="font-semibold text-amber-950">
+                Confidential message evidence
+              </h3>
+              <p className="mt-2 text-sm text-amber-900">
+                This view contains only the reported message and up to 10
+                messages immediately before it. Do not copy, share, or use this
+                content outside this moderation review. Access ends when the
+                ticket is resolved.
+              </p>
+            </div>
+
+            {isMessageContextLoading ? (
+              <p className="rounded-xl border p-4 text-sm text-gray-600">
+                Loading restricted message evidence...
+              </p>
+            ) : isMessageEvidenceUnavailable ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+                Private message evidence is no longer available because this
+                ticket has been resolved.
+              </p>
+            ) : messageContext.length === 0 ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+                No message evidence is available for this ticket.
+              </p>
+            ) : (
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <p className="mb-4 text-sm text-gray-600">
+                  Showing {messageContext.length - 1} prior{" "}
+                  {messageContext.length - 1 === 1 ? "message" : "messages"} and
+                  the reported message. No later messages are displayed.
+                </p>
+
+                <ol className="space-y-3">
+                  {messageContext.map((contextMessage) => (
+                    <li
+                      className={
+                        contextMessage.is_reported_message
+                          ? "rounded-xl border-2 border-red-600 bg-red-50 p-4"
+                          : "rounded-xl border bg-white p-4"
+                      }
+                      key={contextMessage.message_id}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {contextMessage.sender_name}
+                          </p>
+
+                          {contextMessage.is_reported_message && (
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                              Reported message
+                            </p>
+                          )}
+                        </div>
+
+                        <time
+                          className="text-sm text-gray-500"
+                          dateTime={contextMessage.created_at}
+                        >
+                          {new Date(
+                            contextMessage.created_at
+                          ).toLocaleString("en-ZA", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </time>
+                      </div>
+
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-gray-800">
+                        {contextMessage.body}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
         ) : (
           <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
             Review support for {ticket.target_type.replaceAll("_", " ")} will
@@ -688,7 +836,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
             {isWorking ? "Working..." : "Escalate"}
           </button>
 
-          {["post", "comment", "library_document"].includes(ticket.target_type) && (
+          {["post", "comment", "library_document", "message"].includes(ticket.target_type) && (
             <>
               <button
                 className="rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
@@ -700,7 +848,13 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 onClick={() => takeAction("redacted")}
                 type="button"
               >
-                {isWorking ? "Working..." : `Redact ${ticket.target_type === "library_document" ? "library resource" : ticket.target_type}`}
+                {isWorking
+                  ? "Working..."
+                  : `Redact ${
+                      ticket.target_type === "library_document"
+                        ? "library resource"
+                        : ticket.target_type
+                    }`}
               </button>
 
               <button
@@ -713,7 +867,13 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 onClick={() => takeAction("removed")}
                 type="button"
               >
-                {isWorking ? "Working..." : `Remove ${ticket.target_type === "library_document" ? "library resource" : ticket.target_type}`}
+                {isWorking
+                  ? "Working..."
+                  : `Remove ${
+                      ticket.target_type === "library_document"
+                        ? "library resource"
+                        : ticket.target_type
+                    }`}
               </button>
             </>
           )}
