@@ -1,7 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type Profile = {
   id: string;
@@ -123,7 +127,7 @@ export function SkillsWorkflow() {
       setMessage("Skill added.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to add skill.");
+      setMessage(getActionErrorMessage(error, "add skill"));
     } finally {
       setIsWorking(false);
     }
@@ -146,7 +150,7 @@ export function SkillsWorkflow() {
       setMessage(skill.is_published ? "Skill unpublished." : "Skill published.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update skill.");
+      setMessage(getActionErrorMessage(error, "update skill"));
     } finally {
       setIsWorking(false);
     }
@@ -161,7 +165,7 @@ export function SkillsWorkflow() {
         </p>
       </div>
 
-      {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={addSkill} className="flex flex-col gap-4 rounded-xl border p-4">
         <h2 className="text-xl font-semibold">Add a skill</h2>

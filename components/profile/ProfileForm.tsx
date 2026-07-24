@@ -1,7 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type RoleType = "student" | "professional" | "institution";
 type ProfileVisibility = "public" | "connections" | "private";
@@ -183,7 +187,7 @@ export function ProfileForm() {
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to upload profile picture.");
+      setMessage(getActionErrorMessage(error, "upload profile picture"));
     } finally {
       setIsAvatarWorking(false);
     }
@@ -219,7 +223,7 @@ export function ProfileForm() {
       setSelectedAvatarFile(null);
       setMessage("Profile picture deleted.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to delete profile picture.");
+      setMessage(getActionErrorMessage(error, "delete profile picture"));
     } finally {
       setIsAvatarWorking(false);
     }
@@ -270,7 +274,7 @@ export function ProfileForm() {
 
       setMessage("Profile saved.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to save profile.");
+      setMessage(getActionErrorMessage(error, "save profile"));
     } finally {
       setIsSaving(false);
     }
@@ -421,7 +425,7 @@ export function ProfileForm() {
         </>
       )}
 
-      {message && <p className="text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
     </form>
   );
 }

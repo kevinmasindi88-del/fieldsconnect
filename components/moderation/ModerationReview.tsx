@@ -15,7 +15,23 @@ type ReportTicket = {
   reason: string;
   details: string | null;
   status: string;
+  resolution_action: string | null;
   assigned_to: string | null;
+};
+
+type AccountSuspension = {
+  id: string;
+  user_id: string;
+  report_id: string;
+  duration_days: number;
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+  imposed_by: string;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  revocation_reason: string | null;
+  created_at: string;
 };
 
 type ReportedComment = {
@@ -112,6 +128,11 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     useState(false);
   const [isMessageEvidenceUnavailable, setIsMessageEvidenceUnavailable] =
     useState(false);
+  const [suspension, setSuspension] =
+    useState<AccountSuspension | null>(null);
+  const [isSuspensionLoading, setIsSuspensionLoading] = useState(false);
+  const [suspensionReason, setSuspensionReason] = useState("");
+  const [liftReason, setLiftReason] = useState("");
 
   async function loadReportedMessageContext(reportId: string) {
     setIsMessageContextLoading(true);
@@ -258,6 +279,36 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     }
   }
 
+  async function loadSuspension(reportId: string) {
+    setIsSuspensionLoading(true);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const suspensionResult = await supabase
+        .from("account_suspensions")
+        .select(
+          "id, user_id, report_id, duration_days, reason, starts_at, ends_at, imposed_by, revoked_at, revoked_by, revocation_reason, created_at"
+        )
+        .eq("report_id", reportId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (suspensionResult.error) throw suspensionResult.error;
+
+      setSuspension(
+        suspensionResult.data
+          ? (suspensionResult.data as AccountSuspension)
+          : null
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsSuspensionLoading(false);
+    }
+  }
+
   async function loadAuditHistory(reportId: string) {
     setIsAuditLoading(true);
 
@@ -334,7 +385,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         const ticketResult = await supabase
           .from("reports")
           .select(
-            "id, ticket_number, target_type, target_id, reason, details, status, assigned_to"
+            "id, ticket_number, target_type, target_id, reason, details, status, resolution_action, assigned_to"
           )
           .eq("id", ticketId)
           .maybeSingle();
@@ -352,6 +403,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
         await Promise.all([
           loadAuditHistory(ticketId),
+          ["senior_moderator", "admin"].includes(currentRole)
+            ? loadSuspension(ticketId)
+            : Promise.resolve(),
           loadedTicket.target_type === "comment"
             ? loadReportedComment(loadedTicket.target_id)
             : loadedTicket.target_type === "library_document"
@@ -413,6 +467,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       setTicket({
         ...ticket,
         status: nextStatus,
+        resolution_action: action,
       });
 
       if (
@@ -464,6 +519,148 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       setIsWorking(false);
     }
   }
+
+  async function suspendUser(durationDays: 10 | 30) {
+    if (!ticket) return;
+
+    if (!["senior_moderator", "admin"].includes(role)) {
+      setMessage(
+        "Only a senior moderator or administrator may suspend an account."
+      );
+      return;
+    }
+
+    if (ticket.status !== "reviewing" || ticket.resolution_action !== "escalated") {
+      setMessage(
+        "This ticket must be escalated and under review before a suspension can be imposed."
+      );
+      return;
+    }
+
+    const trimmedReason = suspensionReason.trim();
+
+    if (trimmedReason.length < 10) {
+      setMessage(
+        "A suspension reason of at least 10 characters is required."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Suspend this account for ${durationDays} days? The user will receive the reason entered below.`
+    );
+
+    if (!confirmed) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "suspend_account_for_ticket",
+        {
+          report_id: ticket.id,
+          suspension_days: durationDays,
+          suspension_reason: trimmedReason,
+        }
+      );
+
+      if (error) throw error;
+
+      setTicket({
+        ...ticket,
+        status: "actioned",
+        resolution_action: "suspended",
+      });
+
+      setSuspensionReason("");
+      setMessage(`Account suspended for ${durationDays} days.`);
+
+      if (ticket.target_type === "message") {
+        setMessageContext([]);
+        setIsMessageEvidenceUnavailable(true);
+      }
+
+      await Promise.all([
+        loadSuspension(ticket.id),
+        loadAuditHistory(ticket.id),
+      ]);
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  async function liftSuspensionEarly() {
+    if (!ticket || !suspension) return;
+
+    if (!["senior_moderator", "admin"].includes(role)) {
+      setMessage(
+        "Only a senior moderator or administrator may lift a suspension."
+      );
+      return;
+    }
+
+    const trimmedReason = liftReason.trim();
+
+    if (trimmedReason.length < 10) {
+      setMessage(
+        "A reason of at least 10 characters is required to lift this suspension."
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Lift this suspension early? Access to FieldsConnect activity will be restored immediately."
+    );
+
+    if (!confirmed) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "revoke_account_suspension",
+        {
+          suspension_id: suspension.id,
+          revocation_reason: trimmedReason,
+        }
+      );
+
+      if (error) throw error;
+
+      setLiftReason("");
+      setMessage(
+        "Suspension lifted early. The reason has been recorded and the user has been notified."
+      );
+
+      await Promise.all([
+        loadSuspension(ticket.id),
+        loadAuditHistory(ticket.id),
+      ]);
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  const suspensionIsActive =
+    suspension !== null &&
+    suspension.revoked_at === null &&
+    new Date(suspension.ends_at).getTime() > Date.now();
+
+  const canApplySuspension =
+    ["senior_moderator", "admin"].includes(role) &&
+    ticket?.status === "reviewing" &&
+    ticket?.resolution_action === "escalated" &&
+    !suspensionIsActive;
 
   if (isLoading) {
     return (
@@ -537,6 +734,13 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           <div>
             <span className="font-medium">Assignment:</span>{" "}
             {ticket.assigned_to ? "Assigned" : "Unassigned"}
+          </div>
+
+          <div>
+            <span className="font-medium">Resolution action:</span>{" "}
+            {ticket.resolution_action
+              ? ticket.resolution_action.replaceAll("_", " ")
+              : "None"}
           </div>
         </div>
 
@@ -879,8 +1083,193 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           )}
         </div>
 
+        {["senior_moderator", "admin"].includes(role) && (
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-lg font-semibold">
+              Account suspension
+            </h3>
+
+            {isSuspensionLoading ? (
+              <p className="mt-3 text-sm text-gray-600">
+                Loading suspension record...
+              </p>
+            ) : suspension ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="grid gap-3 text-sm md:grid-cols-2">
+                  <div>
+                    <span className="font-medium">Duration:</span>{" "}
+                    {suspension.duration_days} days
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Current state:</span>{" "}
+                    <span
+                      className={
+                        suspensionIsActive
+                          ? "font-semibold text-red-700"
+                          : "font-semibold text-green-700"
+                      }
+                    >
+                      {suspensionIsActive
+                        ? "Active"
+                        : suspension.revoked_at
+                          ? "Lifted early"
+                          : "Expired"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Started:</span>{" "}
+                    {new Date(suspension.starts_at).toLocaleString("en-ZA", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </div>
+
+                  <div>
+                    <span className="font-medium">Scheduled end:</span>{" "}
+                    {new Date(suspension.ends_at).toLocaleString("en-ZA", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg bg-white p-3">
+                  <p className="text-sm font-medium">
+                    Suspension reason
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                    {suspension.reason}
+                  </p>
+                </div>
+
+                {suspension.revoked_at && (
+                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm font-medium text-green-900">
+                      Early-lift record
+                    </p>
+
+                    <p className="mt-2 text-sm text-green-900">
+                      Lifted on{" "}
+                      {new Date(suspension.revoked_at).toLocaleString("en-ZA", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </p>
+
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-green-900">
+                      <span className="font-medium">Reason:</span>{" "}
+                      {suspension.revocation_reason ??
+                        "No revocation reason was recorded."}
+                    </p>
+                  </div>
+                )}
+
+                {suspensionIsActive && (
+                  <div className="mt-5">
+                    <label className="flex flex-col gap-2 text-sm font-medium">
+                      Reason for lifting suspension early
+                      <textarea
+                        className="min-h-28 rounded-lg border border-red-300 bg-white px-3 py-2"
+                        value={liftReason}
+                        onChange={(event) =>
+                          setLiftReason(event.target.value)
+                        }
+                        placeholder="Explain the evaluation and why early restoration is justified. Minimum 10 characters."
+                        disabled={isWorking}
+                      />
+                    </label>
+
+                    <p className="mt-2 text-xs text-gray-600">
+                      This reason is permanently retained for the moderation
+                      record.
+                    </p>
+
+                    <button
+                      className="mt-3 rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                      disabled={
+                        isWorking || liftReason.trim().length < 10
+                      }
+                      onClick={liftSuspensionEarly}
+                      type="button"
+                    >
+                      {isWorking
+                        ? "Working..."
+                        : "Lift suspension early"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : canApplySuspension ? (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="text-sm text-amber-950">
+                  This ticket has been escalated. Record a user-safe reason
+                  before imposing an account suspension.
+                </p>
+
+                <label className="mt-4 flex flex-col gap-2 text-sm font-medium">
+                  Suspension reason
+                  <textarea
+                    className="min-h-28 rounded-lg border border-amber-400 bg-white px-3 py-2"
+                    value={suspensionReason}
+                    onChange={(event) =>
+                      setSuspensionReason(event.target.value)
+                    }
+                    placeholder="Explain the confirmed violation and reason for suspension. This text will be shown to the user."
+                    disabled={isWorking}
+                  />
+                </label>
+
+                <p className="mt-2 text-xs text-amber-900">
+                  Do not include the reporter’s identity, confidential
+                  evidence, or internal moderator notes.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    className="rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    disabled={
+                      isWorking || suspensionReason.trim().length < 10
+                    }
+                    onClick={() => suspendUser(10)}
+                    type="button"
+                  >
+                    {isWorking ? "Working..." : "Suspend 10 days"}
+                  </button>
+
+                  <button
+                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={
+                      isWorking || suspensionReason.trim().length < 10
+                    }
+                    onClick={() => suspendUser(30)}
+                    type="button"
+                  >
+                    {isWorking ? "Working..." : "Suspend 30 days"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-dashed p-3 text-sm text-gray-600">
+                Account suspension controls become available after the ticket
+                is escalated to a senior moderator or administrator.
+              </p>
+            )}
+          </div>
+        )}
+
         {message && (
-          <p className="mt-4 rounded-lg border p-3 text-sm text-gray-700">
+          <p
+            className={`mt-4 rounded-lg border p-3 text-sm ${
+              message.toLowerCase().includes("required") ||
+              message.toLowerCase().includes("unable") ||
+              message.toLowerCase().includes("only a senior") ||
+              message.toLowerCase().includes("must be escalated")
+                ? "border-red-300 bg-red-50 font-medium text-red-700"
+                : "text-gray-700"
+            }`}
+          >
             {message}
           </p>
         )}

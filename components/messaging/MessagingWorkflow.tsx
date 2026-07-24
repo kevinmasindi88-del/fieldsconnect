@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type Profile = {
   id: string;
@@ -338,7 +342,7 @@ export function MessagingWorkflow() {
       setDraftMessage("");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to send message.");
+      setMessage(getActionErrorMessage(error, "send message"));
     } finally {
       setIsWorking(false);
     }
@@ -355,7 +359,7 @@ export function MessagingWorkflow() {
           MVP messaging is limited to accepted 1:1 connections only.
         </p>
 
-        {message && <p className="mt-4 rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+        {message && <p className={`mt-4 ${getMessageAlertClass(message)}`}>{message}</p>}
 
         <div className="mt-6 flex flex-col gap-3">
           {isLoading ? (

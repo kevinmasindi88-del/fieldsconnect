@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type Profile = {
   id: string;
@@ -155,7 +159,7 @@ export function TimelineWorkflow() {
       setVisibility("public");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to create post.");
+      setMessage(getActionErrorMessage(error, "create post"));
     } finally {
       setIsWorking(false);
     }
@@ -202,7 +206,7 @@ export function TimelineWorkflow() {
 
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update reaction.");
+      setMessage(getActionErrorMessage(error, "update reaction"));
     } finally {
       setIsWorking(false);
     }
@@ -234,7 +238,7 @@ export function TimelineWorkflow() {
 
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update comment reaction.");
+      setMessage(getActionErrorMessage(error, "update comment reaction"));
     } finally {
       setIsWorking(false);
     }
@@ -275,7 +279,7 @@ export function TimelineWorkflow() {
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to add comment.");
+      setMessage(getActionErrorMessage(error, "add comment"));
     } finally {
       setIsWorking(false);
     }
@@ -310,7 +314,7 @@ export function TimelineWorkflow() {
       cancelEditingPost();
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to edit post.");
+      setMessage(getActionErrorMessage(error, "edit post"));
     } finally {
       setIsWorking(false);
     }
@@ -345,7 +349,7 @@ export function TimelineWorkflow() {
         <p className="mt-2 text-sm text-gray-600">Share updates, comment, and react to posts and replies.</p>
       </div>
 
-      {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={createPost} className="flex flex-col gap-4 rounded-xl border p-4">
         <label className="flex flex-col gap-2 text-sm font-medium">

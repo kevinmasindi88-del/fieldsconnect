@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 const STORAGE_BUCKET = "library-documents";
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -227,7 +231,7 @@ export function LibraryWorkflow() {
       setMessage("Document uploaded.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to upload document.");
+      setMessage(getActionErrorMessage(error, "upload document"));
     } finally {
       setIsWorking(false);
     }
@@ -250,7 +254,7 @@ export function LibraryWorkflow() {
       setMessage(document.is_published ? "Document unpublished." : "Document published.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update document.");
+      setMessage(getActionErrorMessage(error, "update document"));
     } finally {
       setIsWorking(false);
     }
@@ -274,7 +278,7 @@ export function LibraryWorkflow() {
       setMessage("Document visibility updated.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update visibility.");
+      setMessage(getActionErrorMessage(error, "update document visibility"));
     } finally {
       setIsWorking(false);
     }
@@ -330,7 +334,7 @@ export function LibraryWorkflow() {
       setMessage("Document deleted.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to delete document.");
+      setMessage(getActionErrorMessage(error, "delete document"));
     } finally {
       setIsWorking(false);
     }
@@ -359,7 +363,7 @@ export function LibraryWorkflow() {
         </p>
       </div>
 
-      {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={uploadDocument} className="flex flex-col gap-4 rounded-xl border p-4">
         <h2 className="text-xl font-semibold">Upload document</h2>

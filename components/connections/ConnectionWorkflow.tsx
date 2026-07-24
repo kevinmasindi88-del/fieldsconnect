@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type Profile = {
   id: string;
@@ -212,7 +216,7 @@ export function ConnectionWorkflow() {
       setMessage("Connection request sent.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to send connection request.");
+      setMessage(getActionErrorMessage(error, "send connection request"));
     } finally {
       setIsWorking(false);
     }
@@ -257,7 +261,7 @@ export function ConnectionWorkflow() {
       setMessage(status === "accepted" ? "Connection accepted." : "Connection declined.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to update connection request.");
+      setMessage(getActionErrorMessage(error, "update connection request"));
     } finally {
       setIsWorking(false);
     }
@@ -289,7 +293,7 @@ export function ConnectionWorkflow() {
       setMessage("Connection removed.");
       await loadData();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to remove connection.");
+      setMessage(getActionErrorMessage(error, "remove connection"));
     } finally {
       setIsWorking(false);
     }
@@ -317,7 +321,7 @@ export function ConnectionWorkflow() {
         </p>
       </div>
 
-      {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading connections...</p>
