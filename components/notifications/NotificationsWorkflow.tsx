@@ -20,7 +20,10 @@ type Notification = {
     | "moderation_action"
     | "moderation_report"
     | "moderation_assignment"
-    | "moderation_outcome";
+    | "moderation_outcome"
+    | "moderation_escalation"
+    | "account_suspension"
+    | "suspension_revoked";
   entity_type:
     | "connection"
     | "conversation"
@@ -224,6 +227,12 @@ export function NotificationsWorkflow() {
         return `${actorName} accepted your connection request`;
       case "new_message":
         return `${actorName} sent you a message`;
+      case "moderation_escalation":
+        return "Moderation ticket escalated";
+      case "account_suspension":
+        return notification.title || "FieldsConnect account suspended";
+      case "suspension_revoked":
+        return notification.title || "FieldsConnect suspension ended";
       default:
         return notification.title;
     }
@@ -252,9 +261,11 @@ export function NotificationsWorkflow() {
     if (
       notification.entity_type === "moderation_ticket" &&
       notification.entity_id &&
-      ["moderation_report", "moderation_assignment"].includes(
-        notification.notification_type
-      )
+      [
+        "moderation_report",
+        "moderation_assignment",
+        "moderation_escalation",
+      ].includes(notification.notification_type)
     ) {
       return (
         <>
