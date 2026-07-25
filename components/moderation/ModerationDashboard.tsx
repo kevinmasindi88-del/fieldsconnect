@@ -33,6 +33,8 @@ type ReportTicket = {
 
 type TicketFilter =
   | "all"
+  | "my_queue"
+  | "unassigned"
   | "open"
   | "reviewing"
   | "escalated"
@@ -91,6 +93,16 @@ export function ModerationDashboard() {
   const ticketCounts = useMemo(() => {
     return {
       all: tickets.length,
+      my_queue: tickets.filter(
+        (ticket) =>
+          ticket.assigned_to === currentUserId &&
+          !["actioned", "dismissed"].includes(ticket.status)
+      ).length,
+      unassigned: tickets.filter(
+        (ticket) =>
+          ticket.assigned_to === null &&
+          !["actioned", "dismissed"].includes(ticket.status)
+      ).length,
       open: tickets.filter((ticket) => ticket.status === "open").length,
       reviewing: tickets.filter(
         (ticket) =>
@@ -106,10 +118,22 @@ export function ModerationDashboard() {
         ["actioned", "dismissed"].includes(ticket.status)
       ).length,
     };
-  }, [tickets]);
+  }, [currentUserId, tickets]);
 
   const filteredTickets = useMemo(() => {
     switch (ticketFilter) {
+      case "my_queue":
+        return tickets.filter(
+          (ticket) =>
+            ticket.assigned_to === currentUserId &&
+            !["actioned", "dismissed"].includes(ticket.status)
+        );
+      case "unassigned":
+        return tickets.filter(
+          (ticket) =>
+            ticket.assigned_to === null &&
+            !["actioned", "dismissed"].includes(ticket.status)
+        );
       case "open":
         return tickets.filter((ticket) => ticket.status === "open");
       case "reviewing":
@@ -131,7 +155,7 @@ export function ModerationDashboard() {
       default:
         return tickets;
     }
-  }, [ticketFilter, tickets]);
+  }, [currentUserId, ticketFilter, tickets]);
 
   const activeSuspensionCount = suspensions.filter(
     (suspension) =>
@@ -362,6 +386,20 @@ export function ModerationDashboard() {
 
         <div className="grid grid-cols-2 gap-3">
           <SummaryCard
+            label="My queue"
+            value={ticketCounts.my_queue}
+            active={ticketFilter === "my_queue"}
+            onClick={() => setTicketFilter("my_queue")}
+          />
+
+          <SummaryCard
+            label="Unassigned"
+            value={ticketCounts.unassigned}
+            active={ticketFilter === "unassigned"}
+            onClick={() => setTicketFilter("unassigned")}
+          />
+
+          <SummaryCard
             label="Open"
             value={ticketCounts.open}
             active={ticketFilter === "open"}
@@ -408,6 +446,8 @@ export function ModerationDashboard() {
           {(
             [
               ["all", "All"],
+              ["my_queue", "My queue"],
+              ["unassigned", "Unassigned"],
               ["open", "Open"],
               ["reviewing", "Reviewing"],
               ["escalated", "Escalated"],
@@ -457,9 +497,22 @@ export function ModerationDashboard() {
                 }}
                 type="button"
               >
-                <p className="font-semibold">
-                  {ticket.ticket_number ?? "Legacy report"}
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-semibold">
+                    {ticket.ticket_number ?? "Legacy report"}
+                  </p>
+
+                  <AssignmentBadge
+                    assignedTo={ticket.assigned_to}
+                    currentUserId={currentUserId}
+                    assigneeName={
+                      ticket.assigned_to
+                        ? profileById.get(ticket.assigned_to)?.display_name ??
+                          "Moderation member"
+                        : null
+                    }
+                  />
+                </div>
 
                 <p className="mt-1 text-sm text-gray-700">
                   {ticket.target_type.replaceAll("_", " ")} · {ticket.reason}
@@ -658,6 +711,43 @@ function SummaryCard({
     <button className={className} onClick={onClick} type="button">
       {content}
     </button>
+  );
+}
+
+function AssignmentBadge({
+  assignedTo,
+  currentUserId,
+  assigneeName,
+}: {
+  assignedTo: string | null;
+  currentUserId: string | null;
+  assigneeName: string | null;
+}) {
+  if (!assignedTo) {
+    return (
+      <span className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+        Unassigned
+      </span>
+    );
+  }
+
+  if (assignedTo === currentUserId) {
+    return (
+      <span className="rounded-full border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
+        My ticket
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="max-w-40 truncate rounded-full border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-700"
+      title={`Assigned to ${assigneeName ?? "another moderator"}`}
+    >
+      {assigneeName
+        ? `Assigned: ${assigneeName}`
+        : "Assigned elsewhere"}
+    </span>
   );
 }
 
