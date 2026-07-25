@@ -28,6 +28,9 @@ type ReportTicket = {
   status: string;
   resolution_action: string | null;
   assigned_to: string | null;
+  consolidated_into_report_id: string | null;
+  consolidated_at: string | null;
+  consolidated_by: string | null;
   created_at: string;
 };
 
@@ -97,6 +100,9 @@ export function ModerationDashboard() {
   const [ticketSort, setTicketSort] = useState<TicketSort>("priority");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [consolidationPrimaryId, setConsolidationPrimaryId] =
+    useState("");
+  const [consolidationNotes, setConsolidationNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -113,6 +119,34 @@ export function ModerationDashboard() {
     suspensions.find(
       (suspension) => suspension.report_id === selectedTicketId
     ) ?? null;
+
+  const relatedTickets = useMemo(() => {
+    if (!selectedTicket) return [];
+
+    return tickets
+      .filter(
+        (ticket) =>
+          ticket.id !== selectedTicket.id &&
+          ticket.target_type === selectedTicket.target_type &&
+          ticket.target_id === selectedTicket.target_id
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.created_at).getTime() -
+          new Date(right.created_at).getTime()
+      );
+  }, [selectedTicket, tickets]);
+
+  const activeRelatedTickets = relatedTickets.filter(
+    (ticket) =>
+      !["actioned", "dismissed"].includes(ticket.status) &&
+      ticket.consolidated_into_report_id === null
+  );
+
+  const canConsolidateTickets = [
+    "senior_moderator",
+    "admin",
+  ].includes(role);
 
   const ticketCounts = useMemo(() => {
     return {
@@ -335,7 +369,7 @@ export function ModerationDashboard() {
           supabase
             .from("reports")
             .select(
-              "id, ticket_number, reporter_id, reported_user_id, target_type, target_id, reason, details, status, resolution_action, assigned_to, created_at"
+              "id, ticket_number, reporter_id, reported_user_id, target_type, target_id, reason, details, status, resolution_action, assigned_to, consolidated_into_report_id, consolidated_at, consolidated_by, created_at"
             )
             .order("created_at", { ascending: false }),
         ];
@@ -432,6 +466,96 @@ export function ModerationDashboard() {
       isCancelled = true;
     };
   }, [selectedTicketId]);
+
+  async function consolidateSelectedTicket() {
+    if (!selectedTicket) return;
+
+    if (!consolidationPrimaryId) {
+      setMessage("Select the primary moderation ticket.");
+      return;
+    }
+
+    const notes = consolidationNotes.trim();
+
+    if (notes.length < 5) {
+      setMessage(
+        "Provide a consolidation reason of at least 5 characters."
+      );
+      return;
+    }
+
+    const primaryTicket = tickets.find(
+      (ticket) => ticket.id === consolidationPrimaryId
+    );
+
+    if (!primaryTicket) {
+      setMessage("The selected primary ticket could not be found.");
+      return;
+    }
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "consolidate_moderation_ticket",
+        {
+          secondary_report_id: selectedTicket.id,
+          primary_report_id: primaryTicket.id,
+          consolidation_notes: notes,
+        }
+      );
+
+      if (error) throw error;
+
+      const consolidatedAt = new Date().toISOString();
+
+      setTickets((currentTickets) =>
+        currentTickets.map((ticket) =>
+          ticket.id === selectedTicket.id
+            ? {
+                ...ticket,
+                status: "dismissed",
+                resolution_action: "consolidated",
+                consolidated_into_report_id: primaryTicket.id,
+                consolidated_at: consolidatedAt,
+                consolidated_by: currentUserId,
+              }
+            : ticket
+        )
+      );
+
+      setActionLogs((currentLogs) => [
+        ...currentLogs,
+        {
+          id: `local-consolidation-${selectedTicket.id}`,
+          report_id: selectedTicket.id,
+          action: "consolidated",
+          notes,
+          performed_by: currentUserId ?? "",
+          performed_at: consolidatedAt,
+          target_snapshot: {
+            primary_report_id: primaryTicket.id,
+            primary_ticket_number: primaryTicket.ticket_number,
+          },
+        },
+      ]);
+
+      setConsolidationPrimaryId("");
+      setConsolidationNotes("");
+      setMessage(
+        `Ticket consolidated into ${
+          primaryTicket.ticket_number ?? "the primary case"
+        }.`
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
 
   async function assignToMe(ticketId: string) {
     if (!currentUserId) return;
@@ -688,6 +812,8 @@ export function ModerationDashboard() {
                 onClick={() => {
                   setSelectedTicketId(ticket.id);
                   setSelectedAssigneeId(ticket.assigned_to ?? "");
+                  setConsolidationPrimaryId("");
+                  setConsolidationNotes("");
                   setMessage(null);
                   setActionHistoryMessage(null);
                 }}
@@ -857,6 +983,155 @@ export function ModerationDashboard() {
                   "No additional details supplied."}
               </p>
             </div>
+
+            <section className="rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">Related reports</h3>
+
+                  <p className="mt-1 text-sm text-gray-600">
+                    Other reports concerning the same platform item.
+                  </p>
+                </div>
+
+                <span className="text-xs text-gray-500">
+                  {relatedTickets.length} related{" "}
+                  {relatedTickets.length === 1 ? "report" : "reports"}
+                </span>
+              </div>
+
+              {relatedTickets.length === 0 ? (
+                <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-gray-600">
+                  No other reports have been submitted for this target.
+                </p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {relatedTickets.map((ticket) => {
+                    const reporterName =
+                      profileById.get(ticket.reporter_id)?.display_name ??
+                      "Unknown reporter";
+
+                    const isPrimaryForSelected =
+                      selectedTicket.consolidated_into_report_id ===
+                      ticket.id;
+
+                    const isLinkedToSelected =
+                      ticket.consolidated_into_report_id ===
+                      selectedTicket.id;
+
+                    return (
+                      <div
+                        key={ticket.id}
+                        className="rounded-lg border bg-gray-50 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <Link
+                              className="font-semibold text-blue-700 underline"
+                              href={`/moderation/review/${ticket.id}`}
+                            >
+                              {ticket.ticket_number ?? "Legacy report"}
+                            </Link>
+
+                            <p className="mt-1 text-sm text-gray-700">
+                              Reporter: {reporterName}
+                            </p>
+                          </div>
+
+                          <TicketBadge ticket={ticket} />
+                        </div>
+
+                        <p className="mt-3 text-sm text-gray-700">
+                          {ticket.reason}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
+                          <span>
+                            {new Date(ticket.created_at).toLocaleString()}
+                          </span>
+
+                          {isPrimaryForSelected && (
+                            <span className="font-semibold text-blue-700">
+                              Primary case
+                            </span>
+                          )}
+
+                          {isLinkedToSelected && (
+                            <span className="font-semibold text-purple-700">
+                              Consolidated into this case
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {canConsolidateTickets &&
+                !["actioned", "dismissed"].includes(
+                  selectedTicket.status
+                ) &&
+                activeRelatedTickets.length > 0 && (
+                  <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <h4 className="font-semibold text-amber-950">
+                      Consolidate this ticket
+                    </h4>
+
+                    <p className="mt-1 text-sm text-amber-900">
+                      Close this ticket as a linked secondary report while
+                      preserving its reporter, details and audit history.
+                    </p>
+
+                    <label className="mt-4 flex flex-col gap-2 text-sm font-medium text-amber-950">
+                      Primary moderation ticket
+                      <select
+                        className="rounded-lg border bg-white px-3 py-2 font-normal text-gray-900"
+                        onChange={(event) =>
+                          setConsolidationPrimaryId(event.target.value)
+                        }
+                        value={consolidationPrimaryId}
+                      >
+                        <option value="">Select primary ticket</option>
+
+                        {activeRelatedTickets.map((ticket) => (
+                          <option key={ticket.id} value={ticket.id}>
+                            {ticket.ticket_number ?? "Legacy report"} —{" "}
+                            {ticket.reason}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="mt-4 flex flex-col gap-2 text-sm font-medium text-amber-950">
+                      Consolidation reason
+                      <textarea
+                        className="min-h-24 rounded-lg border bg-white px-3 py-2 font-normal text-gray-900"
+                        onChange={(event) =>
+                          setConsolidationNotes(event.target.value)
+                        }
+                        placeholder="Explain why these reports should be handled as one case."
+                        value={consolidationNotes}
+                      />
+                    </label>
+
+                    <button
+                      className="mt-4 rounded-lg bg-amber-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={
+                        isWorking ||
+                        !consolidationPrimaryId ||
+                        consolidationNotes.trim().length < 5
+                      }
+                      onClick={consolidateSelectedTicket}
+                      type="button"
+                    >
+                      {isWorking
+                        ? "Consolidating..."
+                        : "Consolidate into primary case"}
+                    </button>
+                  </div>
+                )}
+            </section>
 
             <section className="rounded-xl border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1088,12 +1363,16 @@ function TicketBadge({ ticket }: { ticket: ReportTicket }) {
     ? "Escalated"
     : ticket.resolution_action === "suspended"
       ? "Suspended"
-      : ticket.status.replaceAll("_", " ");
+      : ticket.resolution_action === "consolidated"
+        ? "Consolidated"
+        : ticket.status.replaceAll("_", " ");
 
   const className = isEscalated
     ? "border-amber-300 bg-amber-50 text-amber-900"
     : ticket.resolution_action === "suspended"
       ? "border-red-300 bg-red-50 text-red-800"
+      : ticket.resolution_action === "consolidated"
+        ? "border-purple-300 bg-purple-50 text-purple-800"
       : ticket.status === "open"
         ? "border-blue-300 bg-blue-50 text-blue-800"
         : ticket.status === "reviewing"
