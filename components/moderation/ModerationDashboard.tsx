@@ -26,7 +26,28 @@ type ReportTicket = {
   reason: string;
   details: string | null;
   status: string;
+  resolution_action: string | null;
   assigned_to: string | null;
+  created_at: string;
+};
+
+type TicketFilter =
+  | "all"
+  | "open"
+  | "reviewing"
+  | "escalated"
+  | "resolved";
+
+type AccountSuspension = {
+  id: string;
+  user_id: string;
+  report_id: string;
+  duration_days: number;
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+  revoked_at: string | null;
+  revocation_reason: string | null;
   created_at: string;
 };
 
@@ -51,6 +72,8 @@ export function ModerationDashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [moderationMembers, setModerationMembers] = useState<ModerationMember[]>([]);
   const [tickets, setTickets] = useState<ReportTicket[]>([]);
+  const [suspensions, setSuspensions] = useState<AccountSuspension[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -65,7 +88,69 @@ export function ModerationDashboard() {
   const selectedTicket =
     tickets.find((ticket) => ticket.id === selectedTicketId) ?? null;
 
+  const ticketCounts = useMemo(() => {
+    return {
+      all: tickets.length,
+      open: tickets.filter((ticket) => ticket.status === "open").length,
+      reviewing: tickets.filter(
+        (ticket) =>
+          ticket.status === "reviewing" &&
+          ticket.resolution_action !== "escalated"
+      ).length,
+      escalated: tickets.filter(
+        (ticket) =>
+          ticket.status === "reviewing" &&
+          ticket.resolution_action === "escalated"
+      ).length,
+      resolved: tickets.filter((ticket) =>
+        ["actioned", "dismissed"].includes(ticket.status)
+      ).length,
+    };
+  }, [tickets]);
+
+  const filteredTickets = useMemo(() => {
+    switch (ticketFilter) {
+      case "open":
+        return tickets.filter((ticket) => ticket.status === "open");
+      case "reviewing":
+        return tickets.filter(
+          (ticket) =>
+            ticket.status === "reviewing" &&
+            ticket.resolution_action !== "escalated"
+        );
+      case "escalated":
+        return tickets.filter(
+          (ticket) =>
+            ticket.status === "reviewing" &&
+            ticket.resolution_action === "escalated"
+        );
+      case "resolved":
+        return tickets.filter((ticket) =>
+          ["actioned", "dismissed"].includes(ticket.status)
+        );
+      default:
+        return tickets;
+    }
+  }, [ticketFilter, tickets]);
+
+  const activeSuspensionCount = suspensions.filter(
+    (suspension) =>
+      !suspension.revoked_at &&
+      new Date(suspension.starts_at).getTime() <= Date.now() &&
+      new Date(suspension.ends_at).getTime() > Date.now()
+  ).length;
+
+  const recentlyLiftedCount = suspensions.filter((suspension) => {
+    if (!suspension.revoked_at) return false;
+
+    const revokedAt = new Date(suspension.revoked_at).getTime();
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    return revokedAt >= sevenDaysAgo;
+  }).length;
+
   const hasAccess = ["moderator", "senior_moderator", "admin"].includes(role);
+  const canViewSuspensions = ["senior_moderator", "admin"].includes(role);
 
   const assignableMembers = useMemo(() => {
     return moderationMembers
@@ -114,7 +199,7 @@ export function ModerationDashboard() {
           supabase
             .from("reports")
             .select(
-              "id, ticket_number, reporter_id, reported_user_id, target_type, target_id, reason, details, status, assigned_to, created_at"
+              "id, ticket_number, reporter_id, reported_user_id, target_type, target_id, reason, details, status, resolution_action, assigned_to, created_at"
             )
             .order("created_at", { ascending: false }),
         ];
@@ -126,6 +211,21 @@ export function ModerationDashboard() {
 
         setProfiles((profileResult.data ?? []) as Profile[]);
         setTickets((ticketResult.data ?? []) as ReportTicket[]);
+
+        if (["senior_moderator", "admin"].includes(currentRole)) {
+          const suspensionResult = await supabase
+            .from("account_suspensions")
+            .select(
+              "id, user_id, report_id, duration_days, reason, starts_at, ends_at, revoked_at, revocation_reason, created_at"
+            )
+            .order("created_at", { ascending: false });
+
+          if (suspensionResult.error) throw suspensionResult.error;
+
+          setSuspensions(
+            (suspensionResult.data ?? []) as AccountSuspension[]
+          );
+        }
 
         if (currentRole === "admin") {
           const memberResult = await supabase
@@ -260,13 +360,89 @@ export function ModerationDashboard() {
           </p>
         )}
 
-        <div className="grid gap-3">
-          {tickets.length === 0 ? (
+        <div className="grid grid-cols-2 gap-3">
+          <SummaryCard
+            label="Open"
+            value={ticketCounts.open}
+            active={ticketFilter === "open"}
+            onClick={() => setTicketFilter("open")}
+          />
+
+          <SummaryCard
+            label="Reviewing"
+            value={ticketCounts.reviewing}
+            active={ticketFilter === "reviewing"}
+            onClick={() => setTicketFilter("reviewing")}
+          />
+
+          <SummaryCard
+            label="Escalated"
+            value={ticketCounts.escalated}
+            active={ticketFilter === "escalated"}
+            onClick={() => setTicketFilter("escalated")}
+          />
+
+          <SummaryCard
+            label="Resolved"
+            value={ticketCounts.resolved}
+            active={ticketFilter === "resolved"}
+            onClick={() => setTicketFilter("resolved")}
+          />
+
+          {canViewSuspensions && (
+            <>
+              <SummaryCard
+                label="Active suspensions"
+                value={activeSuspensionCount}
+              />
+
+              <SummaryCard
+                label="Lifted in 7 days"
+                value={recentlyLiftedCount}
+              />
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["all", "All"],
+              ["open", "Open"],
+              ["reviewing", "Reviewing"],
+              ["escalated", "Escalated"],
+              ["resolved", "Resolved"],
+            ] as Array<[TicketFilter, string]>
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              className={[
+                "rounded-full border px-3 py-2 text-sm font-medium",
+                ticketFilter === value
+                  ? "bg-black text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50",
+              ].join(" ")}
+              onClick={() => {
+                setTicketFilter(value);
+                setSelectedTicketId(null);
+              }}
+              type="button"
+            >
+              {label}
+              <span className="ml-2 text-xs opacity-75">
+                {ticketCounts[value]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid max-h-[190px] gap-3 overflow-y-auto pr-2">
+          {filteredTickets.length === 0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-              No reports are currently visible.
+              No tickets match this filter.
             </p>
           ) : (
-            tickets.map((ticket) => (
+            filteredTickets.map((ticket) => (
               <button
                 key={ticket.id}
                 className={`rounded-xl border p-4 text-left ${
@@ -317,9 +493,16 @@ export function ModerationDashboard() {
                 {selectedTicket.reason}
               </h2>
 
-              <p className="mt-2 text-sm text-gray-600">
-                Status: {selectedTicket.status}
-              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <TicketBadge ticket={selectedTicket} />
+
+                {selectedTicket.resolution_action && (
+                  <span className="text-sm text-gray-600">
+                    Action:{" "}
+                    {selectedTicket.resolution_action.replaceAll("_", " ")}
+                  </span>
+                )}
+              </div>
             </div>
 
             <dl className="grid gap-4 text-sm md:grid-cols-2">
@@ -426,13 +609,86 @@ export function ModerationDashboard() {
               </p>
             </div>
 
-            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-              Evidence preview, redaction, warnings and suspension actions will
-              be connected in the next dashboard step.
-            </p>
+            <Link
+              className="inline-flex w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
+              href={`/moderation/review/${selectedTicket.id}`}
+            >
+              Open full review and evidence
+            </Link>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  active = false,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const className = [
+    "rounded-xl border p-4 text-left",
+    active ? "border-black bg-black text-white" : "bg-white",
+    onClick ? "cursor-pointer hover:bg-gray-50" : "",
+    active && onClick ? "hover:bg-black" : "",
+  ].join(" ");
+
+  const content = (
+    <>
+      <p className={active ? "text-xs text-gray-300" : "text-xs text-gray-500"}>
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+    </>
+  );
+
+  if (!onClick) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return (
+    <button className={className} onClick={onClick} type="button">
+      {content}
+    </button>
+  );
+}
+
+function TicketBadge({ ticket }: { ticket: ReportTicket }) {
+  const isEscalated =
+    ticket.status === "reviewing" &&
+    ticket.resolution_action === "escalated";
+
+  const label = isEscalated
+    ? "Escalated"
+    : ticket.resolution_action === "suspended"
+      ? "Suspended"
+      : ticket.status.replaceAll("_", " ");
+
+  const className = isEscalated
+    ? "border-amber-300 bg-amber-50 text-amber-900"
+    : ticket.resolution_action === "suspended"
+      ? "border-red-300 bg-red-50 text-red-800"
+      : ticket.status === "open"
+        ? "border-blue-300 bg-blue-50 text-blue-800"
+        : ticket.status === "reviewing"
+          ? "border-purple-300 bg-purple-50 text-purple-800"
+          : ticket.status === "dismissed"
+            ? "border-gray-300 bg-gray-50 text-gray-700"
+            : "border-green-300 bg-green-50 text-green-800";
+
+  return (
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${className}`}
+    >
+      {label}
+    </span>
   );
 }
