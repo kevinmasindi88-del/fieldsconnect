@@ -42,6 +42,16 @@ type TicketFilter =
 
 type TicketSort = "priority" | "newest" | "oldest";
 
+type ModerationActionLog = {
+  id: string;
+  report_id: string;
+  action: string;
+  notes: string;
+  performed_by: string;
+  performed_at: string;
+  target_snapshot: Record<string, unknown> | null;
+};
+
 type AccountSuspension = {
   id: string;
   user_id: string;
@@ -77,6 +87,11 @@ export function ModerationDashboard() {
   const [moderationMembers, setModerationMembers] = useState<ModerationMember[]>([]);
   const [tickets, setTickets] = useState<ReportTicket[]>([]);
   const [suspensions, setSuspensions] = useState<AccountSuspension[]>([]);
+  const [actionLogs, setActionLogs] = useState<ModerationActionLog[]>([]);
+  const [isLoadingActionHistory, setIsLoadingActionHistory] =
+    useState(false);
+  const [actionHistoryMessage, setActionHistoryMessage] =
+    useState<string | null>(null);
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [ticketSort, setTicketSort] = useState<TicketSort>("priority");
@@ -93,6 +108,11 @@ export function ModerationDashboard() {
 
   const selectedTicket =
     tickets.find((ticket) => ticket.id === selectedTicketId) ?? null;
+
+  const selectedTicketSuspension =
+    suspensions.find(
+      (suspension) => suspension.report_id === selectedTicketId
+    ) ?? null;
 
   const ticketCounts = useMemo(() => {
     return {
@@ -365,6 +385,54 @@ export function ModerationDashboard() {
     void loadDashboard();
   }, []);
 
+  useEffect(() => {
+    if (!selectedTicketId) {
+      setActionLogs([]);
+      setActionHistoryMessage(null);
+      setIsLoadingActionHistory(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadActionHistory() {
+      setIsLoadingActionHistory(true);
+      setActionHistoryMessage(null);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+
+        const { data, error } = await supabase
+          .from("moderation_action_log")
+          .select(
+            "id, report_id, action, notes, performed_by, performed_at, target_snapshot"
+          )
+          .eq("report_id", selectedTicketId)
+          .order("performed_at", { ascending: true });
+
+        if (error) throw error;
+        if (isCancelled) return;
+
+        setActionLogs((data ?? []) as ModerationActionLog[]);
+      } catch (error) {
+        if (isCancelled) return;
+
+        setActionLogs([]);
+        setActionHistoryMessage(getErrorMessage(error));
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingActionHistory(false);
+        }
+      }
+    }
+
+    void loadActionHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedTicketId]);
+
   async function assignToMe(ticketId: string) {
     if (!currentUserId) return;
 
@@ -621,6 +689,7 @@ export function ModerationDashboard() {
                   setSelectedTicketId(ticket.id);
                   setSelectedAssigneeId(ticket.assigned_to ?? "");
                   setMessage(null);
+                  setActionHistoryMessage(null);
                 }}
                 type="button"
               >
@@ -789,6 +858,106 @@ export function ModerationDashboard() {
               </p>
             </div>
 
+            <section className="rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">Case history</h3>
+
+                  <p className="mt-1 text-sm text-gray-600">
+                    Chronological moderation actions recorded for this ticket.
+                  </p>
+                </div>
+
+                {!isLoadingActionHistory && (
+                  <span className="text-xs text-gray-500">
+                    {actionLogs.length +
+                      (selectedTicketSuspension?.revoked_at ? 1 : 0)}{" "}
+                    recorded{" "}
+                    {actionLogs.length +
+                      (selectedTicketSuspension?.revoked_at ? 1 : 0) ===
+                    1
+                      ? "event"
+                      : "events"}
+                  </span>
+                )}
+              </div>
+
+              {actionHistoryMessage && (
+                <p className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  {actionHistoryMessage}
+                </p>
+              )}
+
+              {isLoadingActionHistory ? (
+                <p className="mt-4 text-sm text-gray-600">
+                  Loading case history...
+                </p>
+              ) : actionLogs.length === 0 &&
+                !selectedTicketSuspension?.revoked_at ? (
+                <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-gray-600">
+                  No moderation actions have been recorded for this ticket yet.
+                </p>
+              ) : (
+                <ol className="mt-4 space-y-3">
+                  {actionLogs.map((log) => {
+                    const performerName =
+                      profileById.get(log.performed_by)?.display_name ??
+                      "Moderation team member";
+
+                    return (
+                      <li
+                        key={log.id}
+                        className="rounded-lg border bg-gray-50 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <ActionBadge action={log.action} />
+
+                            <p className="mt-2 text-sm font-medium text-gray-800">
+                              {performerName}
+                            </p>
+                          </div>
+
+                          <time className="text-xs text-gray-500">
+                            {new Date(log.performed_at).toLocaleString()}
+                          </time>
+                        </div>
+
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                          {log.notes}
+                        </p>
+                      </li>
+                    );
+                  })}
+
+                  {selectedTicketSuspension?.revoked_at && (
+                    <li className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <ActionBadge action="suspension_revoked" />
+
+                          <p className="mt-2 text-sm font-medium text-blue-950">
+                            Senior moderation review
+                          </p>
+                        </div>
+
+                        <time className="text-xs text-blue-700">
+                          {new Date(
+                            selectedTicketSuspension.revoked_at
+                          ).toLocaleString()}
+                        </time>
+                      </div>
+
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-blue-900">
+                        {selectedTicketSuspension.revocation_reason ||
+                          "The account suspension was lifted early."}
+                      </p>
+                    </li>
+                  )}
+                </ol>
+              )}
+            </section>
+
             <Link
               className="inline-flex w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
               href={`/moderation/review/${selectedTicket.id}`}
@@ -838,6 +1007,38 @@ function SummaryCard({
     <button className={className} onClick={onClick} type="button">
       {content}
     </button>
+  );
+}
+
+function ActionBadge({ action }: { action: string }) {
+  const label =
+    action === "suspension_revoked"
+      ? "Suspension lifted"
+      : action.replaceAll("_", " ");
+
+  const className =
+    action === "suspended"
+      ? "border-red-300 bg-red-50 text-red-800"
+      : action === "suspension_revoked"
+        ? "border-blue-300 bg-blue-50 text-blue-800"
+        : action === "escalated"
+          ? "border-amber-300 bg-amber-50 text-amber-900"
+          : action === "dismissed"
+            ? "border-gray-300 bg-gray-100 text-gray-700"
+            : action === "warned"
+              ? "border-orange-300 bg-orange-50 text-orange-800"
+              : action === "redacted"
+                ? "border-purple-300 bg-purple-50 text-purple-800"
+                : action === "removed"
+                  ? "border-red-300 bg-red-50 text-red-800"
+                  : "border-green-300 bg-green-50 text-green-800";
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${className}`}
+    >
+      {label}
+    </span>
   );
 }
 
