@@ -40,6 +40,8 @@ type TicketFilter =
   | "escalated"
   | "resolved";
 
+type TicketSort = "priority" | "newest" | "oldest";
+
 type AccountSuspension = {
   id: string;
   user_id: string;
@@ -76,6 +78,8 @@ export function ModerationDashboard() {
   const [tickets, setTickets] = useState<ReportTicket[]>([]);
   const [suspensions, setSuspensions] = useState<AccountSuspension[]>([]);
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [ticketSort, setTicketSort] = useState<TicketSort>("priority");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -156,6 +160,94 @@ export function ModerationDashboard() {
         return tickets;
     }
   }, [currentUserId, ticketFilter, tickets]);
+
+  const visibleTickets = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    const matchingTickets = normalizedQuery
+      ? filteredTickets.filter((ticket) => {
+          const reporterName =
+            profileById.get(ticket.reporter_id)?.display_name ?? "";
+
+          const reportedUserName = ticket.reported_user_id
+            ? profileById.get(ticket.reported_user_id)?.display_name ?? ""
+            : "";
+
+          const assigneeName = ticket.assigned_to
+            ? profileById.get(ticket.assigned_to)?.display_name ?? ""
+            : "unassigned";
+
+          const searchableText = [
+            ticket.ticket_number ?? "",
+            ticket.reason,
+            ticket.details ?? "",
+            ticket.target_type.replaceAll("_", " "),
+            ticket.status,
+            ticket.resolution_action ?? "",
+            reporterName,
+            reportedUserName,
+            assigneeName,
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return searchableText.includes(normalizedQuery);
+        })
+      : [...filteredTickets];
+
+    return matchingTickets.sort((left, right) => {
+      const leftCreatedAt = new Date(left.created_at).getTime();
+      const rightCreatedAt = new Date(right.created_at).getTime();
+
+      if (ticketSort === "newest") {
+        return rightCreatedAt - leftCreatedAt;
+      }
+
+      if (ticketSort === "oldest") {
+        return leftCreatedAt - rightCreatedAt;
+      }
+
+      const getPriority = (ticket: ReportTicket) => {
+        const isResolved = ["actioned", "dismissed"].includes(
+          ticket.status
+        );
+
+        if (
+          ticket.status === "reviewing" &&
+          ticket.resolution_action === "escalated"
+        ) {
+          return 0;
+        }
+
+        if (!isResolved && ticket.assigned_to === null) {
+          return 1;
+        }
+
+        if (!isResolved && ticket.assigned_to === currentUserId) {
+          return 2;
+        }
+
+        if (!isResolved) {
+          return 3;
+        }
+
+        return 4;
+      };
+
+      const priorityDifference =
+        getPriority(left) - getPriority(right);
+
+      return priorityDifference !== 0
+        ? priorityDifference
+        : rightCreatedAt - leftCreatedAt;
+    });
+  }, [
+    currentUserId,
+    filteredTickets,
+    profileById,
+    searchQuery,
+    ticketSort,
+  ]);
 
   const activeSuspensionCount = suspensions.filter(
     (suspension) =>
@@ -476,13 +568,48 @@ export function ModerationDashboard() {
           ))}
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Search tickets
+            <input
+              className="rounded-lg border px-3 py-2 font-normal"
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setSelectedTicketId(null);
+              }}
+              placeholder="Ticket, user, reason or target"
+              type="search"
+              value={searchQuery}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Sort
+            <select
+              className="rounded-lg border px-3 py-2 font-normal"
+              onChange={(event) =>
+                setTicketSort(event.target.value as TicketSort)
+              }
+              value={ticketSort}
+            >
+              <option value="priority">Priority</option>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+        </div>
+
+        <p className="text-xs text-gray-500">
+          Showing {visibleTickets.length} of {filteredTickets.length} tickets
+        </p>
+
         <div className="grid max-h-[190px] gap-3 overflow-y-auto pr-2">
-          {filteredTickets.length === 0 ? (
+          {visibleTickets.length === 0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
               No tickets match this filter.
             </p>
           ) : (
-            filteredTickets.map((ticket) => (
+            visibleTickets.map((ticket) => (
               <button
                 key={ticket.id}
                 className={`rounded-xl border p-4 text-left ${
