@@ -139,6 +139,64 @@ export function TimelineWorkflow() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`timeline-live:${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "posts",
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comments",
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reactions",
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comment_reactions",
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   async function createPost(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!currentUserId || !postBody.trim() || !isSupabaseConfigured()) return;
