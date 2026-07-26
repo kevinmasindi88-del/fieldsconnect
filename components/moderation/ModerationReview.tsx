@@ -366,8 +366,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     }
   }
 
-  useEffect(() => {
-    async function loadReview() {
+  async function loadReview() {
       try {
         const supabase = getSupabaseBrowserClient();
 
@@ -419,10 +418,66 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       } finally {
         setIsLoading(false);
       }
-    }
+  }
 
+  useEffect(() => {
     void loadReview();
   }, [ticketId]);
+
+  useEffect(() => {
+    if (
+      !ticketId ||
+      !["moderator", "senior_moderator", "admin"].includes(role)
+    ) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`moderation-review-live:${ticketId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reports",
+          filter: `id=eq.${ticketId}`,
+        },
+        () => {
+          void loadReview();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "moderation_action_log",
+          filter: `report_id=eq.${ticketId}`,
+        },
+        () => {
+          void loadReview();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "account_suspensions",
+          filter: `report_id=eq.${ticketId}`,
+        },
+        () => {
+          void loadReview();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [ticketId, role]);
 
   async function takeAction(
     action: "dismissed" | "warned" | "escalated" | "redacted" | "removed"
