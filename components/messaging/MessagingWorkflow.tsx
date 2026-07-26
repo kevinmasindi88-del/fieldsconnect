@@ -215,6 +215,32 @@ export function MessagingWorkflow() {
     };
   }, [currentUserId]);
 
+  useEffect(() => {
+    if (!activeConversationId || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`messages-page-conversation:${activeConversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${activeConversationId}`,
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeConversationId]);
+
   function getOtherProfile(connection: Connection) {
     const otherId = connection.requester_id === currentUserId ? connection.recipient_id : connection.requester_id;
     return profileById.get(otherId);
