@@ -337,6 +337,42 @@ export function ModerationDashboard() {
       );
   }, [moderationMembers, profileById]);
 
+  async function loadReports() {
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("reports")
+      .select(
+        "id, ticket_number, reporter_id, reported_user_id, target_type, target_id, reason, details, status, resolution_action, assigned_to, consolidated_into_report_id, consolidated_at, consolidated_by, created_at"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Unable to refresh moderation reports:", error);
+      return;
+    }
+
+    setTickets((data ?? []) as ReportTicket[]);
+  }
+
+  async function loadSuspensions() {
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("account_suspensions")
+      .select(
+        "id, user_id, report_id, duration_days, reason, starts_at, ends_at, revoked_at, revocation_reason, created_at"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Unable to refresh account suspensions:", error);
+      return;
+    }
+
+    setSuspensions((data ?? []) as AccountSuspension[]);
+  }
+
   async function loadDashboard() {
       try {
         const supabase = getSupabaseBrowserClient();
@@ -439,7 +475,7 @@ export function ModerationDashboard() {
           table: "reports",
         },
         () => {
-          void loadDashboard();
+          void loadReports();
         }
       )
       .on(
@@ -450,7 +486,9 @@ export function ModerationDashboard() {
           table: "account_suspensions",
         },
         () => {
-          void loadDashboard();
+          if (["senior_moderator", "admin"].includes(role)) {
+            void loadSuspensions();
+          }
         }
       )
       .on(
