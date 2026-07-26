@@ -85,6 +85,57 @@ export function MessagingWorkflow() {
     return counts;
   }, [unreadMessageNotifications]);
 
+  async function loadUnreadMessageNotifications(userId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id, actor_id, read_at")
+      .eq("recipient_id", userId)
+      .eq("notification_type", "new_message")
+      .is("read_at", null);
+
+    if (error) {
+      console.error("Unable to refresh unread message notifications:", error);
+      return;
+    }
+
+    setUnreadMessageNotifications(
+      (data ?? []) as UnreadMessageNotification[]
+    );
+  }
+
+  async function loadConversationMessages(conversationId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("id, conversation_id, sender_id, body, created_at")
+      .eq("conversation_id", conversationId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Unable to refresh conversation messages:", error);
+      return;
+    }
+
+    setMessages((currentMessages) => {
+      const otherConversationMessages = currentMessages.filter(
+        (item) => item.conversation_id !== conversationId
+      );
+
+      return [
+        ...otherConversationMessages,
+        ...((data ?? []) as Message[]),
+      ];
+    });
+  }
+
   async function loadData() {
     setMessage(null);
 
@@ -205,7 +256,7 @@ export function MessagingWorkflow() {
           filter: `recipient_id=eq.${currentUserId}`,
         },
         () => {
-          void loadData();
+          void loadUnreadMessageNotifications(currentUserId);
         }
       )
       .subscribe();
@@ -231,7 +282,7 @@ export function MessagingWorkflow() {
           filter: `conversation_id=eq.${activeConversationId}`,
         },
         () => {
-          void loadData();
+          void loadConversationMessages(activeConversationId);
         }
       )
       .subscribe();
