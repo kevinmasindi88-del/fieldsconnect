@@ -69,6 +69,78 @@ export function TimelineWorkflow() {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
 
+  async function loadPosts() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select("id, author_id, body, visibility, created_at, edited_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Unable to refresh timeline posts:", error);
+      return;
+    }
+
+    setPosts((data ?? []) as Post[]);
+  }
+
+  async function loadComments() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("comments")
+      .select("id, post_id, author_id, body, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Unable to refresh timeline comments:", error);
+      return;
+    }
+
+    setComments((data ?? []) as Comment[]);
+  }
+
+  async function loadReactions() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("reactions")
+      .select("id, post_id, profile_id, reaction_type");
+
+    if (error) {
+      console.error("Unable to refresh post reactions:", error);
+      return;
+    }
+
+    setReactions((data ?? []) as Reaction[]);
+  }
+
+  async function loadCommentReactions() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("comment_reactions")
+      .select("id, comment_id, profile_id, reaction_type");
+
+    if (error) {
+      console.error("Unable to refresh comment reactions:", error);
+      return;
+    }
+
+    setCommentReactions((data ?? []) as CommentReaction[]);
+  }
+
   async function loadData() {
     setMessage(null);
 
@@ -154,7 +226,7 @@ export function TimelineWorkflow() {
           table: "posts",
         },
         () => {
-          void loadData();
+          void loadPosts();
         }
       )
       .on(
@@ -165,7 +237,7 @@ export function TimelineWorkflow() {
           table: "comments",
         },
         () => {
-          void loadData();
+          void loadComments();
         }
       )
       .on(
@@ -176,7 +248,7 @@ export function TimelineWorkflow() {
           table: "reactions",
         },
         () => {
-          void loadData();
+          void loadReactions();
         }
       )
       .on(
@@ -187,13 +259,28 @@ export function TimelineWorkflow() {
           table: "comment_reactions",
         },
         () => {
-          void loadData();
+          void loadCommentReactions();
         }
       )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    const intervalId = window.setInterval(() => {
+      void Promise.all([
+        loadPosts(),
+        loadComments(),
+      ]);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
     };
   }, [currentUserId]);
 
