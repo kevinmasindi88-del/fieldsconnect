@@ -18,3 +18,54 @@ body {
 a[href^="/profile/"] > div > p:first-of-type {
   text-transform: capitalize;
 }
+:root {
+  --fc-blue: #1d4ed8;
+  --fc-blue-dark: #1e40af;
+  --fc-page: #f8fafc;
+  --fc-surface: #ffffff;
+  --fc-border: #e5e7eb;
+}
+
+body {
+  min-width: 320px;
+  background: var(--fc-page);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+summary {
+  touch-action: manipulation;
+}
+
+.fc-scrollbar-none {
+  scrollbar-width: none;
+}
+
+.fc-scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: #dbeafe;
+  color: #172554;
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

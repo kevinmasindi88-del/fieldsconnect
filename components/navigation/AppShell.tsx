@@ -254,11 +254,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       suspensionAllowedRoutes.has(pathname);
 
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-950">
-        <header className="border-b bg-white">
-          <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
-            <Link className="text-xl font-bold tracking-tight" href="/">
-              FieldsConnect
+      <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
+        <header className="border-b border-gray-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between">
+            <Link className="inline-flex items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" href="/">
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span>
             </Link>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -322,12 +322,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-950">
-      <header className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4">
-          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-            <Link href="/" className="text-xl font-bold tracking-tight">
-              FieldsConnect
+    <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
+      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="inline-flex shrink-0 items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span>
             </Link>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -576,7 +576,7 @@ function SuspensionScreen({
 
             <p className="mt-2 text-sm leading-6 text-gray-600">
               You may review platform notifications and read the
-              FieldsConnect Code of Conduct. Normal access will be restored
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span> Code of Conduct. Normal access will be restored
               automatically when the suspension expires or is lifted early.
             </p>
 
