@@ -157,6 +157,25 @@ export function ConnectionWorkflow() {
     skillsByProfileId,
   ]);
 
+  async function loadConnections(userId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("connections")
+      .select("id, requester_id, recipient_id, status, created_at")
+      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Unable to refresh connections:", error);
+      return;
+    }
+
+    setConnections((data ?? []) as Connection[]);
+  }
+
   async function loadData() {
     setMessage(null);
 
@@ -243,7 +262,7 @@ export function ConnectionWorkflow() {
           table: "connections",
         },
         () => {
-          void loadData();
+          void loadConnections(currentUserId);
         }
       )
       .subscribe();
