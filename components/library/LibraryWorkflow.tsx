@@ -355,10 +355,10 @@ export function LibraryWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
-      <form onSubmit={uploadDocument} className="flex flex-col gap-4 rounded-xl border p-4">
+      <form onSubmit={uploadDocument} className="flex flex-col gap-4 rounded-xl border bg-white p-4">
         <h2 className="text-xl font-semibold">Upload document</h2>
 
         <label className="flex flex-col gap-2 text-sm font-medium">
@@ -642,7 +642,7 @@ function DocumentCard({
 }) {
   return (
     <article
-      className={`flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center ${
+      className={`flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center ${
         isSelected ? "border-black" : ""
       }`}
     >

@@ -49,6 +49,21 @@ type CommentReaction = {
   reaction_type: string;
 };
 
+const postEmojis = [
+  "😀",
+  "😂",
+  "😊",
+  "😍",
+  "🤔",
+  "👏",
+  "👍",
+  "🔥",
+  "🎉",
+  "💡",
+  "🚀",
+  "❤️",
+];
+
 export function TimelineWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -57,6 +72,7 @@ export function TimelineWorkflow() {
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [postBody, setPostBody] = useState("");
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "connections">("public");
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -488,10 +504,10 @@ export function TimelineWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8">
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
-      <form onSubmit={createPost} className="flex flex-col gap-4 rounded-xl border p-4">
+      <form onSubmit={createPost} className="flex flex-col gap-4 rounded-xl border bg-white p-4">
         <label className="flex flex-col gap-2 text-sm font-medium">
           What's new?
           <textarea
@@ -514,13 +530,47 @@ export function TimelineWorkflow() {
           </select>
         </label>
 
-        <button
-          className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={!postBody.trim() || isWorking}
-          type="submit"
-        >
-          Post
-        </button>
+        <div className="flex items-end justify-between gap-3">
+          <div className="relative flex items-center gap-2">
+            <button
+              aria-expanded={isEmojiPickerOpen}
+              aria-label="Add emoji"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              onClick={() => setIsEmojiPickerOpen((current) => !current)}
+              title="Add emoji"
+              type="button"
+            >
+              <span aria-hidden="true">😊</span>
+            </button>
+
+            {isEmojiPickerOpen && (
+              <div className="absolute bottom-full left-0 z-10 mb-2 flex max-w-xs flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                {postEmojis.map((emoji) => (
+                  <button
+                    aria-label={`Add ${emoji}`}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-xl transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                    key={emoji}
+                    onClick={() => {
+                      setPostBody((current) => `${current}${emoji}`);
+                      setIsEmojiPickerOpen(false);
+                    }}
+                    type="button"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            className="min-h-10 rounded-xl bg-gray-950 px-5 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            disabled={!postBody.trim() || isWorking}
+            type="submit"
+          >
+            Post
+          </button>
+        </div>
       </form>
 
       {isLoading ? (
@@ -536,7 +586,7 @@ export function TimelineWorkflow() {
           const isEditing = editingPostId === post.id;
 
           return (
-            <article key={post.id} className="flex flex-col gap-4 rounded-xl border p-4">
+            <article key={post.id} className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-4">
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                   {author ? (
@@ -682,9 +732,9 @@ export function TimelineWorkflow() {
                   );
                 })}
 
-                <form onSubmit={(event) => addComment(event, post.id)} className="flex gap-3">
+                <form onSubmit={(event) => addComment(event, post.id)} className="flex flex-col gap-3 sm:flex-row">
                   <input
-                    className="flex-1 rounded-lg border px-3 py-2 text-sm"
+                    className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
                     value={commentDrafts[post.id] ?? ""}
                     onChange={(event) =>
                       setCommentDrafts((current) => ({ ...current, [post.id]: event.target.value }))

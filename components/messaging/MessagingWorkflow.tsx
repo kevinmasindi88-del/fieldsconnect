@@ -429,8 +429,8 @@ export function MessagingWorkflow() {
   const activeProfile = activeConnection ? getOtherProfile(activeConnection) : null;
 
   return (
-    <section className="mx-auto grid w-full max-w-6xl gap-6 p-8 lg:grid-cols-[320px_1fr]">
-      <aside className="rounded-xl border p-4">
+    <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="min-w-0 rounded-xl border bg-white p-4">
         {message && <p className={`mt-4 ${getMessageAlertClass(message)}`}>{message}</p>}
 
         <div className="mt-6 flex flex-col gap-3">
@@ -478,7 +478,7 @@ export function MessagingWorkflow() {
         </div>
       </aside>
 
-      <main className="flex min-h-[520px] flex-col rounded-xl border">
+      <main className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:min-h-[520px]">
         <div className="flex items-center gap-3 border-b p-4">
           {activeProfile ? (
             <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${activeProfile.id}`}>
@@ -549,9 +549,9 @@ export function MessagingWorkflow() {
           )}
         </div>
 
-        <form onSubmit={sendMessage} className="flex gap-3 border-t p-4">
+        <form onSubmit={sendMessage} className="flex flex-col gap-3 border-t p-4 sm:flex-row">
           <input
-            className="flex-1 rounded-lg border px-3 py-2 text-sm"
+            className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
             disabled={!activeConversationId || isWorking}
             value={draftMessage}
             onChange={(event) => setDraftMessage(event.target.value)}

@@ -439,7 +439,7 @@ export function ConnectionWorkflow() {
   const hasActiveSearch = searchTerm.trim() || roleFilter !== "all" || mentorFilter !== "all";
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       {isLoading ? (
@@ -695,9 +695,9 @@ function ConnectionCard({
   );
 
   return (
-    <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center">
+    <article className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center">
       {profile ? (
-        <Link className="flex gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
+        <Link className="flex min-w-0 gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
           {identity}
         </Link>
       ) : (

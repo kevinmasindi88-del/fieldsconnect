@@ -718,7 +718,7 @@ export function ModerationDashboard() {
 
   if (isLoading) {
     return (
-      <p className="p-8 text-sm text-gray-600">
+      <p className="px-4 py-6 text-sm text-gray-600 sm:p-8">
         Loading moderation dashboard...
       </p>
     );
@@ -726,7 +726,7 @@ export function ModerationDashboard() {
 
   if (!hasAccess) {
     return (
-      <section className="mx-auto max-w-3xl p-8">
+      <section className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
         <h1 className="text-3xl font-semibold">Moderation dashboard</h1>
 
         <p className="mt-4 rounded-xl border p-4 text-sm text-gray-700">
@@ -738,7 +738,7 @@ export function ModerationDashboard() {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-6 p-8 lg:grid-cols-[360px_1fr]">
+    <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[360px_minmax(0,1fr)]">
       <div className="space-y-4">
         <div>
           <p className="text-sm font-medium text-blue-700">
@@ -758,7 +758,7 @@ export function ModerationDashboard() {
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
           <SummaryCard
             label="My queue"
             value={ticketCounts.my_queue}
@@ -1016,7 +1016,7 @@ export function ModerationDashboard() {
 
             {role === "admin" ? (
               <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
-                <label className="flex min-w-64 flex-col gap-2 text-sm font-medium">
+                <label className="flex w-full min-w-0 flex-col gap-2 text-sm font-medium sm:min-w-64 sm:w-auto">
                   Assign to
                   <select
                     className="rounded-lg border px-3 py-2"
