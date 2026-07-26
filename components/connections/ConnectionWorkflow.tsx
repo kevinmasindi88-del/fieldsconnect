@@ -228,6 +228,31 @@ export function ConnectionWorkflow() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`connections-live:${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "connections",
+        },
+        () => {
+          void loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
   async function sendRequest(profileId: string) {
     if (!currentUserId || !isSupabaseConfigured()) return;
 
