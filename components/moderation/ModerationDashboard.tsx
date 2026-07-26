@@ -337,8 +337,7 @@ export function ModerationDashboard() {
       );
   }, [moderationMembers, profileById]);
 
-  useEffect(() => {
-    async function loadDashboard() {
+  async function loadDashboard() {
       try {
         const supabase = getSupabaseBrowserClient();
 
@@ -414,10 +413,63 @@ export function ModerationDashboard() {
       } finally {
         setIsLoading(false);
       }
-    }
+  }
 
+  useEffect(() => {
     void loadDashboard();
   }, []);
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !["moderator", "senior_moderator", "admin"].includes(role)
+    ) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`moderation-dashboard-live:${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "reports",
+        },
+        () => {
+          void loadDashboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "account_suspensions",
+        },
+        () => {
+          void loadDashboard();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "platform_roles",
+        },
+        () => {
+          void loadDashboard();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId, role]);
 
   useEffect(() => {
     if (!selectedTicketId) {
