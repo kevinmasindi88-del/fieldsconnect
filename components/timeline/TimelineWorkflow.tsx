@@ -344,16 +344,11 @@ export function TimelineWorkflow() {
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Timeline</h1>
-        <p className="mt-2 text-sm text-gray-600">Share updates, comment, and react to posts and replies.</p>
-      </div>
-
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={createPost} className="flex flex-col gap-4 rounded-xl border p-4">
         <label className="flex flex-col gap-2 text-sm font-medium">
-          New post
+          What's new?
           <textarea
             className="min-h-28 rounded-lg border px-3 py-2"
             value={postBody}

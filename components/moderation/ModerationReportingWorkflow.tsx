@@ -147,13 +147,6 @@ export function ModerationReportingWorkflow() {
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Moderation</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Report a profile for behaviour or content that needs review.
-        </p>
-      </div>
-
       {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
 
       <form onSubmit={submitReport} className="flex flex-col gap-4 rounded-xl border p-4">

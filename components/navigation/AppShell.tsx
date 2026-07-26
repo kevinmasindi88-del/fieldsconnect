@@ -18,13 +18,11 @@ const suspensionAllowedRoutes = new Set([
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/profile", label: "Profile" },
   { href: "/connections", label: "Connections" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
   { href: "/skills", label: "Skills" },
   { href: "/library", label: "Library" },
-  { href: "/moderation", label: "Moderation" },
 ];
 
 type ActiveSuspension = {
@@ -145,9 +143,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       } catch (error) {
         if (isCancelled) return;
 
-        console.error(
+        const suspensionError =
+          error && typeof error === "object"
+            ? error
+            : { message: String(error) };
+
+        console.warn(
           "Unable to check active account suspension:",
-          error
+          suspensionError
         );
 
         setSuspensionCheckMessage(
@@ -334,9 +337,54 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               ) : user ? (
                 <>
-                  <span className="text-sm font-medium text-gray-700">
-                    Welcome, {welcomeName ?? "..."}
-                  </span>
+                  <details className="group relative">
+                    <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      <span>Welcome, {welcomeName ?? "..."}</span>
+
+                      <span
+                        aria-hidden="true"
+                        className="text-xs text-gray-500"
+                      >
+                        ▾
+                      </span>
+                    </summary>
+
+                    <div className="absolute right-0 top-full z-30 mt-2 min-w-44 overflow-hidden rounded-xl border bg-white p-1 shadow-lg">
+                      <Link
+                        className={[
+                          "block rounded-lg px-3 py-2 text-sm",
+                          pathname === "/profile"
+                            ? "bg-gray-100 font-medium text-gray-950"
+                            : "text-gray-700 hover:bg-gray-50",
+                        ].join(" ")}
+                        href="/profile"
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                        }}
+                      >
+                        Profile
+                      </Link>
+
+                      <Link
+                        className={[
+                          "block rounded-lg px-3 py-2 text-sm",
+                          pathname.startsWith("/moderation")
+                            ? "bg-gray-100 font-medium text-gray-950"
+                            : "text-gray-700 hover:bg-gray-50",
+                        ].join(" ")}
+                        href="/moderation"
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                        }}
+                      >
+                        Moderation
+                      </Link>
+                    </div>
+                  </details>
 
                   <button
                     className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"

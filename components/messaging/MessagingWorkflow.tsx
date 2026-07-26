@@ -354,11 +354,6 @@ export function MessagingWorkflow() {
   return (
     <section className="mx-auto grid w-full max-w-6xl gap-6 p-8 lg:grid-cols-[320px_1fr]">
       <aside className="rounded-xl border p-4">
-        <h1 className="text-2xl font-semibold">Messages</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          MVP messaging is limited to accepted 1:1 connections only.
-        </p>
-
         {message && <p className={`mt-4 ${getMessageAlertClass(message)}`}>{message}</p>}
 
         <div className="mt-6 flex flex-col gap-3">

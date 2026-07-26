@@ -347,13 +347,6 @@ export function NotificationsWorkflow() {
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-3xl font-semibold">Notifications</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Stay updated on connection activity, messages, likes, and comments.
-          </p>
-        </div>
-
         <button
           className="w-fit rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
           disabled={unreadCount === 0 || isWorking}

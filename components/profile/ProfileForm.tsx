@@ -282,13 +282,6 @@ export function ProfileForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-xl border p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Profile setup</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Complete the basic profile fields needed for the FieldsConnect MVP. Privileged roles are not editable here.
-        </p>
-      </div>
-
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading profile...</p>
       ) : (

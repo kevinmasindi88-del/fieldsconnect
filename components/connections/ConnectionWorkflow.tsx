@@ -28,6 +28,11 @@ type Connection = {
   created_at: string;
 };
 
+type Skill = {
+  profile_id: string;
+  name: string;
+};
+
 export function ConnectionWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -35,6 +40,10 @@ export function ConnectionWorkflow() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mentorFilter, setMentorFilter] = useState("all");
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [connectionSearch, setConnectionSearch] = useState("");
+  const [connectionSort, setConnectionSort] =
+    useState<"newest" | "oldest">("newest");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -42,6 +51,18 @@ export function ConnectionWorkflow() {
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
+
+  const skillsByProfileId = useMemo(() => {
+    const skillMap = new Map<string, string[]>();
+
+    skills.forEach((skill) => {
+      const profileSkills = skillMap.get(skill.profile_id) ?? [];
+      profileSkills.push(skill.name);
+      skillMap.set(skill.profile_id, profileSkills);
+    });
+
+    return skillMap;
+  }, [skills]);
 
   const discoverableProfiles = useMemo(() => {
     return profiles.filter((profile) => {
@@ -88,8 +109,53 @@ export function ConnectionWorkflow() {
   const acceptedConnections = connections.filter(
     (connection) =>
       connection.status === "accepted" &&
-      (connection.requester_id === currentUserId || connection.recipient_id === currentUserId)
+      (connection.requester_id === currentUserId ||
+        connection.recipient_id === currentUserId)
   );
+
+  const visibleAcceptedConnections = useMemo(() => {
+    const normalizedSearch = connectionSearch.trim().toLowerCase();
+
+    return acceptedConnections
+      .filter((connection) => {
+        const otherProfileId =
+          connection.requester_id === currentUserId
+            ? connection.recipient_id
+            : connection.requester_id;
+
+        const profile = profileById.get(otherProfileId);
+        const profileSkills =
+          skillsByProfileId.get(otherProfileId) ?? [];
+
+        if (!normalizedSearch) return true;
+
+        return [
+          profile?.display_name,
+          profile?.username,
+          profile?.field,
+          ...profileSkills,
+        ]
+          .filter((value): value is string => Boolean(value))
+          .some((value) =>
+            value.toLowerCase().includes(normalizedSearch)
+          );
+      })
+      .sort((left, right) => {
+        const leftDate = new Date(left.created_at).getTime();
+        const rightDate = new Date(right.created_at).getTime();
+
+        return connectionSort === "newest"
+          ? rightDate - leftDate
+          : leftDate - rightDate;
+      });
+  }, [
+    acceptedConnections,
+    connectionSearch,
+    connectionSort,
+    currentUserId,
+    profileById,
+    skillsByProfileId,
+  ]);
 
   async function loadData() {
     setMessage(null);
@@ -116,25 +182,41 @@ export function ConnectionWorkflow() {
 
       setCurrentUserId(userId);
 
-      const [{ data: profilesData, error: profilesError }, { data: connectionsData, error: connectionsError }] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select("id, display_name, username, role_type, field, bio, mentor_available, avatar_url")
-            .is("deleted_at", null)
-            .order("display_name", { ascending: true }),
-          supabase
-            .from("connections")
-            .select("id, requester_id, recipient_id, status, created_at")
-            .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
-            .order("created_at", { ascending: false }),
-        ]);
+      const [
+        { data: profilesData, error: profilesError },
+        { data: connectionsData, error: connectionsError },
+        { data: skillsData, error: skillsError },
+      ] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
+          )
+          .is("deleted_at", null)
+          .order("display_name", { ascending: true }),
+        supabase
+          .from("connections")
+          .select(
+            "id, requester_id, recipient_id, status, created_at"
+          )
+          .or(
+            `requester_id.eq.${userId},recipient_id.eq.${userId}`
+          )
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("skills")
+          .select("profile_id, name")
+          .eq("is_published", true)
+          .is("deleted_at", null),
+      ]);
 
       if (profilesError) throw profilesError;
       if (connectionsError) throw connectionsError;
+      if (skillsError) throw skillsError;
 
       setProfiles((profilesData ?? []) as Profile[]);
       setConnections((connectionsData ?? []) as Connection[]);
+      setSkills((skillsData ?? []) as Skill[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load connection data.");
     } finally {
@@ -314,13 +396,6 @@ export function ConnectionWorkflow() {
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Connections</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Find visible profiles, send connection requests, and accept or decline incoming requests.
-        </p>
-      </div>
-
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       {isLoading ? (
@@ -357,22 +432,84 @@ export function ConnectionWorkflow() {
             )}
           </ConnectionSection>
 
-          <ConnectionSection title="Accepted connections">
+          <ConnectionSection
+            title={`Your connections · ${acceptedConnections.length}`}
+          >
             {acceptedConnections.length === 0 ? (
-              <EmptyState text="No accepted connections yet." />
+              <EmptyState text="No connections yet." />
             ) : (
-              acceptedConnections.map((connection) => (
-                <ConnectionCard key={connection.id} profile={getOtherProfile(connection)}>
-                  <button
-                    className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
-                    disabled={isWorking}
-                    onClick={() => disconnectConnection(connection.id)}
-                    type="button"
-                  >
-                    Disconnect
-                  </button>
-                </ConnectionCard>
-              ))
+              <>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
+                    Search
+                    <input
+                      className="rounded-lg border px-3 py-2 font-normal"
+                      onChange={(event) =>
+                        setConnectionSearch(event.target.value)
+                      }
+                      placeholder="Name, field, or skill"
+                      type="search"
+                      value={connectionSearch}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-sm font-medium">
+                    Sort
+                    <select
+                      className="rounded-lg border px-3 py-2 font-normal"
+                      onChange={(event) =>
+                        setConnectionSort(
+                          event.target.value as "newest" | "oldest"
+                        )
+                      }
+                      value={connectionSort}
+                    >
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                    </select>
+                  </label>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  {visibleAcceptedConnections.length}{" "}
+                  {visibleAcceptedConnections.length === 1
+                    ? "connection"
+                    : "connections"}{" "}
+                  shown
+                </p>
+
+                {visibleAcceptedConnections.length === 0 ? (
+                  <EmptyState text="No connections match your search." />
+                ) : (
+                  <div className="max-h-48 space-y-3 overflow-y-auto pr-1">
+                    {visibleAcceptedConnections.map((connection) => {
+                      const profile = getOtherProfile(connection);
+                      const profileSkills = profile
+                        ? skillsByProfileId.get(profile.id) ?? []
+                        : [];
+
+                      return (
+                        <ConnectionCard
+                          key={connection.id}
+                          profile={profile}
+                          skills={profileSkills}
+                        >
+                          <button
+                            className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                            disabled={isWorking}
+                            onClick={() =>
+                              disconnectConnection(connection.id)
+                            }
+                            type="button"
+                          >
+                            Disconnect
+                          </button>
+                        </ConnectionCard>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </ConnectionSection>
 
@@ -475,7 +612,15 @@ function ConnectionSection({ title, children }: { title: string; children: React
   );
 }
 
-function ConnectionCard({ profile, children }: { profile?: Profile; children: React.ReactNode }) {
+function ConnectionCard({
+  profile,
+  skills = [],
+  children,
+}: {
+  profile?: Profile;
+  skills?: string[];
+  children: React.ReactNode;
+}) {
   const identity = (
     <>
       <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={40} />
@@ -484,8 +629,23 @@ function ConnectionCard({ profile, children }: { profile?: Profile; children: Re
         <p className="text-sm text-gray-600">
           {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
         </p>
-        {profile?.bio && <p className="mt-2 max-w-2xl text-sm text-gray-700">{profile.bio}</p>}
-        {profile?.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
+        {profile?.bio && (
+          <p className="mt-2 max-w-2xl text-sm text-gray-700">
+            {profile.bio}
+          </p>
+        )}
+
+        {skills.length > 0 && (
+          <p className="mt-2 text-xs text-gray-500">
+            {skills.slice(0, 4).join(" · ")}
+          </p>
+        )}
+
+        {profile?.mentor_available && (
+          <p className="mt-2 text-sm font-medium">
+            Available as mentor
+          </p>
+        )}
       </div>
     </>
   );

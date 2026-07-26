@@ -356,13 +356,6 @@ export function LibraryWorkflow() {
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Library</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Upload and share documents with the network. Files are limited to 8 MB. Messaging attachments are out of scope.
-        </p>
-      </div>
-
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={uploadDocument} className="flex flex-col gap-4 rounded-xl border p-4">

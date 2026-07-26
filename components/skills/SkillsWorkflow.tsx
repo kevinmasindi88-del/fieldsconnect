@@ -158,13 +158,6 @@ export function SkillsWorkflow() {
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Skills</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Add and publish skills for your FieldsConnect profile. Endorsements and uploads are out of scope for this baseline.
-        </p>
-      </div>
-
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={addSkill} className="flex flex-col gap-4 rounded-xl border p-4">
