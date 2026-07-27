@@ -192,11 +192,38 @@ export function AuthForm({ mode }: AuthFormProps) {
             />
             <button
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute inset-y-0 right-0 px-3 text-lg text-gray-600"
+              aria-pressed={showPassword}
+              className={[
+                "absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
+                showPassword
+                  ? "border-gray-950 bg-gray-950 text-white"
+                  : "border-transparent bg-white text-gray-700 hover:bg-gray-100",
+              ].join(" ")}
               onClick={() => setShowPassword((current) => !current)}
+              title={showPassword ? "Hide password" : "Show password"}
               type="button"
             >
-              {showPassword ? "🙈" : "👁"}
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="2.8"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
             </button>
           </div>
         </label>
@@ -216,12 +243,49 @@ export function AuthForm({ mode }: AuthFormProps) {
               minLength={8}
             />
             <button
-              aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
-              className="absolute inset-y-0 right-0 px-3 text-lg text-gray-600"
-              onClick={() => setShowConfirmPassword((current) => !current)}
+              aria-label={
+                showConfirmPassword
+                  ? "Hide confirmed password"
+                  : "Show confirmed password"
+              }
+              aria-pressed={showConfirmPassword}
+              className={[
+                "absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
+                showConfirmPassword
+                  ? "border-gray-950 bg-gray-950 text-white"
+                  : "border-transparent bg-white text-gray-700 hover:bg-gray-100",
+              ].join(" ")}
+              onClick={() =>
+                setShowConfirmPassword((current) => !current)
+              }
+              title={
+                showConfirmPassword
+                  ? "Hide confirmed password"
+                  : "Show confirmed password"
+              }
               type="button"
             >
-              {showConfirmPassword ? "🙈" : "👁"}
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="2.8"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
             </button>
           </div>
         </label>

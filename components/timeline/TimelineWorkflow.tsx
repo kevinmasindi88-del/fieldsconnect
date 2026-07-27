@@ -80,6 +80,8 @@ export function TimelineWorkflow() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+  const [reactingPostId, setReactingPostId] = useState<string | null>(null);
+  const [reactingCommentId, setReactingCommentId] = useState<string | null>(null);
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -327,81 +329,190 @@ export function TimelineWorkflow() {
   }
 
   async function toggleLike(postId: string) {
-    if (!currentUserId || !isSupabaseConfigured()) return;
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured() ||
+      reactingPostId === postId
+    ) {
+      return;
+    }
 
-    setIsWorking(true);
+    setReactingPostId(postId);
     setMessage(null);
+
+    const existing = reactions.find(
+      (reaction) =>
+        reaction.post_id === postId &&
+        reaction.profile_id === currentUserId
+    );
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const existing = reactions.find(
-        (reaction) => reaction.post_id === postId && reaction.profile_id === currentUserId
-      );
 
       if (existing) {
-        const { error } = await supabase.from("reactions").delete().eq("id", existing.id);
-        if (error) throw error;
+        setReactions((current) =>
+          current.filter((reaction) => reaction.id !== existing.id)
+        );
+
+        const { error } = await supabase
+          .from("reactions")
+          .delete()
+          .eq("id", existing.id);
+
+        if (error) {
+          setReactions((current) => [...current, existing]);
+          throw error;
+        }
       } else {
-        const { error } = await supabase.from("reactions").insert({
+        const optimisticId = `optimistic-${postId}-${currentUserId}`;
+
+        const optimisticReaction: Reaction = {
+          id: optimisticId,
           post_id: postId,
           profile_id: currentUserId,
           reaction_type: "like",
-        });
-        if (error) throw error;
+        };
+
+        setReactions((current) => [...current, optimisticReaction]);
+
+        const { data: createdReaction, error } = await supabase
+          .from("reactions")
+          .insert({
+            post_id: postId,
+            profile_id: currentUserId,
+            reaction_type: "like",
+          })
+          .select("id, post_id, profile_id, reaction_type")
+          .single();
+
+        if (error) {
+          setReactions((current) =>
+            current.filter((reaction) => reaction.id !== optimisticId)
+          );
+          throw error;
+        }
+
+        setReactions((current) =>
+          current.map((reaction) =>
+            reaction.id === optimisticId
+              ? (createdReaction as Reaction)
+              : reaction
+          )
+        );
 
         const post = posts.find((item) => item.id === postId);
+
         if (post && post.author_id !== currentUserId) {
           const actor = profileById.get(currentUserId);
-          const { error: notificationError } = await supabase.from("notifications").insert({
-            recipient_id: post.author_id,
-            actor_id: currentUserId,
-            notification_type: "post_liked",
-            entity_type: "post",
-            entity_id: post.id,
-            title: "Someone liked your post",
-            body: `${actor?.display_name ?? "Someone"} liked your post.`,
-          });
-          if (notificationError) console.error("Unable to create post-like notification:", notificationError);
+
+          const { error: notificationError } = await supabase
+            .from("notifications")
+            .insert({
+              recipient_id: post.author_id,
+              actor_id: currentUserId,
+              notification_type: "post_liked",
+              entity_type: "post",
+              entity_id: post.id,
+              title: "Someone liked your post",
+              body: `${actor?.display_name ?? "Someone"} liked your post.`,
+            });
+
+          if (notificationError) {
+            console.error(
+              "Unable to create post-like notification:",
+              notificationError
+            );
+          }
         }
       }
-
-      await loadData();
     } catch (error) {
       setMessage(getActionErrorMessage(error, "update reaction"));
     } finally {
-      setIsWorking(false);
+      setReactingPostId(null);
     }
   }
 
   async function toggleCommentLike(commentId: string) {
-    if (!currentUserId || !isSupabaseConfigured()) return;
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured() ||
+      reactingCommentId === commentId
+    ) {
+      return;
+    }
 
-    setIsWorking(true);
+    setReactingCommentId(commentId);
     setMessage(null);
+
+    const existing = commentReactions.find(
+      (reaction) =>
+        reaction.comment_id === commentId &&
+        reaction.profile_id === currentUserId
+    );
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const existing = commentReactions.find(
-        (reaction) => reaction.comment_id === commentId && reaction.profile_id === currentUserId
-      );
 
       if (existing) {
-        const { error } = await supabase.from("comment_reactions").delete().eq("id", existing.id);
-        if (error) throw error;
+        setCommentReactions((current) =>
+          current.filter((reaction) => reaction.id !== existing.id)
+        );
+
+        const { error } = await supabase
+          .from("comment_reactions")
+          .delete()
+          .eq("id", existing.id);
+
+        if (error) {
+          setCommentReactions((current) => [...current, existing]);
+          throw error;
+        }
       } else {
-        const { error } = await supabase.from("comment_reactions").insert({
+        const optimisticId = `optimistic-${commentId}-${currentUserId}`;
+
+        const optimisticReaction: CommentReaction = {
+          id: optimisticId,
           comment_id: commentId,
           profile_id: currentUserId,
           reaction_type: "like",
-        });
-        if (error) throw error;
-      }
+        };
 
-      await loadData();
+        setCommentReactions((current) => [
+          ...current,
+          optimisticReaction,
+        ]);
+
+        const { data: createdReaction, error } = await supabase
+          .from("comment_reactions")
+          .insert({
+            comment_id: commentId,
+            profile_id: currentUserId,
+            reaction_type: "like",
+          })
+          .select("id, comment_id, profile_id, reaction_type")
+          .single();
+
+        if (error) {
+          setCommentReactions((current) =>
+            current.filter((reaction) => reaction.id !== optimisticId)
+          );
+          throw error;
+        }
+
+        setCommentReactions((current) =>
+          current.map((reaction) =>
+            reaction.id === optimisticId
+              ? (createdReaction as CommentReaction)
+              : reaction
+          )
+        );
+      }
     } catch (error) {
-      setMessage(getActionErrorMessage(error, "update comment reaction"));
+      setMessage(
+        getActionErrorMessage(error, "update comment reaction")
+      );
     } finally {
-      setIsWorking(false);
+      setReactingCommentId(null);
     }
   }
 
@@ -535,16 +646,42 @@ export function TimelineWorkflow() {
             <button
               aria-expanded={isEmojiPickerOpen}
               aria-label="Add emoji"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-lg transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              className={[
+                "inline-flex h-10 w-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                isEmojiPickerOpen
+                  ? "border-gray-950 bg-gray-950 text-white"
+                  : "border-gray-300 bg-white text-gray-950 hover:border-gray-500 hover:bg-gray-50",
+              ].join(" ")}
               onClick={() => setIsEmojiPickerOpen((current) => !current)}
               title="Add emoji"
               type="button"
             >
-              <span aria-hidden="true">😊</span>
+              <svg
+                aria-hidden="true"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <circle cx="9" cy="10" r="1" fill="currentColor" />
+                <circle cx="15" cy="10" r="1" fill="currentColor" />
+                <path
+                  d="M8.5 14c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
             </button>
 
             {isEmojiPickerOpen && (
-              <div className="absolute bottom-full left-0 z-10 mb-2 flex max-w-xs flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+              <div className="absolute left-full top-1/2 z-10 ml-2 grid w-max -translate-y-1/2 grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
                 {postEmojis.map((emoji) => (
                   <button
                     aria-label={`Add ${emoji}`}
@@ -672,12 +809,35 @@ export function TimelineWorkflow() {
 
               <div className="flex items-center gap-3">
                 <button
-                  className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-                  disabled={isWorking}
+                  aria-label={liked ? "Unlike post" : "Like post"}
+                  aria-pressed={liked}
+                  className={[
+                    "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50",
+                    liked
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700",
+                  ].join(" ")}
+                  disabled={reactingPostId === post.id}
                   onClick={() => toggleLike(post.id)}
+                  title={liked ? "Unlike" : "Like"}
                   type="button"
                 >
-                  {liked ? "Unlike" : "Like"} ({getPostLikeCount(post.id)})
+                  <svg
+                    aria-hidden="true"
+                    className="h-5 w-5"
+                    fill={liked ? "currentColor" : "none"}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M7 10v10H4V10h3Zm4.2-7c.8 0 1.5.7 1.5 1.5v3.1h4.8c1.4 0 2.4 1.3 2 2.6l-2.1 7.3c-.3.9-1.1 1.5-2.1 1.5H9V9.7l2-4.7c.1-.3.2-.7.2-1V3Z"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                    />
+                  </svg>
+
+                  <span>{getPostLikeCount(post.id)}</span>
                 </button>
                 <span className="text-sm text-gray-600">{postComments.length} comments</span>
               </div>
@@ -720,12 +880,39 @@ export function TimelineWorkflow() {
                           )}
                         </div>
                         <button
-                          className="mt-2 rounded-lg border px-2 py-1 text-xs font-medium disabled:opacity-50"
-                          disabled={isWorking}
+                          aria-label={
+                            commentLiked
+                              ? "Unlike comment"
+                              : "Like comment"
+                          }
+                          aria-pressed={commentLiked}
+                          className={[
+                            "mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50",
+                            commentLiked
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700",
+                          ].join(" ")}
+                          disabled={reactingCommentId === comment.id}
                           onClick={() => toggleCommentLike(comment.id)}
+                          title={commentLiked ? "Unlike" : "Like"}
                           type="button"
                         >
-                          {commentLiked ? "Unlike" : "Like"} ({getCommentLikeCount(comment.id)})
+                          <svg
+                            aria-hidden="true"
+                            className="h-4 w-4"
+                            fill={commentLiked ? "currentColor" : "none"}
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M7 10v10H4V10h3Zm4.2-7c.8 0 1.5.7 1.5 1.5v3.1h4.8c1.4 0 2.4 1.3 2 2.6l-2.1 7.3c-.3.9-1.1 1.5-2.1 1.5H9V9.7l2-4.7c.1-.3.2-.7.2-1V3Z"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.8"
+                            />
+                          </svg>
+
+                          <span>{getCommentLikeCount(comment.id)}</span>
                         </button>
                       </div>
                     </div>
