@@ -416,7 +416,7 @@ export function LibraryWorkflow() {
         </label>
 
         <button
-          className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-fit min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
           disabled={!title.trim() || !selectedFile || isWorking}
           type="submit"
         >
@@ -471,7 +471,7 @@ export function LibraryWorkflow() {
           </DocumentSection>
 
           <DocumentSection title="Published library">
-            <div className="flex flex-col gap-4 rounded-xl border p-4">
+            <div className="flex flex-col gap-4 rounded-xl border bg-white p-4">
               <div>
                 <h3 className="font-semibold">Find resources</h3>
                 <p className="mt-1 text-sm text-gray-600">
@@ -539,7 +539,7 @@ export function LibraryWorkflow() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
-                  className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
                   disabled={filteredPublishedDocuments.length === 0}
                   onClick={() => setIsResultListOpen((current) => !current)}
                   type="button"
@@ -672,7 +672,7 @@ function DocumentCard({
 
       <div className="flex flex-wrap gap-2">
         <button
-          className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
           disabled={isWorking}
           onClick={onOpen}
           type="button"

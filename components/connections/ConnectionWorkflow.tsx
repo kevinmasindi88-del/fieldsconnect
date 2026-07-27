@@ -456,7 +456,7 @@ export function ConnectionWorkflow() {
                   <ConnectionCard key={connection.id} profile={profile}>
                     <div className="flex gap-2">
                       <button
-                        className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => updateRequest(connection.id, "accepted")}
                       >
@@ -570,7 +570,7 @@ export function ConnectionWorkflow() {
           </ConnectionSection>
 
           <ConnectionSection title="Find people">
-            <div className="rounded-xl border p-4">
+            <div className="rounded-xl border bg-white p-4">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Search people
@@ -631,7 +631,7 @@ export function ConnectionWorkflow() {
               filteredDiscoverableProfiles.map((profile) => (
                 <ConnectionCard key={profile.id} profile={profile}>
                   <button
-                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
                     disabled={isWorking}
                     onClick={() => sendRequest(profile.id)}
                   >

@@ -466,7 +466,7 @@ export function MessagingWorkflow() {
                       </span>
                     </span>
                     {unreadCount > 0 && (
-                      <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                      <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
                         {unreadCount > 99 ? "99+" : unreadCount}
                       </span>
                     )}
@@ -558,7 +558,7 @@ export function MessagingWorkflow() {
             placeholder="Write a message..."
           />
           <button
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
             disabled={!activeConversationId || !draftMessage.trim() || isWorking}
             type="submit"
           >
