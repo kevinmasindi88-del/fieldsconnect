@@ -26,7 +26,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     mode === "login"
       ? "Log in"
       : mode === "signup"
-        ? "Create your FieldsConnect account"
+        ? "Create your account"
         : "Reset your password";
 
   async function routeAfterLogin(userId: string) {
@@ -125,7 +125,16 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   if (mode === "signup" && signupComplete) {
     return (
-      <section className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border p-6">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-3xl border border-gray-200 bg-white p-6 text-center shadow-xl shadow-gray-200/60 sm:p-8">
+        <Link
+          aria-label="FieldsConnect home"
+          className="inline-flex items-center justify-center text-3xl font-bold tracking-tight"
+          href="/"
+        >
+          <span className="text-blue-700">Fields</span>
+          <span className="text-gray-950">Connect</span>
+        </Link>
+
         <div>
           <h1 className="text-2xl font-semibold">Check your email</h1>
           <p className="mt-2 text-sm text-gray-700">
@@ -152,11 +161,23 @@ export function AuthForm({ mode }: AuthFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border p-6"
+      className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/60 sm:p-8"
     >
-      <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm text-gray-600">
+      <div className="text-center">
+        <Link
+          aria-label="FieldsConnect home"
+          className="inline-flex items-center justify-center text-3xl font-bold tracking-tight"
+          href="/"
+        >
+          <span className="text-blue-700">Fields</span>
+          <span className="text-gray-950">Connect</span>
+        </Link>
+
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-950">
+          {title}
+        </h1>
+
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-600">
           {mode === "signup"
             ? "Create your account, then verify your email before signing in."
             : mode === "reset"
@@ -300,12 +321,36 @@ export function AuthForm({ mode }: AuthFormProps) {
       )}
 
       <button
-        className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+        className="min-h-12 rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
         type="submit"
         disabled={isSubmitting}
       >
         {isSubmitting ? "Please wait..." : title}
       </button>
+
+      {mode === "login" && (
+        <p className="text-center text-sm text-gray-600">
+          New to FieldsConnect?{" "}
+          <Link
+            className="font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+            href="/signup"
+          >
+            Create an account
+          </Link>
+        </p>
+      )}
+
+      {mode === "signup" && (
+        <p className="text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link
+            className="font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+            href="/login"
+          >
+            Log in
+          </Link>
+        </p>
+      )}
 
       {message && (
         <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>

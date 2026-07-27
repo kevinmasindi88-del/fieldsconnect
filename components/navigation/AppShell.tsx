@@ -17,7 +17,7 @@ const suspensionAllowedRoutes = new Set([
 ]);
 
 const navItems = [
-  { href: "/", label: "Home" },
+  { href: "/timeline", label: "Home" },
   { href: "/connections", label: "Connections" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
