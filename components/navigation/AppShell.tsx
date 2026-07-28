@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/browser";
 
 const authRoutes = new Set(["/login", "/signup", "/reset-password"]);
+
+const publicRoutes = new Set([
+  "/",
+  "/login",
+  "/signup",
+  "/reset-password",
+  "/code-of-conduct",
+]);
 
 const suspensionAllowedRoutes = new Set([
   "/notifications",
@@ -36,7 +44,9 @@ type ActiveSuspension = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const shouldHideNavigation = authRoutes.has(pathname);
+  const isPublicRoute = publicRoutes.has(pathname);
 
   const [user, setUser] = useState<User | null>(null);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
@@ -71,6 +81,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (isLoadingAuth || user || isPublicRoute) return;
+
+    router.replace("/login");
+  }, [isLoadingAuth, user, isPublicRoute, router]);
 
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
@@ -244,10 +260,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   }
 
+  if (!isPublicRoute && isLoadingAuth) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[var(--fc-page)] px-4">
+        <div className="text-center">
+          <div className="text-3xl font-bold tracking-tight">
+            <span className="text-blue-700">Fields</span>
+            <span className="text-gray-950">Connect</span>
+          </div>
+
+          <p className="mt-3 text-sm text-gray-600">
+            Restoring your session…
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isPublicRoute && !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[var(--fc-page)] px-4">
+        <p className="text-sm text-gray-600">Taking you to login…</p>
+      </main>
+    );
+  }
+
   if (shouldHideNavigation) {
     return <>{children}</>;
   }
-
 
   if (user && activeSuspension) {
     const isAllowedSuspensionRoute =
