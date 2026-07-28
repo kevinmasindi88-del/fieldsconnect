@@ -8,6 +8,19 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/browser";
 
+function AuthBrand() {
+  return (
+    <Link
+      aria-label="FieldsConnect home"
+      className="inline-flex items-center justify-center text-3xl font-bold tracking-tight"
+      href="/"
+    >
+      <span className="text-blue-700">Fields</span>
+      <span className="text-gray-950">Connect</span>
+    </Link>
+  );
+}
+
 export function ResetPasswordWorkflow() {
   const router = useRouter();
 
@@ -265,17 +278,19 @@ export function ResetPasswordWorkflow() {
   if (!hasRecoveryLink && !isRecoveryReady) {
     return (
       <form
-        className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border p-6"
+        className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/60 sm:p-8"
         onSubmit={handleRequestReset}
       >
-        <div>
-          <h1 className="text-2xl font-semibold">
+        <div className="text-center">
+          <AuthBrand />
+
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight">
             Forgot your password?
           </h1>
 
           <p className="mt-2 text-sm text-gray-600">
-            Enter your email address and FieldsConnect will send
-            you a secure password reset link.
+            Enter your email address. If a FieldsConnect account exists
+            for it, we will send you a secure password reset link.
           </p>
         </div>
 
@@ -316,21 +331,32 @@ export function ResetPasswordWorkflow() {
           </p>
         )}
 
-        <Link
-          className="w-fit text-sm font-medium underline"
-          href="/login"
-        >
-          Return to login
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <Link
+            className="font-medium text-gray-700 underline"
+            href="/login"
+          >
+            Return to login
+          </Link>
+
+          <Link
+            className="font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+            href="/signup"
+          >
+            Create an account
+          </Link>
+        </div>
       </form>
     );
   }
 
   if (!isRecoveryReady) {
     return (
-      <section className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border p-6">
-        <div>
-          <h1 className="text-2xl font-semibold">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/60 sm:p-8">
+        <div className="text-center">
+          <AuthBrand />
+
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight">
             Reset link unavailable
           </h1>
 
@@ -346,23 +372,34 @@ export function ResetPasswordWorkflow() {
           Request a new reset link
         </Link>
 
-        <Link
-          className="w-fit text-sm font-medium underline"
-          href="/login"
-        >
-          Return to login
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <Link
+            className="font-medium text-gray-700 underline"
+            href="/login"
+          >
+            Return to login
+          </Link>
+
+          <Link
+            className="font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+            href="/signup"
+          >
+            Create an account
+          </Link>
+        </div>
       </section>
     );
   }
 
   return (
     <form
-      className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border p-6"
+      className="mx-auto flex w-full max-w-md flex-col gap-5 rounded-3xl border border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/60 sm:p-8"
       onSubmit={handleSubmit}
     >
-      <div>
-        <h1 className="text-2xl font-semibold">
+      <div className="text-center">
+        <AuthBrand />
+
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight">
           Choose a new password
         </h1>
 
@@ -377,7 +414,7 @@ export function ResetPasswordWorkflow() {
         <div className="relative">
           <input
             autoComplete="new-password"
-            className="w-full rounded-lg border px-3 py-2 pr-20"
+            className="w-full rounded-lg border px-3 py-2 pr-12"
             minLength={8}
             onChange={(event) =>
               setPassword(event.target.value)
@@ -388,16 +425,39 @@ export function ResetPasswordWorkflow() {
           />
 
           <button
-            aria-label={
-              showPassword ? "Hide password" : "Show password"
-            }
-            className="absolute inset-y-0 right-0 px-3 text-sm font-medium text-gray-600"
-            onClick={() =>
-              setShowPassword((current) => !current)
-            }
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            className={[
+              "absolute inset-y-1 right-1 flex w-10 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
+              showPassword
+                ? "border-gray-950 bg-gray-950 text-white"
+                : "border-transparent bg-white text-gray-700 hover:bg-gray-100",
+            ].join(" ")}
+            onClick={() => setShowPassword((current) => !current)}
+            title={showPassword ? "Hide password" : "Show password"}
             type="button"
           >
-            {showPassword ? "Hide" : "Show"}
+            <svg
+              aria-hidden="true"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="2.8"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+            </svg>
           </button>
         </div>
       </label>
@@ -408,7 +468,7 @@ export function ResetPasswordWorkflow() {
         <div className="relative">
           <input
             autoComplete="new-password"
-            className="w-full rounded-lg border px-3 py-2 pr-20"
+            className="w-full rounded-lg border px-3 py-2 pr-12"
             minLength={8}
             onChange={(event) =>
               setConfirmPassword(event.target.value)
