@@ -4,12 +4,14 @@
 
 Build the MVP ticket-by-ticket against approved documentation. Do not implement feature logic before the documentation baseline, environment separation, database foundation, auth, and RLS baseline are in place.
 
+The Library feature must be implemented against `docs/library-feature-spec.md`, including the Library-specific legal acceptance gate, uploader rights declaration, private storage controls, moderation, takedown, versioning, and audit requirements.
+
 ## Phase 0: Controlled Documentation Baseline
 
 ### Goals
 
 - Commit controlled MVP documents.
-- Confirm approved amendments.
+- Confirm approved amendments, including the Library feature specification.
 - Create GitHub issue tickets.
 - Lock MVP scope before coding.
 
@@ -17,7 +19,7 @@ Build the MVP ticket-by-ticket against approved documentation. Do not implement 
 
 - Documentation committed.
 - GitHub issues created.
-- MVP scope approved.
+- MVP and Library scope approved.
 
 ## Phase 1: Project Foundation
 
@@ -40,6 +42,7 @@ Build the MVP ticket-by-ticket against approved documentation. Do not implement 
 ### Goals
 
 - Create initial Supabase schema migrations.
+- Include the Library schema, acceptance records, document versions, reports, moderation actions, and audit records.
 - Implement Supabase Auth.
 - Add onboarding acceptance gate.
 - Implement RLS baseline.
@@ -49,7 +52,8 @@ Build the MVP ticket-by-ticket against approved documentation. Do not implement 
 
 - Users can sign up, verify, login, logout, and reset password.
 - Users cannot access or mutate unauthorized rows.
-- Users must accept required policies before using protected features.
+- Users must accept required platform policies before using protected features.
+- Library tables and private storage authorization are covered by the RLS/security baseline.
 
 ## Phase 3: Profiles and Discovery
 
@@ -98,30 +102,55 @@ Build the MVP ticket-by-ticket against approved documentation. Do not implement 
 - Only accepted connections can message.
 - Blocked users cannot interact.
 
-## Phase 6: Trust, Safety, and Admin
+## Phase 6: Controlled Library
+
+### Goals
+
+- Implement Library-specific terms versioning and acceptance.
+- Create private Library storage and secure upload policies.
+- Implement the 8 MB server-side file limit and explicit file-type allow-list.
+- Build upload metadata and uploader ownership/permission declaration.
+- Build Library catalogue, search, document details, and short-lived signed access.
+- Build own-document management and controlled version replacement.
+- Implement Library reporting, quarantine, takedown, restoration, moderation, and audit records.
+
+### Exit Criteria
+
+- Users cannot upload or download without accepting the current Library terms.
+- Every upload has a recorded lawful-sharing declaration and required metadata.
+- Invalid, unsupported, disguised, or oversized files are rejected server-side.
+- Library files are stored privately and are not exposed through permanent public URLs.
+- Users cannot access or alter another user's protected Library records.
+- Removed, quarantined, restricted, or deleted documents cannot be newly accessed.
+- Moderation and sensitive administrative actions are recorded in immutable audit records.
+- Library upload, access, reporting, moderation, versioning, and mobile UAT pass.
+
+## Phase 7: Trust, Safety, and Admin
 
 ### Goals
 
 - Implement reporting.
 - Implement blocking.
 - Build admin moderation dashboard.
+- Integrate the Library moderation queue with the protected admin experience.
 - Implement protected role management.
 - Write moderation actions and audit logs.
 
 ### Exit Criteria
 
-- Reports appear in admin queue.
-- Moderators/admins can action reports.
+- Reports appear in admin queues.
+- Moderators/admins can action reports, including Library reports.
 - Role changes are protected and audited.
 - Moderation and audit records are created correctly.
 
-## Phase 7: Hardening and Demo Readiness
+## Phase 8: Hardening and Demo Readiness
 
 ### Goals
 
 - Add validation and sanitization layer.
 - Add rate limits.
-- Complete backup/export/recovery runbook.
+- Complete backup/export/recovery runbook, including Library database and storage objects.
+- Finalise retention, incident response, malware/quarantine compensating controls, and takedown procedures.
 - Add seed data.
 - Perform mobile QA and UAT.
 
@@ -130,5 +159,6 @@ Build the MVP ticket-by-ticket against approved documentation. Do not implement 
 - Demo flow passes end-to-end.
 - RLS/security tests pass.
 - Mobile checks pass.
-- Demo users are seeded.
+- Demo users and safe Library sample documents are seeded.
 - Backup/export/recovery process is documented and tested.
+- Library compliance and security controls pass the pre-pilot review.
