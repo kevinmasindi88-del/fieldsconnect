@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
+import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
 import { usePathname, useRouter } from "next/navigation";
 import {
   getSupabaseBrowserClient,
@@ -51,6 +52,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [showLoadingScreen, setShowLoadingScreen] =
+    useState(false);
+
   const [activeSuspension, setActiveSuspension] =
     useState<ActiveSuspension | null>(null);
 
@@ -87,6 +91,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     router.replace("/login");
   }, [isLoadingAuth, user, isPublicRoute, router]);
+
+  useEffect(() => {
+    const isWaitingForProtectedAccess =
+      !isPublicRoute &&
+      (isLoadingAuth || !user);
+
+    if (!isWaitingForProtectedAccess) {
+      setShowLoadingScreen(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowLoadingScreen(true);
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isLoadingAuth, user, isPublicRoute]);
 
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
@@ -260,29 +283,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   }
 
-  if (!isPublicRoute && isLoadingAuth) {
+  const isWaitingForProtectedAccess =
+    !isPublicRoute &&
+    (isLoadingAuth || !user);
+
+  if (
+    isWaitingForProtectedAccess &&
+    showLoadingScreen
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[var(--fc-page)] px-4">
         <div className="text-center">
-          <div className="text-3xl font-bold tracking-tight">
-            <span className="text-blue-700">Fields</span>
-            <span className="text-gray-950">Connect</span>
+          <div
+            aria-label="FieldsConnect"
+            className="text-3xl font-bold tracking-tight"
+          >
+            <span className="text-blue-700">
+              Fields
+            </span>
+
+            <span className="text-gray-950">
+              Connect
+            </span>
           </div>
 
           <p className="mt-3 text-sm text-gray-600">
-            Restoring your session…
+            Loading...
           </p>
         </div>
       </main>
     );
   }
 
-  if (!isPublicRoute && !user) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--fc-page)] px-4">
-        <p className="text-sm text-gray-600">Taking you to login…</p>
-      </main>
-    );
+  if (isWaitingForProtectedAccess) {
+    return null;
   }
 
   if (shouldHideNavigation) {
@@ -385,7 +419,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         aria-hidden="true"
                         className="text-xs text-gray-500"
                       >
-                        ▾
+                        &#9662;
                       </span>
                     </summary>
 
@@ -406,23 +440,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       >
                         Profile
                       </Link>
-
                       <Link
                         className={[
                           "block rounded-lg px-3 py-2 text-sm",
-                          pathname.startsWith("/moderation")
+                          pathname === "/feedback"
                             ? "bg-gray-100 font-medium text-gray-950"
                             : "text-gray-700 hover:bg-gray-50",
                         ].join(" ")}
-                        href="/moderation"
+                        href="/feedback"
                         onClick={(event) => {
                           event.currentTarget
                             .closest("details")
                             ?.removeAttribute("open");
                         }}
                       >
-                        Moderation
+                        Feedback
                       </Link>
+                      <RoleAwareAccountLinks pathname={pathname} />
                     </div>
                   </details>
 

@@ -23,6 +23,16 @@ type Notification = {
     | "moderation_outcome"
     | "moderation_escalation"
     | "account_suspension"
+  | "new_fc_feedback"
+  | "fc_feedback_assignment"
+  | "fc_team_activated"
+  | "fc_team_recruitment_accepted"
+  | "fc_team_recruitment"
+  | "fc_team_removed"
+  | "fc_team_leave_declined"
+  | "fc_team_leave_approved"
+  | "fc_team_leave_requested"
+  | "fc_feedback_unassigned"
     | "suspension_revoked";
   entity_type:
     | "connection"
@@ -399,6 +409,77 @@ export function NotificationsWorkflow() {
                         {renderNotificationBody(notification, postId)}
                       </p>
                     )}
+
+                    {notification.notification_type ===
+                      "new_fc_feedback" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/feedback/manage?submission=${notification.entity_id}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View feedback
+                        </button>
+                      )}
+                    {notification.notification_type ===
+                      "fc_team_recruitment" && (
+                        <button
+                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          View invitation
+                        </button>
+                      )}
+                    {notification.notification_type ===
+                      "fc_team_recruitment_accepted" && (
+                        <button
+                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          Review and activate
+                        </button>
+                      )}
+
+                    {notification.notification_type ===
+                      "fc_team_activated" && (
+                        <button
+                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          View FC Team
+                        </button>
+                      )}
+
+                    {notification.notification_type ===
+                      "fc_feedback_assignment" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/feedback/manage?ticket=${encodeURIComponent(
+                                notification.entity_id!
+                              )}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View assignment
+                        </button>
+                      )}
 
                     <p className="mt-2 text-xs text-gray-500">
                       {formatDate(notification.created_at)}

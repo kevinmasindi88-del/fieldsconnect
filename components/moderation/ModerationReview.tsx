@@ -51,11 +51,21 @@ type ReportedLibraryDocument = {
   owner_name: string;
   title: string;
   description: string | null;
-  file_name: string;
-  file_size_bytes: number;
-  mime_type: string;
-  storage_bucket: string;
-  storage_path: string;
+
+  resource_type: "uploaded_file" | "external_link";
+
+  file_name: string | null;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+
+  external_url: string | null;
+  source_title: string | null;
+  source_publisher: string | null;
+  source_accessed_on: string | null;
+  link_access_confirmed: boolean;
+
   visibility: string;
   is_published: boolean;
   created_at: string;
@@ -221,7 +231,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       const documentResult = await supabase
         .from("library_documents")
         .select(
-          "id, owner_id, title, description, file_name, file_size_bytes, mime_type, storage_bucket, storage_path, visibility, is_published, created_at, updated_at, deleted_at"
+          "id, owner_id, title, description, resource_type, file_name, file_size_bytes, mime_type, storage_bucket, storage_path, external_url, source_title, source_publisher, source_accessed_on, link_access_confirmed, visibility, is_published, created_at, updated_at, deleted_at"
         )
         .eq("id", documentId)
         .maybeSingle();
@@ -259,19 +269,56 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     setMessage(null);
 
     try {
+      if (
+        reportedLibraryDocument.resource_type ===
+        "external_link"
+      ) {
+        if (!reportedLibraryDocument.external_url) {
+          throw new Error(
+            "This online resource does not have a valid link."
+          );
+        }
+
+        window.open(
+          reportedLibraryDocument.external_url,
+          "_blank",
+          "noopener,noreferrer"
+        );
+
+        return;
+      }
+
+      if (
+        !reportedLibraryDocument.storage_bucket ||
+        !reportedLibraryDocument.storage_path
+      ) {
+        throw new Error(
+          "This uploaded file does not have a valid storage location."
+        );
+      }
+
       const supabase = getSupabaseBrowserClient();
 
       const { data, error } = await supabase.storage
         .from(reportedLibraryDocument.storage_bucket)
-        .createSignedUrl(reportedLibraryDocument.storage_path, 300);
+        .createSignedUrl(
+          reportedLibraryDocument.storage_path,
+          300
+        );
 
       if (error) throw error;
 
       if (!data?.signedUrl) {
-        throw new Error("Unable to generate a secure resource link.");
+        throw new Error(
+          "Unable to generate a secure resource link."
+        );
       }
 
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      window.open(
+        data.signedUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -511,6 +558,61 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       });
 
       if (error) throw error;
+
+      if (
+        ticket.target_type === "library_document" &&
+        (action === "redacted" || action === "removed")
+      ) {
+        const broadcastChannel = supabase.channel(
+          "library-resource-events"
+        );
+
+        await new Promise<void>((resolve, reject) => {
+          const timeoutId = window.setTimeout(() => {
+            void supabase.removeChannel(broadcastChannel);
+            reject(
+              new Error(
+                "The resource was removed, but the live update timed out."
+              )
+            );
+          }, 5000);
+
+          broadcastChannel.subscribe(async (status) => {
+            if (status === "SUBSCRIBED") {
+              try {
+                await broadcastChannel.send({
+                  type: "broadcast",
+                  event: "resource-removed",
+                  payload: {
+                    resourceId: ticket.target_id,
+                  },
+                });
+
+                window.clearTimeout(timeoutId);
+                await supabase.removeChannel(broadcastChannel);
+                resolve();
+              } catch (broadcastError) {
+                window.clearTimeout(timeoutId);
+                await supabase.removeChannel(broadcastChannel);
+                reject(broadcastError);
+              }
+            }
+
+            if (
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT"
+            ) {
+              window.clearTimeout(timeoutId);
+              void supabase.removeChannel(broadcastChannel);
+              reject(
+                new Error(
+                  "The resource was removed, but its live update could not be sent."
+                )
+              );
+            }
+          });
+        });
+      }
 
       const nextStatus =
         action === "dismissed"
@@ -902,40 +1004,126 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
                   <dl className="mt-4 grid gap-3 rounded-lg bg-gray-50 p-3 text-sm md:grid-cols-2">
                     <div>
-                      <dt className="font-medium">File name</dt>
-                      <dd className="mt-1 break-all">
-                        {reportedLibraryDocument.deleted_at ? (
-                          <span className="text-gray-500">
-                            {reportedLibraryDocument.file_name}
-                          </span>
-                        ) : (
-                          <button
-                            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
-                            disabled={isWorking}
-                            onClick={openReportedLibraryDocument}
-                            type="button"
-                          >
-                            {reportedLibraryDocument.file_name}
-                          </button>
-                        )}
+                      <dt className="font-medium">
+                        Resource type
+                      </dt>
+                      <dd className="mt-1 text-gray-700">
+                        {reportedLibraryDocument.resource_type ===
+                        "external_link"
+                          ? "Online link"
+                          : "Uploaded file"}
                       </dd>
                     </div>
 
-                    <div>
-                      <dt className="font-medium">File size</dt>
-                      <dd className="mt-1 text-gray-700">
-                        {formatFileSize(
-                          reportedLibraryDocument.file_size_bytes
-                        )}
-                      </dd>
-                    </div>
+                    {reportedLibraryDocument.resource_type ===
+                    "external_link" ? (
+                      <>
+                        <div>
+                          <dt className="font-medium">
+                            Source title
+                          </dt>
+                          <dd className="mt-1 break-words text-gray-700">
+                            {reportedLibraryDocument.source_title ??
+                              "Not provided"}
+                          </dd>
+                        </div>
 
-                    <div>
-                      <dt className="font-medium">File type</dt>
-                      <dd className="mt-1 text-gray-700">
-                        {reportedLibraryDocument.mime_type}
-                      </dd>
-                    </div>
+                        <div>
+                          <dt className="font-medium">
+                            Publisher
+                          </dt>
+                          <dd className="mt-1 text-gray-700">
+                            {reportedLibraryDocument.source_publisher ??
+                              "Not provided"}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-medium">
+                            External resource
+                          </dt>
+                          <dd className="mt-1 break-all">
+                            <button
+                              className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+                              disabled={
+                                isWorking ||
+                                Boolean(
+                                  reportedLibraryDocument.deleted_at
+                                )
+                              }
+                              onClick={
+                                openReportedLibraryDocument
+                              }
+                              type="button"
+                            >
+                              Open original link
+                            </button>
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-medium">
+                            Access recorded
+                          </dt>
+                          <dd className="mt-1 text-gray-700">
+                            {reportedLibraryDocument.source_accessed_on ??
+                              "Not recorded"}
+                          </dd>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <dt className="font-medium">
+                            File name
+                          </dt>
+                          <dd className="mt-1 break-all">
+                            {reportedLibraryDocument.deleted_at ? (
+                              <span className="text-gray-500">
+                                {reportedLibraryDocument.file_name ??
+                                  "Uploaded file"}
+                              </span>
+                            ) : (
+                              <button
+                                className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+                                disabled={isWorking}
+                                onClick={
+                                  openReportedLibraryDocument
+                                }
+                                type="button"
+                              >
+                                {reportedLibraryDocument.file_name ??
+                                  "Open uploaded file"}
+                              </button>
+                            )}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-medium">
+                            File size
+                          </dt>
+                          <dd className="mt-1 text-gray-700">
+                            {reportedLibraryDocument.file_size_bytes !==
+                            null
+                              ? formatFileSize(
+                                  reportedLibraryDocument.file_size_bytes
+                                )
+                              : "Unknown size"}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-medium">
+                            File type
+                          </dt>
+                          <dd className="mt-1 text-gray-700">
+                            {reportedLibraryDocument.mime_type ??
+                              "Unknown type"}
+                          </dd>
+                        </div>
+                      </>
+                    )}
 
                     <div>
                       <dt className="font-medium">Publication status</dt>

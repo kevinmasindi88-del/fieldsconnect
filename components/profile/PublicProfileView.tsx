@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -29,10 +29,19 @@ type LibraryDocument = {
   id: string;
   title: string;
   description: string | null;
-  file_name: string;
-  file_size_bytes: number;
-  storage_bucket: string;
-  storage_path: string;
+
+  resource_type: "uploaded_file" | "external_link";
+
+  file_name: string | null;
+  file_size_bytes: number | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+
+  external_url: string | null;
+  source_title: string | null;
+  source_publisher: string | null;
+  source_accessed_on: string | null;
+
   visibility: "public" | "connections";
   is_published: boolean;
 };
@@ -48,6 +57,34 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+
+  async function reloadVisibleLibraryDocuments() {
+    if (!isSupabaseConfigured()) return;
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { data, error } = await supabase
+        .from("library_documents")
+        .select(
+          "id, title, description, resource_type, file_name, file_size_bytes, storage_bucket, storage_path, external_url, source_title, source_publisher, source_accessed_on, visibility, is_published"
+        )
+        .eq("owner_id", profileId)
+        .eq("is_published", true)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      setDocuments((data ?? []) as LibraryDocument[]);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to refresh visible library resources."
+      );
+    }
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -90,7 +127,9 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             .order("created_at", { ascending: false }),
           supabase
             .from("library_documents")
-            .select("id, title, description, file_name, file_size_bytes, storage_bucket, storage_path, visibility, is_published")
+            .select(
+              "id, title, description, resource_type, file_name, file_size_bytes, storage_bucket, storage_path, external_url, source_title, source_publisher, source_accessed_on, visibility, is_published"
+            )
             .eq("owner_id", profileId)
             .eq("is_published", true)
             .is("deleted_at", null)
@@ -114,6 +153,49 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     void loadProfile();
   }, [profileId]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel("library-resource-events")
+      .on(
+        "broadcast",
+        {
+          event: "resource-removed",
+        },
+        ({ payload }) => {
+          const resourceId =
+            typeof payload?.resourceId === "string"
+              ? payload.resourceId
+              : null;
+
+          if (!resourceId) return;
+
+          setDocuments((currentDocuments) =>
+            currentDocuments.filter(
+              (document) => document.id !== resourceId
+            )
+          );
+        }
+      )
+      .on(
+        "broadcast",
+        {
+          event: "resource-visibility-changed",
+        },
+        () => {
+          void reloadVisibleLibraryDocuments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
   async function openDocument(document: LibraryDocument) {
     if (!isSupabaseConfigured()) return;
 
@@ -121,7 +203,33 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     setMessage(null);
 
     try {
+      if (document.resource_type === "external_link") {
+        if (!document.external_url) {
+          throw new Error(
+            "This online resource does not have a valid link."
+          );
+        }
+
+        window.open(
+          document.external_url,
+          "_blank",
+          "noopener,noreferrer"
+        );
+
+        return;
+      }
+
+      if (
+        !document.storage_bucket ||
+        !document.storage_path
+      ) {
+        throw new Error(
+          "This uploaded file does not have a valid storage location."
+        );
+      }
+
       const supabase = getSupabaseBrowserClient();
+
       const { data, error } = await supabase.storage
         .from(document.storage_bucket)
         .createSignedUrl(document.storage_path, 60);
@@ -129,10 +237,18 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       if (error) throw error;
 
       if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        window.open(
+          data.signedUrl,
+          "_blank",
+          "noopener,noreferrer"
+        );
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to open document.");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to open resource."
+      );
     } finally {
       setIsWorking(false);
     }
@@ -232,16 +348,43 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{document.title}</h3>
+
                     <span className="rounded-full border px-2 py-1 text-xs">
-                      {document.visibility === "public" ? "Public" : "Connections"}
+                      {document.resource_type === "external_link"
+                        ? "Online link"
+                        : "File"}
+                    </span>
+
+                    <span className="rounded-full border px-2 py-1 text-xs">
+                      {document.visibility === "public"
+                        ? "Public"
+                        : "Connections"}
                     </span>
                   </div>
 
                   {document.description && <p className="mt-2 text-sm text-gray-700">{document.description}</p>}
 
-                  <p className="mt-2 text-xs text-gray-500">
-                    {document.file_name} - {formatBytes(document.file_size_bytes)}
-                  </p>
+                  {document.resource_type === "external_link" ? (
+                    <div className="mt-2 space-y-1 text-xs text-gray-500">
+                      <p>
+                        Online resource
+                        {document.source_publisher
+                          ? ` - ${document.source_publisher}`
+                          : ""}
+                      </p>
+
+                      {document.source_title && (
+                        <p>{document.source_title}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-gray-500">
+                      {document.file_name ?? "Uploaded file"} -{" "}
+                      {document.file_size_bytes !== null
+                        ? formatBytes(document.file_size_bytes)
+                        : "Unknown size"}
+                    </p>
+                  )}
                 </div>
 
                 <button

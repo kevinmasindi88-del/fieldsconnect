@@ -15,7 +15,10 @@ type LibraryDocument = {
   owner_id: string;
   title: string;
   description: string | null;
-  file_name: string;
+  resource_type: "uploaded_file" | "external_link";
+  file_name: string | null;
+  source_title: string | null;
+  source_publisher: string | null;
   is_published: boolean;
   created_at: string;
 };
@@ -35,40 +38,105 @@ export function LibraryDiscoveryFilters() {
   const [recency, setRecency] = useState("all");
   const [isReady, setIsReady] = useState(false);
 
+  async function loadDiscoveryData() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const [
+      { data: profileData, error: profileError },
+      { data: documentData, error: documentError },
+    ] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, display_name, role_type, field")
+        .is("deleted_at", null),
+      supabase
+        .from("library_documents")
+        .select(
+          "id, owner_id, title, description, resource_type, file_name, source_title, source_publisher, is_published, created_at"
+        )
+        .is("deleted_at", null)
+        .eq("is_published", true),
+    ]);
+
+    if (profileError) {
+      console.error(
+        "Unable to refresh Library discovery profiles.",
+        profileError
+      );
+    }
+
+    if (documentError) {
+      console.error(
+        "Unable to refresh Library discovery resources.",
+        documentError
+      );
+
+      return;
+    }
+
+    const profiles = (profileData ?? []) as Profile[];
+
+    const profileById = new Map(
+      profiles.map((profile) => [
+        profile.id,
+        profile,
+      ])
+    );
+
+    const discoveryDocuments = (
+      (documentData ?? []) as LibraryDocument[]
+    ).map((document) => {
+      const owner = profileById.get(document.owner_id);
+
+      return {
+        ...document,
+        ownerName:
+          owner?.display_name ?? "Unknown profile",
+        ownerRole: owner?.role_type ?? "",
+        ownerField: owner?.field ?? "",
+      };
+    });
+
+    setDocuments(discoveryDocuments);
+    setIsReady(true);
+  }
+
+  useEffect(() => {
+    void loadDiscoveryData();
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    async function loadDiscoveryData() {
-      const supabase = getSupabaseBrowserClient();
-      const [{ data: profileData }, { data: documentData }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, display_name, role_type, field")
-          .is("deleted_at", null),
-        supabase
-          .from("library_documents")
-          .select("id, owner_id, title, description, file_name, is_published, created_at")
-          .is("deleted_at", null)
-          .eq("is_published", true),
-      ]);
+    const supabase = getSupabaseBrowserClient();
 
-      const profiles = (profileData ?? []) as Profile[];
-      const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
-      const discoveryDocuments = ((documentData ?? []) as LibraryDocument[]).map((document) => {
-        const owner = profileById.get(document.owner_id);
-        return {
-          ...document,
-          ownerName: owner?.display_name ?? "Unknown profile",
-          ownerRole: owner?.role_type ?? "",
-          ownerField: owner?.field ?? "",
-        };
-      });
+    const channel = supabase
+      .channel("library-resource-events")
+      .on(
+        "broadcast",
+        {
+          event: "resource-visibility-changed",
+        },
+        () => {
+          void loadDiscoveryData();
+        }
+      )
+      .on(
+        "broadcast",
+        {
+          event: "resource-removed",
+        },
+        () => {
+          void loadDiscoveryData();
+        }
+      )
+      .subscribe();
 
-      setDocuments(discoveryDocuments);
-      setIsReady(true);
-    }
-
-    void loadDiscoveryData();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const fields = useMemo(
@@ -91,7 +159,9 @@ export function LibraryDiscoveryFilters() {
         [
           document.title,
           document.description ?? "",
-          document.file_name,
+          document.file_name ?? "",
+          document.source_title ?? "",
+          document.source_publisher ?? "",
           document.ownerName,
           document.ownerField,
           document.ownerRole,
@@ -116,8 +186,8 @@ export function LibraryDiscoveryFilters() {
   useEffect(() => {
     if (!isReady) return;
 
-    const visibleKeys = new Set(
-      filteredDocuments.map((document) => `${document.title}\u0000${document.file_name}`)
+    const visibleIds = new Set(
+      filteredDocuments.map((document) => document.id)
     );
 
     function applyFilters() {
@@ -133,14 +203,30 @@ export function LibraryDiscoveryFilters() {
 
       for (const card of cards) {
         const title = card.querySelector("h3")?.textContent?.trim() ?? "";
-        const fileLine = Array.from(card.querySelectorAll("p")).find((paragraph) =>
-          paragraph.className.includes("text-xs")
-        )?.textContent ?? "";
+        const metadataText = Array.from(
+          card.querySelectorAll("p")
+        )
+          .map((paragraph) => paragraph.textContent ?? "")
+          .join(" ");
+
         const matchingDocument = documents.find(
-          (document) => document.title === title && fileLine.includes(document.file_name)
+          (document) =>
+            document.title === title &&
+            (
+              document.resource_type === "external_link"
+                ? (
+                    !document.source_title ||
+                    metadataText.includes(document.source_title)
+                  )
+                : (
+                    !document.file_name ||
+                    metadataText.includes(document.file_name)
+                  )
+            )
         );
+
         const shouldShow = matchingDocument
-          ? visibleKeys.has(`${matchingDocument.title}\u0000${matchingDocument.file_name}`)
+          ? visibleIds.has(matchingDocument.id)
           : false;
 
         card.style.display = shouldShow ? "flex" : "none";
