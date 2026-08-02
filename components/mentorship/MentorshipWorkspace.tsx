@@ -658,10 +658,21 @@ export function MentorshipWorkspace({
     }
   }
 
+  const isWorkspaceReadOnly =
+    Boolean(
+      mentorship &&
+        (
+          mentorship.status === "completed" ||
+          mentorship.status === "cancelled" ||
+          mentorship.status === "ended_early"
+        )
+    );
+
   const canManageMilestones =
     Boolean(
       currentUserId &&
         mentorship &&
+        !isWorkspaceReadOnly &&
         currentUserId === mentorship.mentor_id
     );
 
@@ -1205,6 +1216,22 @@ export function MentorshipWorkspace({
         </div>
       </section>
 
+      {isWorkspaceReadOnly && (
+        <div className="rounded-2xl border bg-gray-50 p-5">
+          <h2 className="font-semibold">
+            Read-only mentorship record
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            This mentorship has ended. Its updates,
+            milestones, action items, completion evidence
+            and reviews remain available as a permanent
+            record, but no further workspace changes can
+            be made.
+          </p>
+        </div>
+      )}
+
       <LifecyclePanel
         completionRequestNote={
           completionRequestNote
@@ -1251,6 +1278,7 @@ export function MentorshipWorkspace({
             reflections and agreed decisions.
           </p>
 
+          {!isWorkspaceReadOnly && (
           <form
             className="mt-5 grid gap-4"
             onSubmit={submitUpdate}
@@ -1314,6 +1342,7 @@ export function MentorshipWorkspace({
                 : "Add update"}
             </button>
           </form>
+          )}
 
           <div className="mt-6 space-y-3">
             {updates.length === 0 ? (
@@ -1461,6 +1490,7 @@ export function MentorshipWorkspace({
           )}
 
 
+          {!isWorkspaceReadOnly && (
           <section className="rounded-2xl border bg-white p-5">
             <h2 className="text-xl font-semibold">
               Add action item
@@ -1604,13 +1634,19 @@ export function MentorshipWorkspace({
               </button>
             </form>
           </section>
+          )}
 
           <MentorshipWorkboard
             actionItems={actionItems}
             canManageMilestones={
               canManageMilestones
             }
-            currentUserId={currentUserId}
+            currentUserId={
+              isWorkspaceReadOnly
+                ? null
+                : currentUserId
+            }
+            isReadOnly={isWorkspaceReadOnly}
             milestones={milestones}
             profileById={profileById}
             selectedActionItem={
@@ -2088,6 +2124,7 @@ function MentorshipWorkboard({
   actionItems,
   canManageMilestones,
   currentUserId,
+  isReadOnly,
   milestones,
   profileById,
   selectedActionItem,
@@ -2100,6 +2137,7 @@ function MentorshipWorkboard({
   actionItems: MentorshipActionItem[];
   canManageMilestones: boolean;
   currentUserId: string | null;
+  isReadOnly: boolean;
   milestones: MentorshipMilestone[];
   profileById: Map<string, Profile>;
   selectedActionItem:
@@ -2194,11 +2232,12 @@ function MentorshipWorkboard({
         />
       </div>
 
-      {!canManageMilestones && (
-        <p className="mt-4 text-sm text-gray-600">
-          Milestones are created and managed by the mentor.
-        </p>
-      )}
+      {!canManageMilestones &&
+        !isReadOnly && (
+          <p className="mt-4 text-sm text-gray-600">
+            Milestones are created and managed by the mentor.
+          </p>
+        )}
 
       <div className="mt-5 space-y-4">
         {milestones.length === 0 ? (
@@ -2265,6 +2304,7 @@ function MentorshipWorkboard({
                     canManageMilestones={
                       canManageMilestones
                     }
+                    isReadOnly={isReadOnly}
                     milestones={[milestone]}
                     updateMilestoneStatus={
                       updateMilestoneStatus
@@ -2378,12 +2418,14 @@ function WorkSummaryCard({
 function MilestoneList({
   actionItems,
   canManageMilestones,
+  isReadOnly,
   milestones,
   updateMilestoneStatus,
   updatingMilestoneId,
 }: {
   actionItems: MentorshipActionItem[];
   canManageMilestones: boolean;
+  isReadOnly: boolean;
   milestones: MentorshipMilestone[];
   updateMilestoneStatus: (
     milestone: MentorshipMilestone,
@@ -2397,11 +2439,12 @@ function MilestoneList({
         Milestones
       </h2>
 
-      {!canManageMilestones && (
-        <p className="mt-2 text-sm text-gray-600">
-          Milestones are created and managed by the mentor.
-        </p>
-      )}
+      {!canManageMilestones &&
+        !isReadOnly && (
+          <p className="mt-2 text-sm text-gray-600">
+            Milestones are created and managed by the mentor.
+          </p>
+        )}
 
       <div className="mt-4 space-y-3">
         {milestones.length === 0 ? (
