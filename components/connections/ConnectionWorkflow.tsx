@@ -28,6 +28,77 @@ type Connection = {
   created_at: string;
 };
 
+type MentorshipRequest = {
+  id: string;
+  mentee_id: string;
+  mentor_id: string;
+  mentorship_field: string;
+  objective: string;
+  motivation: string;
+  requested_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing";
+  requested_frequency:
+    | "weekly"
+    | "fortnightly"
+    | "monthly"
+    | "flexible";
+  proposed_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing"
+    | null;
+  proposed_frequency:
+    | "weekly"
+    | "fortnightly"
+    | "monthly"
+    | "flexible"
+    | null;
+  proposal_message: string | null;
+  status:
+    | "pending"
+    | "change_proposed"
+    | "accepted"
+    | "declined"
+    | "cancelled"
+    | "expired";
+  requested_at: string;
+  expires_at: string | null;
+};
+
+type Mentorship = {
+  id: string;
+  request_id: string;
+  mentor_id: string;
+  mentee_id: string;
+  mentorship_field: string;
+  agreed_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing";
+  agreed_frequency:
+    | "weekly"
+    | "fortnightly"
+    | "monthly"
+    | "flexible";
+  objective: string;
+  status:
+    | "active"
+    | "paused"
+    | "completion_requested"
+    | "completed"
+    | "cancelled"
+    | "ended_early";
+  start_date: string;
+  expected_end_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type Skill = {
   profile_id: string;
   name: string;
@@ -37,6 +108,10 @@ export function ConnectionWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [mentorshipRequests, setMentorshipRequests] =
+    useState<MentorshipRequest[]>([]);
+  const [mentorships, setMentorships] =
+    useState<Mentorship[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mentorFilter, setMentorFilter] = useState("all");
@@ -97,6 +172,29 @@ export function ConnectionWorkflow() {
       return matchesSearch && matchesRole && matchesMentor;
     });
   }, [discoverableProfiles, searchTerm, roleFilter, mentorFilter]);
+
+  const activeMentorships = mentorships.filter(
+    (mentorship) =>
+      mentorship.mentor_id === currentUserId ||
+      mentorship.mentee_id === currentUserId
+  );
+
+  const incomingMentorshipRequests =
+    mentorshipRequests.filter(
+      (request) =>
+        request.mentor_id === currentUserId &&
+        request.status === "pending"
+    );
+
+  const outgoingMentorshipRequests =
+    mentorshipRequests.filter(
+      (request) =>
+        request.mentee_id === currentUserId &&
+        (
+          request.status === "pending" ||
+          request.status === "change_proposed"
+        )
+    );
 
   const incomingRequests = connections.filter(
     (connection) => connection.recipient_id === currentUserId && connection.status === "pending"
@@ -176,6 +274,56 @@ export function ConnectionWorkflow() {
     setConnections((data ?? []) as Connection[]);
   }
 
+  async function loadMentorships(userId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("mentorships")
+      .select(
+        "id, request_id, mentor_id, mentee_id, mentorship_field, agreed_duration, agreed_frequency, objective, status, start_date, expected_end_date, created_at, updated_at"
+      )
+      .or(`mentor_id.eq.${userId},mentee_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        "Unable to refresh mentorships:",
+        error
+      );
+      return;
+    }
+
+    setMentorships((data ?? []) as Mentorship[]);
+  }
+
+  async function loadMentorshipRequests(userId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("mentorship_requests")
+      .select(
+        "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_at, expires_at"
+      )
+      .or(`mentee_id.eq.${userId},mentor_id.eq.${userId}`)
+      .order("requested_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        "Unable to refresh mentorship requests:",
+        error
+      );
+      return;
+    }
+
+    setMentorshipRequests(
+      (data ?? []) as MentorshipRequest[]
+    );
+  }
+
   async function loadData() {
     setMessage(null);
 
@@ -204,6 +352,14 @@ export function ConnectionWorkflow() {
       const [
         { data: profilesData, error: profilesError },
         { data: connectionsData, error: connectionsError },
+        {
+          data: mentorshipRequestData,
+          error: mentorshipRequestError,
+        },
+        {
+          data: mentorshipData,
+          error: mentorshipError,
+        },
         { data: skillsData, error: skillsError },
       ] = await Promise.all([
         supabase
@@ -223,6 +379,28 @@ export function ConnectionWorkflow() {
           )
           .order("created_at", { ascending: false }),
         supabase
+          .from("mentorship_requests")
+          .select(
+            "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_at, expires_at"
+          )
+          .or(
+            `mentee_id.eq.${userId},mentor_id.eq.${userId}`
+          )
+          .order("requested_at", {
+            ascending: false,
+          }),
+        supabase
+          .from("mentorships")
+          .select(
+            "id, request_id, mentor_id, mentee_id, mentorship_field, agreed_duration, agreed_frequency, objective, status, start_date, expected_end_date, created_at, updated_at"
+          )
+          .or(
+            `mentor_id.eq.${userId},mentee_id.eq.${userId}`
+          )
+          .order("created_at", {
+            ascending: false,
+          }),
+        supabase
           .from("skills")
           .select("profile_id, name")
           .eq("is_published", true)
@@ -231,10 +409,22 @@ export function ConnectionWorkflow() {
 
       if (profilesError) throw profilesError;
       if (connectionsError) throw connectionsError;
+      if (mentorshipRequestError) {
+        throw mentorshipRequestError;
+      }
+      if (mentorshipError) {
+        throw mentorshipError;
+      }
       if (skillsError) throw skillsError;
 
       setProfiles((profilesData ?? []) as Profile[]);
       setConnections((connectionsData ?? []) as Connection[]);
+      setMentorshipRequests(
+        (mentorshipRequestData ?? []) as MentorshipRequest[]
+      );
+      setMentorships(
+        (mentorshipData ?? []) as Mentorship[]
+      );
       setSkills((skillsData ?? []) as Skill[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load connection data.");
@@ -265,12 +455,83 @@ export function ConnectionWorkflow() {
           void loadConnections(currentUserId);
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mentorship_requests",
+        },
+        () => {
+          void loadMentorshipRequests(currentUserId);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mentorships",
+        },
+        () => {
+          void loadMentorships(currentUserId);
+        }
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [currentUserId]);
+
+  async function respondToMentorshipRequest(
+    requestId: string,
+    action: "accept" | "decline"
+  ) {
+    if (!isSupabaseConfigured()) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "respond_to_mentorship_request",
+        {
+          target_request_id: requestId,
+          response_action: action,
+          counterproposal_duration: null,
+          counterproposal_frequency: null,
+          response_message: null,
+        }
+      );
+
+      if (error) throw error;
+
+      setMessage(
+        action === "accept"
+          ? "Mentorship request accepted."
+          : "Mentorship request declined."
+      );
+
+      if (currentUserId) {
+        await Promise.all([
+          loadMentorshipRequests(currentUserId),
+          loadMentorships(currentUserId),
+        ]);
+      }
+    } catch (error) {
+      setMessage(
+        getActionErrorMessage(
+          error,
+          `${action} mentorship request`
+        )
+      );
+    } finally {
+      setIsWorking(false);
+    }
+  }
 
   async function sendRequest(profileId: string) {
     if (!currentUserId || !isSupabaseConfigured()) return;
@@ -446,6 +707,282 @@ export function ConnectionWorkflow() {
         <p className="text-sm text-gray-600">Loading connections...</p>
       ) : (
         <>
+          <ConnectionSection
+            title={`Active mentorships · ${activeMentorships.length}`}
+          >
+            {activeMentorships.length === 0 ? (
+              <EmptyState text="No active mentorships yet." />
+            ) : (
+              activeMentorships.map((mentorship) => {
+                const isMentor =
+                  mentorship.mentor_id === currentUserId;
+
+                const otherProfileId = isMentor
+                  ? mentorship.mentee_id
+                  : mentorship.mentor_id;
+
+                const otherProfile =
+                  profileById.get(otherProfileId);
+
+                return (
+                  <article
+                    key={mentorship.id}
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+                  >
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                      <div className="flex gap-3">
+                        <ProfileAvatar
+                          avatarPath={otherProfile?.avatar_url}
+                          displayName={otherProfile?.display_name}
+                          size={40}
+                        />
+
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold hover:underline"
+                            href={`/profile/${otherProfileId}`}
+                          >
+                            {otherProfile?.display_name ??
+                              "Unknown profile"}
+                          </Link>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            {mentorship.mentorship_field}
+                          </p>
+
+                          <p className="mt-1 text-xs font-medium text-gray-500">
+                            You are the{" "}
+                            {isMentor ? "mentor" : "mentee"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium capitalize">
+                        {mentorship.status.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold">
+                        Objective
+                      </h3>
+
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                        {mentorship.objective}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipDuration(
+                          mentorship.agreed_duration
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipFrequency(
+                          mentorship.agreed_frequency
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1">
+                        Started{" "}
+                        {formatMentorshipDate(
+                          mentorship.start_date
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1">
+                        {mentorship.expected_end_date
+                          ? `Expected end ${formatMentorshipDate(
+                              mentorship.expected_end_date
+                            )}`
+                          : "Ongoing"}
+                      </span>
+                    </div>
+
+                    <Link
+                      className="inline-flex min-h-10 w-fit items-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                      href={`/mentorships/${mentorship.id}`}
+                    >
+                      Open mentorship
+                    </Link>
+                  </article>
+                );
+              })
+            )}
+          </ConnectionSection>
+
+          <ConnectionSection title="Mentorship requests">
+            {incomingMentorshipRequests.length === 0 ? (
+              <EmptyState text="No incoming mentorship requests yet." />
+            ) : (
+              incomingMentorshipRequests.map((request) => {
+                const mentee =
+                  profileById.get(request.mentee_id);
+
+                return (
+                  <article
+                    key={request.id}
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+                  >
+                    <div className="flex gap-3">
+                      <ProfileAvatar
+                        avatarPath={mentee?.avatar_url}
+                        displayName={mentee?.display_name}
+                        size={40}
+                      />
+
+                      <div className="min-w-0">
+                        <Link
+                          className="font-semibold hover:underline"
+                          href={`/profile/${request.mentee_id}`}
+                        >
+                          {mentee?.display_name ??
+                            "Unknown profile"}
+                        </Link>
+
+                        <p className="mt-1 text-sm text-gray-600">
+                          {request.mentorship_field}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <h3 className="font-semibold">
+                          Objective
+                        </h3>
+                        <p className="mt-1 whitespace-pre-wrap text-gray-700">
+                          {request.objective}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h3 className="font-semibold">
+                          Motivation
+                        </h3>
+                        <p className="mt-1 whitespace-pre-wrap text-gray-700">
+                          {request.motivation}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipDuration(
+                          request.requested_duration
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipFrequency(
+                          request.requested_frequency
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() =>
+                          respondToMentorshipRequest(
+                            request.id,
+                            "accept"
+                          )
+                        }
+                        type="button"
+                      >
+                        Accept
+                      </button>
+
+                      <button
+                        className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() =>
+                          respondToMentorshipRequest(
+                            request.id,
+                            "decline"
+                          )
+                        }
+                        type="button"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </ConnectionSection>
+
+          <ConnectionSection title="Outgoing mentorship requests">
+            {outgoingMentorshipRequests.length === 0 ? (
+              <EmptyState text="No outgoing mentorship requests pending." />
+            ) : (
+              outgoingMentorshipRequests.map((request) => {
+                const mentor =
+                  profileById.get(request.mentor_id);
+
+                return (
+                  <article
+                    key={request.id}
+                    className="flex flex-col gap-3 rounded-xl border bg-white p-4"
+                  >
+                    <div className="flex gap-3">
+                      <ProfileAvatar
+                        avatarPath={mentor?.avatar_url}
+                        displayName={mentor?.display_name}
+                        size={40}
+                      />
+
+                      <div>
+                        <Link
+                          className="font-semibold hover:underline"
+                          href={`/profile/${request.mentor_id}`}
+                        >
+                          {mentor?.display_name ??
+                            "Unknown profile"}
+                        </Link>
+
+                        <p className="mt-1 text-sm text-gray-600">
+                          {request.mentorship_field}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipDuration(
+                          request.proposed_duration ??
+                            request.requested_duration
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipFrequency(
+                          request.proposed_frequency ??
+                            request.requested_frequency
+                        )}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1 capitalize">
+                        {request.status.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    {request.proposal_message && (
+                      <p className="text-sm text-gray-700">
+                        {request.proposal_message}
+                      </p>
+                    )}
+                  </article>
+                );
+              })
+            )}
+          </ConnectionSection>
+
           <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
@@ -706,6 +1243,46 @@ function ConnectionCard({
       <div>{children}</div>
     </article>
   );
+}
+
+function formatMentorshipDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatMentorshipDuration(
+  duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing"
+) {
+  const labels = {
+    "3_months": "3 months",
+    "6_months": "6 months",
+    "1_year": "1 year",
+    ongoing: "Full-time / ongoing",
+  };
+
+  return labels[duration];
+}
+
+function formatMentorshipFrequency(
+  frequency:
+    | "weekly"
+    | "fortnightly"
+    | "monthly"
+    | "flexible"
+) {
+  const labels = {
+    weekly: "Weekly",
+    fortnightly: "Every two weeks",
+    monthly: "Monthly",
+    flexible: "Flexible",
+  };
+
+  return labels[frequency];
 }
 
 function EmptyState({ text }: { text: string }) {

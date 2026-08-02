@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type Profile = {
   id: string;
@@ -15,6 +19,39 @@ type Profile = {
   profile_visibility: "public" | "connections" | "private";
   mentor_available: boolean;
   avatar_url: string | null;
+};
+
+type MentorshipDuration =
+  | "3_months"
+  | "6_months"
+  | "1_year"
+  | "ongoing";
+
+type MentorshipFrequency =
+  | "weekly"
+  | "fortnightly"
+  | "monthly"
+  | "flexible";
+
+type MentorProfile = {
+  mentorship_summary: string | null;
+  mentoring_fields: string[];
+  mentoring_levels: string[];
+  maximum_active_mentees: number;
+  preferred_frequency: MentorshipFrequency | null;
+  accepts_3_month: boolean;
+  accepts_6_month: boolean;
+  accepts_1_year: boolean;
+  accepts_ongoing: boolean;
+  is_accepting_requests: boolean;
+};
+
+type MentorshipRequestForm = {
+  mentorshipField: string;
+  objective: string;
+  motivation: string;
+  requestedDuration: MentorshipDuration;
+  requestedFrequency: MentorshipFrequency;
 };
 
 type Skill = {
@@ -50,13 +87,33 @@ type PublicProfileViewProps = {
   profileId: string;
 };
 
+const initialMentorshipRequestForm: MentorshipRequestForm = {
+  mentorshipField: "",
+  objective: "",
+  motivation: "",
+  requestedDuration: "3_months",
+  requestedFrequency: "flexible",
+};
+
 export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [mentorProfile, setMentorProfile] =
+    useState<MentorProfile | null>(null);
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
+  const [requestForm, setRequestForm] =
+    useState<MentorshipRequestForm>(
+      initialMentorshipRequestForm
+    );
   const [skills, setSkills] = useState<Skill[]>([]);
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] =
+    useState(false);
+  const [requestSubmitted, setRequestSubmitted] =
+    useState(false);
 
   async function reloadVisibleLibraryDocuments() {
     if (!isSupabaseConfigured()) return;
@@ -102,14 +159,19 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
         if (sessionError) throw sessionError;
 
-        if (!sessionData.session?.user.id) {
+        const userId = sessionData.session?.user.id;
+
+        if (!userId) {
           setMessage("Please log in before viewing profiles.");
           setIsLoading(false);
           return;
         }
 
+        setCurrentUserId(userId);
+
         const [
           { data: profileData, error: profileError },
+          { data: mentorData, error: mentorError },
           { data: skillData, error: skillError },
           { data: documentData, error: documentError },
         ] = await Promise.all([
@@ -117,6 +179,13 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             .from("profiles")
             .select("id, display_name, username, bio, field, role_type, profile_visibility, mentor_available, avatar_url")
             .eq("id", profileId)
+            .maybeSingle(),
+          supabase
+            .from("mentor_profiles")
+            .select(
+              "mentorship_summary, mentoring_fields, mentoring_levels, maximum_active_mentees, preferred_frequency, accepts_3_month, accepts_6_month, accepts_1_year, accepts_ongoing, is_accepting_requests"
+            )
+            .eq("mentor_id", profileId)
             .maybeSingle(),
           supabase
             .from("skills")
@@ -137,12 +206,43 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         ]);
 
         if (profileError) throw profileError;
+        if (mentorError) throw mentorError;
         if (skillError) throw skillError;
         if (documentError) throw documentError;
 
         setProfile((profileData ?? null) as Profile | null);
+        setMentorProfile(
+          (mentorData ?? null) as MentorProfile | null
+        );
         setSkills((skillData ?? []) as Skill[]);
         setDocuments((documentData ?? []) as LibraryDocument[]);
+
+        if (mentorData) {
+          const firstAcceptedDuration:
+            | MentorshipDuration
+            | null =
+            mentorData.accepts_3_month
+              ? "3_months"
+              : mentorData.accepts_6_month
+                ? "6_months"
+                : mentorData.accepts_1_year
+                  ? "1_year"
+                  : mentorData.accepts_ongoing
+                    ? "ongoing"
+                    : null;
+
+          setRequestForm((current) => ({
+            ...current,
+            mentorshipField:
+              mentorData.mentoring_fields?.[0] ?? "",
+            requestedDuration:
+              firstAcceptedDuration ??
+              current.requestedDuration,
+            requestedFrequency:
+              mentorData.preferred_frequency ??
+              "flexible",
+          }));
+        }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Unable to load profile.");
       } finally {
@@ -254,6 +354,194 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     }
   }
 
+  function updateRequestField<
+    K extends keyof MentorshipRequestForm
+  >(
+    key: K,
+    value: MentorshipRequestForm[K]
+  ) {
+    setRequestForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function getAcceptedDurations() {
+    if (!mentorProfile) {
+      return [] as Array<{
+        value: MentorshipDuration;
+        label: string;
+      }>;
+    }
+
+    const durations: Array<{
+      value: MentorshipDuration;
+      label: string;
+    }> = [];
+
+    if (mentorProfile.accepts_3_month) {
+      durations.push({
+        value: "3_months",
+        label: "3 months",
+      });
+    }
+
+    if (mentorProfile.accepts_6_month) {
+      durations.push({
+        value: "6_months",
+        label: "6 months",
+      });
+    }
+
+    if (mentorProfile.accepts_1_year) {
+      durations.push({
+        value: "1_year",
+        label: "1 year",
+      });
+    }
+
+    if (mentorProfile.accepts_ongoing) {
+      durations.push({
+        value: "ongoing",
+        label: "Full-time / ongoing",
+      });
+    }
+
+    return durations;
+  }
+
+  async function submitMentorshipRequest(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+    setMessage(null);
+
+    const mentorshipField =
+      requestForm.mentorshipField.trim();
+    const objective = requestForm.objective.trim();
+    const motivation = requestForm.motivation.trim();
+
+    if (!currentUserId) {
+      setMessage(
+        "Please log in before requesting mentorship."
+      );
+      return;
+    }
+
+    if (currentUserId === profileId) {
+      setMessage(
+        "You cannot request mentorship from yourself."
+      );
+      return;
+    }
+
+    if (
+      !mentorProfile ||
+      !mentorProfile.is_accepting_requests
+    ) {
+      setMessage(
+        "This mentor is not currently accepting requests."
+      );
+      return;
+    }
+
+    if (
+      mentorshipField.length < 2 ||
+      mentorshipField.length > 120
+    ) {
+      setMessage(
+        "Mentorship field must be between 2 and 120 characters."
+      );
+      return;
+    }
+
+    if (
+      objective.length < 10 ||
+      objective.length > 1000
+    ) {
+      setMessage(
+        "Objective must be between 10 and 1,000 characters."
+      );
+      return;
+    }
+
+    if (
+      motivation.length < 10 ||
+      motivation.length > 1500
+    ) {
+      setMessage(
+        "Motivation must be between 10 and 1,500 characters."
+      );
+      return;
+    }
+
+    const acceptedDurationValues =
+      getAcceptedDurations().map(
+        (duration) => duration.value
+      );
+
+    if (
+      !acceptedDurationValues.includes(
+        requestForm.requestedDuration
+      )
+    ) {
+      setMessage(
+        "Select a mentorship period accepted by this mentor."
+      );
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      setMessage(
+        "Supabase is not configured yet."
+      );
+      return;
+    }
+
+    setIsSubmittingRequest(true);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "create_mentorship_request",
+        {
+          target_mentor_id: profileId,
+          requested_mentorship_field:
+            mentorshipField,
+          requested_objective: objective,
+          requested_motivation: motivation,
+          requested_period:
+            requestForm.requestedDuration,
+          requested_contact_frequency:
+            requestForm.requestedFrequency,
+        }
+      );
+
+      if (error) throw error;
+
+      setRequestSubmitted(true);
+      setRequestForm((current) => ({
+        ...current,
+        objective: "",
+        motivation: "",
+      }));
+
+      setMessage(
+        "Mentorship request sent successfully."
+      );
+    } catch (error) {
+      setMessage(
+        getActionErrorMessage(
+          error,
+          "send mentorship request"
+        )
+      );
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <section className="mx-auto w-full max-w-5xl p-8">
@@ -282,7 +570,11 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         ← Back to connections
       </Link>
 
-      {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
+      {message && (
+        <p className={getMessageAlertClass(message)}>
+          {message}
+        </p>
+      )}
 
       <header className="flex flex-col gap-4 rounded-xl border p-6 md:flex-row md:items-center">
         <ProfileAvatar avatarPath={profile.avatar_url} displayName={profile.display_name} size={88} />
@@ -306,6 +598,287 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           {profile.bio && <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-gray-700">{profile.bio}</p>}
         </div>
       </header>
+
+      {profile.mentor_available && mentorProfile && (
+        <section className="flex flex-col gap-5 rounded-xl border p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold">
+                Mentorship
+              </h2>
+
+              <span className="rounded-full border px-3 py-1 text-xs font-medium">
+                {mentorProfile.is_accepting_requests
+                  ? "Accepting requests"
+                  : "Requests paused"}
+              </span>
+            </div>
+
+            {mentorProfile.mentorship_summary && (
+              <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm text-gray-700">
+                {mentorProfile.mentorship_summary}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-semibold">
+                Mentoring fields
+              </h3>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {mentorProfile.mentoring_fields.length > 0 ? (
+                  mentorProfile.mentoring_fields.map(
+                    (field) => (
+                      <span
+                        key={field}
+                        className="rounded-full border px-3 py-1 text-xs"
+                      >
+                        {field}
+                      </span>
+                    )
+                  )
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    No fields listed.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold">
+                Mentee levels
+              </h3>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {mentorProfile.mentoring_levels.map(
+                  (level) => (
+                    <span
+                      key={level}
+                      className="rounded-full border px-3 py-1 text-xs capitalize"
+                    >
+                      {level}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold">
+                Preferred frequency
+              </h3>
+
+              <p className="mt-1 text-sm capitalize text-gray-700">
+                {mentorProfile.preferred_frequency
+                  ? mentorProfile.preferred_frequency.replace(
+                      "_",
+                      " "
+                    )
+                  : "Flexible"}
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold">
+                Maximum active mentees
+              </h3>
+
+              <p className="mt-1 text-sm text-gray-700">
+                {mentorProfile.maximum_active_mentees}
+              </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <h3 className="text-sm font-semibold">
+                Periods accepted
+              </h3>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {getAcceptedDurations().map(
+                  (duration) => (
+                    <span
+                      key={duration.value}
+                      className="rounded-full border px-3 py-1 text-xs"
+                    >
+                      {duration.label}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+
+          {currentUserId === profileId ? (
+            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+              This is your mentor profile. Other eligible users
+              will see the mentorship request form here.
+            </p>
+          ) : !mentorProfile.is_accepting_requests ? (
+            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+              This mentor has temporarily paused new requests.
+            </p>
+          ) : requestSubmitted ? (
+            <p className="rounded-xl border p-4 text-sm font-medium">
+              Your mentorship request has been sent.
+            </p>
+          ) : (
+            <form
+              className="flex flex-col gap-4 border-t pt-5"
+              onSubmit={submitMentorshipRequest}
+            >
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Request mentorship
+                </h3>
+
+                <p className="mt-1 text-sm text-gray-600">
+                  Explain what you hope to achieve and why this
+                  mentor is a suitable match.
+                </p>
+              </div>
+
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Mentorship field
+
+                <select
+                  className="rounded-lg border px-3 py-2"
+                  value={requestForm.mentorshipField}
+                  onChange={(event) =>
+                    updateRequestField(
+                      "mentorshipField",
+                      event.target.value
+                    )
+                  }
+                >
+                  <option value="">
+                    Select a field
+                  </option>
+
+                  {mentorProfile.mentoring_fields.map(
+                    (field) => (
+                      <option key={field} value={field}>
+                        {field}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Objective
+
+                <textarea
+                  className="min-h-28 rounded-lg border px-3 py-2"
+                  maxLength={1000}
+                  value={requestForm.objective}
+                  onChange={(event) =>
+                    updateRequestField(
+                      "objective",
+                      event.target.value
+                    )
+                  }
+                  placeholder="What specific outcome would you like to achieve through this mentorship?"
+                />
+
+                <span className="text-xs font-normal text-gray-500">
+                  10–1,000 characters.
+                </span>
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Motivation
+
+                <textarea
+                  className="min-h-32 rounded-lg border px-3 py-2"
+                  maxLength={1500}
+                  value={requestForm.motivation}
+                  onChange={(event) =>
+                    updateRequestField(
+                      "motivation",
+                      event.target.value
+                    )
+                  }
+                  placeholder="Why are you requesting mentorship from this person, and what commitment will you bring?"
+                />
+
+                <span className="text-xs font-normal text-gray-500">
+                  10–1,500 characters.
+                </span>
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Requested period
+
+                  <select
+                    className="rounded-lg border px-3 py-2"
+                    value={requestForm.requestedDuration}
+                    onChange={(event) =>
+                      updateRequestField(
+                        "requestedDuration",
+                        event.target.value as MentorshipDuration
+                      )
+                    }
+                  >
+                    {getAcceptedDurations().map(
+                      (duration) => (
+                        <option
+                          key={duration.value}
+                          value={duration.value}
+                        >
+                          {duration.label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Preferred contact frequency
+
+                  <select
+                    className="rounded-lg border px-3 py-2"
+                    value={requestForm.requestedFrequency}
+                    onChange={(event) =>
+                      updateRequestField(
+                        "requestedFrequency",
+                        event.target.value as MentorshipFrequency
+                      )
+                    }
+                  >
+                    <option value="weekly">Weekly</option>
+
+                    <option value="fortnightly">
+                      Every two weeks
+                    </option>
+
+                    <option value="monthly">
+                      Monthly
+                    </option>
+
+                    <option value="flexible">
+                      Flexible
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <button
+                className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={isSubmittingRequest}
+                type="submit"
+              >
+                {isSubmittingRequest
+                  ? "Sending request..."
+                  : "Send mentorship request"}
+              </button>
+            </form>
+          )}
+        </section>
+      )}
 
       <section className="rounded-xl border p-4">
         <h2 className="text-xl font-semibold">Published skills</h2>
