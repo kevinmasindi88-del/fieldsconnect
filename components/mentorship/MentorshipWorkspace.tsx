@@ -1460,19 +1460,6 @@ export function MentorshipWorkspace({
             </section>
           )}
 
-          <MilestoneList
-            actionItems={actionItems}
-            canManageMilestones={
-              canManageMilestones
-            }
-            milestones={milestones}
-            updateMilestoneStatus={
-              updateMilestoneStatus
-            }
-            updatingMilestoneId={
-              updatingMilestoneId
-            }
-          />
 
           <section className="rounded-2xl border bg-white p-5">
             <h2 className="text-xl font-semibold">
@@ -1618,17 +1605,13 @@ export function MentorshipWorkspace({
             </form>
           </section>
 
-          <ActionItemList
+          <MentorshipWorkboard
             actionItems={actionItems}
-            currentUserId={currentUserId}
-            milestoneById={
-              new Map(
-                milestones.map((milestone) => [
-                  milestone.id,
-                  milestone,
-                ])
-              )
+            canManageMilestones={
+              canManageMilestones
             }
+            currentUserId={currentUserId}
+            milestones={milestones}
             profileById={profileById}
             selectedActionItem={
               selectedActionItem
@@ -1639,8 +1622,14 @@ export function MentorshipWorkspace({
             updateActionItemWorkflow={
               updateActionItemWorkflow
             }
+            updateMilestoneStatus={
+              updateMilestoneStatus
+            }
             updatingActionItemId={
               updatingActionItemId
+            }
+            updatingMilestoneId={
+              updatingMilestoneId
             }
           />
         </div>
@@ -2092,6 +2081,297 @@ function LifecyclePanel({
         </p>
       )}
     </section>
+  );
+}
+
+function MentorshipWorkboard({
+  actionItems,
+  canManageMilestones,
+  currentUserId,
+  milestones,
+  profileById,
+  selectedActionItem,
+  setSelectedActionItemId,
+  updateActionItemWorkflow,
+  updateMilestoneStatus,
+  updatingActionItemId,
+  updatingMilestoneId,
+}: {
+  actionItems: MentorshipActionItem[];
+  canManageMilestones: boolean;
+  currentUserId: string | null;
+  milestones: MentorshipMilestone[];
+  profileById: Map<string, Profile>;
+  selectedActionItem:
+    | MentorshipActionItem
+    | null;
+  setSelectedActionItemId: (
+    actionItemId: string | null
+  ) => void;
+  updateActionItemWorkflow: (
+    item: MentorshipActionItem,
+    changes: Partial<{
+      status: MentorshipActionItem["status"];
+      completion_summary: string | null;
+      completion_rating: number | null;
+      completion_review: string | null;
+    }>,
+    successMessage: string
+  ) => Promise<void>;
+  updateMilestoneStatus: (
+    milestone: MentorshipMilestone,
+    nextStatus: MentorshipMilestone["status"]
+  ) => Promise<void>;
+  updatingActionItemId: string | null;
+  updatingMilestoneId: string | null;
+}) {
+  const milestoneById = new Map(
+    milestones.map((milestone) => [
+      milestone.id,
+      milestone,
+    ])
+  );
+
+  const unlinkedActionItems =
+    actionItems.filter(
+      (item) => !item.milestone_id
+    );
+
+  const finishedActionItemCount =
+    actionItems.filter(
+      (item) =>
+        item.status === "completed" ||
+        item.status === "cancelled"
+    ).length;
+
+  const remainingActionItemCount =
+    actionItems.length -
+    finishedActionItemCount;
+
+  const awaitingReviewCount =
+    actionItems.filter(
+      (item) =>
+        item.status === "awaiting_review"
+    ).length;
+
+  return (
+    <section className="rounded-2xl border bg-white p-5">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div>
+          <h2 className="text-xl font-semibold">
+            Mentorship workboard
+          </h2>
+
+          <p className="mt-1 text-sm text-gray-600">
+            Milestones and their linked action items.
+          </p>
+        </div>
+
+        <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium text-gray-600">
+          {remainingActionItemCount} remaining
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <WorkSummaryCard
+          label="Milestones"
+          value={milestones.length}
+        />
+
+        <WorkSummaryCard
+          label="Action items"
+          value={actionItems.length}
+        />
+
+        <WorkSummaryCard
+          label="Awaiting review"
+          value={awaitingReviewCount}
+        />
+
+        <WorkSummaryCard
+          label="Finished"
+          value={finishedActionItemCount}
+        />
+      </div>
+
+      {!canManageMilestones && (
+        <p className="mt-4 text-sm text-gray-600">
+          Milestones are created and managed by the mentor.
+        </p>
+      )}
+
+      <div className="mt-5 space-y-4">
+        {milestones.length === 0 ? (
+          <EmptyState text="No milestones yet." />
+        ) : (
+          milestones.map((milestone) => {
+            const linkedActionItems =
+              actionItems.filter(
+                (item) =>
+                  item.milestone_id ===
+                  milestone.id
+              );
+
+            const finishedLinkedCount =
+              linkedActionItems.filter(
+                (item) =>
+                  item.status === "completed" ||
+                  item.status === "cancelled"
+              ).length;
+
+            const remainingLinkedCount =
+              linkedActionItems.length -
+              finishedLinkedCount;
+
+            return (
+              <details
+                className="group rounded-2xl border bg-gray-50 p-3"
+
+                key={milestone.id}
+              >
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 rounded-xl p-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="text-sm text-gray-500 transition group-open:rotate-90"
+                      >
+                        ▶
+                      </span>
+
+                      <h3 className="truncate font-semibold">
+                        {milestone.title}
+                      </h3>
+                    </div>
+
+                    <p className="mt-1 pl-6 text-xs text-gray-500">
+                      {finishedLinkedCount}/
+                      {linkedActionItems.length} linked action items finished
+                    </p>
+                  </div>
+
+                  <span className="h-fit shrink-0 rounded-full border bg-white px-2 py-1 text-xs capitalize">
+                    {formatStatus(
+                      milestone.status
+                    )}
+                  </span>
+                </summary>
+
+                <div className="mt-3 space-y-4 border-t pt-4">
+                  <MilestoneList
+                    actionItems={
+                      linkedActionItems
+                    }
+                    canManageMilestones={
+                      canManageMilestones
+                    }
+                    milestones={[milestone]}
+                    updateMilestoneStatus={
+                      updateMilestoneStatus
+                    }
+                    updatingMilestoneId={
+                      updatingMilestoneId
+                    }
+                  />
+
+                  <ActionItemList
+                    actionItems={
+                      linkedActionItems
+                    }
+                    currentUserId={
+                      currentUserId
+                    }
+                    milestoneById={
+                      milestoneById
+                    }
+                    profileById={profileById}
+                    selectedActionItem={
+                      selectedActionItem
+                    }
+                    setSelectedActionItemId={
+                      setSelectedActionItemId
+                    }
+                    updateActionItemWorkflow={
+                      updateActionItemWorkflow
+                    }
+                    updatingActionItemId={
+                      updatingActionItemId
+                    }
+                  />
+                </div>
+              </details>
+            );
+          })
+        )}
+
+        <details
+          className="group rounded-2xl border bg-gray-50 p-3"
+
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl p-2">
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="text-sm text-gray-500 transition group-open:rotate-90"
+              >
+                ▶
+              </span>
+
+              <h3 className="font-semibold">
+                Unlinked action items
+              </h3>
+            </div>
+
+            <span className="rounded-full border bg-white px-2 py-1 text-xs">
+              {unlinkedActionItems.length}
+            </span>
+          </summary>
+
+          <div className="mt-3 border-t pt-4">
+            <ActionItemList
+              actionItems={
+                unlinkedActionItems
+              }
+              currentUserId={currentUserId}
+              milestoneById={milestoneById}
+              profileById={profileById}
+              selectedActionItem={
+                selectedActionItem
+              }
+              setSelectedActionItemId={
+                setSelectedActionItemId
+              }
+              updateActionItemWorkflow={
+                updateActionItemWorkflow
+              }
+              updatingActionItemId={
+                updatingActionItemId
+              }
+            />
+          </div>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+function WorkSummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl border bg-gray-50 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-semibold">
+        {value}
+      </p>
+    </div>
   );
 }
 
