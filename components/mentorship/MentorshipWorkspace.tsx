@@ -469,8 +469,7 @@ export function MentorshipWorkspace({
   useEffect(() => {
     if (
       !isSupabaseConfigured() ||
-      !currentUserId ||
-      !mentorship
+      !currentUserId
     ) {
       return;
     }
@@ -530,7 +529,11 @@ export function MentorshipWorkspace({
           void loadWorkspace();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void loadWorkspace();
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
@@ -538,7 +541,6 @@ export function MentorshipWorkspace({
   }, [
     currentUserId,
     loadWorkspace,
-    mentorship,
     mentorshipId,
   ]);
 
