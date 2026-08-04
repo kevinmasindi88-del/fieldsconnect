@@ -122,6 +122,18 @@ export function ConnectionWorkflow() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+  const [counterproposalRequestId, setCounterproposalRequestId] =
+    useState<string | null>(null);
+  const [counterproposalDuration, setCounterproposalDuration] =
+    useState<"3_months" | "6_months" | "1_year" | "ongoing">(
+      "6_months"
+    );
+  const [counterproposalFrequency, setCounterproposalFrequency] =
+    useState<"weekly" | "fortnightly" | "monthly" | "flexible">(
+      "monthly"
+    );
+  const [counterproposalMessage, setCounterproposalMessage] =
+    useState("");
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -173,10 +185,30 @@ export function ConnectionWorkflow() {
     });
   }, [discoverableProfiles, searchTerm, roleFilter, mentorFilter]);
 
-  const activeMentorships = mentorships.filter(
+  const participantMentorships = mentorships.filter(
     (mentorship) =>
       mentorship.mentor_id === currentUserId ||
       mentorship.mentee_id === currentUserId
+  );
+
+  const activeMentorships = participantMentorships.filter(
+    (mentorship) =>
+      [
+        "active",
+        "ending",
+        "extension_pending",
+        "paused",
+        "completion_requested",
+      ].includes(mentorship.status)
+  );
+
+  const historicalMentorships = participantMentorships.filter(
+    (mentorship) =>
+      [
+        "completed",
+        "cancelled",
+        "ended_early",
+      ].includes(mentorship.status)
   );
 
   const incomingMentorshipRequests =
@@ -486,9 +518,20 @@ export function ConnectionWorkflow() {
 
   async function respondToMentorshipRequest(
     requestId: string,
-    action: "accept" | "decline"
+    action: "accept" | "decline" | "counterpropose"
   ) {
     if (!isSupabaseConfigured()) return;
+
+    const normalizedCounterproposalMessage =
+      counterproposalMessage.trim();
+
+    if (
+      action === "counterpropose" &&
+      normalizedCounterproposalMessage.length === 0
+    ) {
+      setMessage("Add a short message explaining the proposed changes.");
+      return;
+    }
 
     setIsWorking(true);
     setMessage(null);
@@ -501,9 +544,18 @@ export function ConnectionWorkflow() {
         {
           target_request_id: requestId,
           response_action: action,
-          counterproposal_duration: null,
-          counterproposal_frequency: null,
-          response_message: null,
+          counterproposal_duration:
+            action === "counterpropose"
+              ? counterproposalDuration
+              : null,
+          counterproposal_frequency:
+            action === "counterpropose"
+              ? counterproposalFrequency
+              : null,
+          response_message:
+            action === "counterpropose"
+              ? normalizedCounterproposalMessage
+              : null,
         }
       );
 
@@ -512,8 +564,17 @@ export function ConnectionWorkflow() {
       setMessage(
         action === "accept"
           ? "Mentorship request accepted."
-          : "Mentorship request declined."
+          : action === "decline"
+            ? "Mentorship request declined."
+            : "Mentorship counterproposal sent."
       );
+
+      if (action === "counterpropose") {
+        setCounterproposalRequestId(null);
+        setCounterproposalDuration("6_months");
+        setCounterproposalFrequency("monthly");
+        setCounterproposalMessage("");
+      }
 
       if (currentUserId) {
         await Promise.all([
@@ -691,6 +752,113 @@ export function ConnectionWorkflow() {
     return profileById.get(otherId);
   }
 
+  function renderMentorshipCard(
+    mentorship: Mentorship
+  ) {
+    const isMentor =
+      mentorship.mentor_id === currentUserId;
+
+    const otherProfileId = isMentor
+      ? mentorship.mentee_id
+      : mentorship.mentor_id;
+
+    const otherProfile =
+      profileById.get(otherProfileId);
+
+    const isHistorical =
+      mentorship.status === "completed" ||
+      mentorship.status === "cancelled" ||
+      mentorship.status === "ended_early";
+
+    return (
+      <article
+        key={mentorship.id}
+        className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+      >
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div className="flex gap-3">
+            <ProfileAvatar
+              avatarPath={otherProfile?.avatar_url}
+              displayName={otherProfile?.display_name}
+              size={40}
+            />
+
+            <div className="min-w-0">
+              <Link
+                className="font-semibold hover:underline"
+                href={`/profile/${otherProfileId}`}
+              >
+                {otherProfile?.display_name ??
+                  "Unknown profile"}
+              </Link>
+
+              <p className="mt-1 text-sm text-gray-600">
+                {mentorship.mentorship_field}
+              </p>
+
+              <p className="mt-1 text-xs font-medium text-gray-500">
+                You are the{" "}
+                {isMentor ? "mentor" : "mentee"}
+              </p>
+            </div>
+          </div>
+
+          <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium capitalize">
+            {mentorship.status.replace("_", " ")}
+          </span>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold">
+            Objective
+          </h3>
+
+          <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+            {mentorship.objective}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border px-3 py-1">
+            {formatMentorshipDuration(
+              mentorship.agreed_duration
+            )}
+          </span>
+
+          <span className="rounded-full border px-3 py-1">
+            {formatMentorshipFrequency(
+              mentorship.agreed_frequency
+            )}
+          </span>
+
+          <span className="rounded-full border px-3 py-1">
+            Started{" "}
+            {formatMentorshipDate(
+              mentorship.start_date
+            )}
+          </span>
+
+          <span className="rounded-full border px-3 py-1">
+            {mentorship.expected_end_date
+              ? `Expected end ${formatMentorshipDate(
+                  mentorship.expected_end_date
+                )}`
+              : "Ongoing"}
+          </span>
+        </div>
+
+        <Link
+          className="inline-flex min-h-10 w-fit items-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+          href={`/mentorships/${mentorship.id}`}
+        >
+          {isHistorical
+            ? "View mentorship"
+            : "Open mentorship"}
+        </Link>
+      </article>
+    );
+  }
+
   function clearSearchFilters() {
     setSearchTerm("");
     setRoleFilter("all");
@@ -713,106 +881,23 @@ export function ConnectionWorkflow() {
             {activeMentorships.length === 0 ? (
               <EmptyState text="No active mentorships yet." />
             ) : (
-              activeMentorships.map((mentorship) => {
-                const isMentor =
-                  mentorship.mentor_id === currentUserId;
-
-                const otherProfileId = isMentor
-                  ? mentorship.mentee_id
-                  : mentorship.mentor_id;
-
-                const otherProfile =
-                  profileById.get(otherProfileId);
-
-                return (
-                  <article
-                    key={mentorship.id}
-                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
-                  >
-                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                      <div className="flex gap-3">
-                        <ProfileAvatar
-                          avatarPath={otherProfile?.avatar_url}
-                          displayName={otherProfile?.display_name}
-                          size={40}
-                        />
-
-                        <div className="min-w-0">
-                          <Link
-                            className="font-semibold hover:underline"
-                            href={`/profile/${otherProfileId}`}
-                          >
-                            {otherProfile?.display_name ??
-                              "Unknown profile"}
-                          </Link>
-
-                          <p className="mt-1 text-sm text-gray-600">
-                            {mentorship.mentorship_field}
-                          </p>
-
-                          <p className="mt-1 text-xs font-medium text-gray-500">
-                            You are the{" "}
-                            {isMentor ? "mentor" : "mentee"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium capitalize">
-                        {mentorship.status.replace("_", " ")}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-semibold">
-                        Objective
-                      </h3>
-
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
-                        {mentorship.objective}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full border px-3 py-1">
-                        {formatMentorshipDuration(
-                          mentorship.agreed_duration
-                        )}
-                      </span>
-
-                      <span className="rounded-full border px-3 py-1">
-                        {formatMentorshipFrequency(
-                          mentorship.agreed_frequency
-                        )}
-                      </span>
-
-                      <span className="rounded-full border px-3 py-1">
-                        Started{" "}
-                        {formatMentorshipDate(
-                          mentorship.start_date
-                        )}
-                      </span>
-
-                      <span className="rounded-full border px-3 py-1">
-                        {mentorship.expected_end_date
-                          ? `Expected end ${formatMentorshipDate(
-                              mentorship.expected_end_date
-                            )}`
-                          : "Ongoing"}
-                      </span>
-                    </div>
-
-                    <Link
-                      className="inline-flex min-h-10 w-fit items-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-                      href={`/mentorships/${mentorship.id}`}
-                    >
-                      Open mentorship
-                    </Link>
-                  </article>
-                );
-              })
+              activeMentorships.map(
+                renderMentorshipCard
+              )
             )}
           </ConnectionSection>
 
+          <ConnectionSection
+            title={`Mentorship history · ${historicalMentorships.length}`}
+          >
+            {historicalMentorships.length === 0 ? (
+              <EmptyState text="No completed or closed mentorships yet." />
+            ) : (
+              historicalMentorships.map(
+                renderMentorshipCard
+              )
+            )}
+          </ConnectionSection>
           <ConnectionSection title="Mentorship requests">
             {incomingMentorshipRequests.length === 0 ? (
               <EmptyState text="No incoming mentorship requests yet." />
@@ -910,7 +995,139 @@ export function ConnectionWorkflow() {
                       >
                         Decline
                       </button>
+
+                      <button
+                        className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() => {
+                          setCounterproposalRequestId(
+                            counterproposalRequestId === request.id
+                              ? null
+                              : request.id
+                          );
+                          setCounterproposalDuration(
+                            request.requested_duration
+                          );
+                          setCounterproposalFrequency(
+                            request.requested_frequency
+                          );
+                          setCounterproposalMessage("");
+                          setMessage(null);
+                        }}
+                        type="button"
+                      >
+                        {counterproposalRequestId === request.id
+                          ? "Cancel changes"
+                          : "Propose changes"}
+                      </button>
                     </div>
+
+                    {counterproposalRequestId === request.id && (
+                      <div className="grid gap-3 rounded-xl border bg-gray-50 p-4">
+                        <h3 className="font-semibold">
+                          Counterproposal
+                        </h3>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="flex flex-col gap-2 text-sm font-medium">
+                            Duration
+                            <select
+                              className="rounded-lg border bg-white px-3 py-2 font-normal"
+                              disabled={isWorking}
+                              onChange={(event) =>
+                                setCounterproposalDuration(
+                                  event.target.value as
+                                    | "3_months"
+                                    | "6_months"
+                                    | "1_year"
+                                    | "ongoing"
+                                )
+                              }
+                              value={counterproposalDuration}
+                            >
+                              <option value="3_months">
+                                3 months
+                              </option>
+                              <option value="6_months">
+                                6 months
+                              </option>
+                              <option value="1_year">
+                                1 year
+                              </option>
+                              <option value="ongoing">
+                                Ongoing
+                              </option>
+                            </select>
+                          </label>
+
+                          <label className="flex flex-col gap-2 text-sm font-medium">
+                            Frequency
+                            <select
+                              className="rounded-lg border bg-white px-3 py-2 font-normal"
+                              disabled={isWorking}
+                              onChange={(event) =>
+                                setCounterproposalFrequency(
+                                  event.target.value as
+                                    | "weekly"
+                                    | "fortnightly"
+                                    | "monthly"
+                                    | "flexible"
+                                )
+                              }
+                              value={counterproposalFrequency}
+                            >
+                              <option value="weekly">
+                                Weekly
+                              </option>
+                              <option value="fortnightly">
+                                Fortnightly
+                              </option>
+                              <option value="monthly">
+                                Monthly
+                              </option>
+                              <option value="flexible">
+                                Flexible
+                              </option>
+                            </select>
+                          </label>
+                        </div>
+
+                        <label className="flex flex-col gap-2 text-sm font-medium">
+                          Message
+                          <textarea
+                            className="min-h-24 rounded-lg border bg-white px-3 py-2 font-normal"
+                            disabled={isWorking}
+                            maxLength={1000}
+                            onChange={(event) =>
+                              setCounterproposalMessage(
+                                event.target.value
+                              )
+                            }
+                            placeholder="Explain the proposed duration or meeting frequency."
+                            value={counterproposalMessage}
+                          />
+                        </label>
+
+                        <div>
+                          <button
+                            className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                            disabled={
+                              isWorking ||
+                              counterproposalMessage.trim().length === 0
+                            }
+                            onClick={() =>
+                              respondToMentorshipRequest(
+                                request.id,
+                                "counterpropose"
+                              )
+                            }
+                            type="button"
+                          >
+                            Send counterproposal
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </article>
                 );
               })
@@ -973,9 +1190,46 @@ export function ConnectionWorkflow() {
                     </div>
 
                     {request.proposal_message && (
-                      <p className="text-sm text-gray-700">
-                        {request.proposal_message}
-                      </p>
+                      <div className="rounded-xl border bg-gray-50 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Mentor proposal
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                          {request.proposal_message}
+                        </p>
+                      </div>
+                    )}
+
+                    {request.status === "change_proposed" && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() =>
+                            respondToMentorshipRequest(
+                              request.id,
+                              "accept"
+                            )
+                          }
+                          type="button"
+                        >
+                          Accept proposal
+                        </button>
+
+                        <button
+                          className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() =>
+                            respondToMentorshipRequest(
+                              request.id,
+                              "decline"
+                            )
+                          }
+                          type="button"
+                        >
+                          Decline proposal
+                        </button>
+                      </div>
                     )}
                   </article>
                 );

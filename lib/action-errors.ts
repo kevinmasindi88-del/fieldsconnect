@@ -40,6 +40,20 @@ export function getActionErrorMessage(
     `Unable to ${actionDescription}.`
   );
 
+  const normalizedMessage = rawMessage.toLowerCase();
+
+  if (
+    normalizedMessage.includes(
+      "mentorship_requests_one_open_pair_idx"
+    ) ||
+    (
+      normalizedMessage.includes("duplicate key value") &&
+      normalizedMessage.includes("mentorship_requests")
+    )
+  ) {
+    return "Request already sent and is pending approval.";
+  }
+
   if (isSuspensionMessage(rawMessage)) {
     return `Unable to ${actionDescription} — account suspended. Platform activity is unavailable until the suspension ends.`;
   }
