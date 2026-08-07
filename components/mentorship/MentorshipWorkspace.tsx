@@ -43,6 +43,7 @@ type Mentorship = {
   status:
     | "active"
     | "ending"
+    | "extension_pending"
     | "paused"
     | "completion_requested"
     | "completed"
@@ -64,6 +65,35 @@ type Mentorship = {
   ended_early_at: string | null;
   ended_early_by: string | null;
   end_reason: string | null;
+};
+
+type MentorshipExtensionRequest = {
+  id: string;
+  mentorship_id: string;
+  requested_by: string;
+  requested_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing";
+  reason: string;
+  status:
+    | "pending"
+    | "accepted"
+    | "declined"
+    | "cancelled"
+    | "expired";
+  responded_by: string | null;
+  previous_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year"
+    | "ongoing";
+  previous_end_date: string | null;
+  proposed_end_date: string | null;
+  requested_at: string;
+  responded_at: string | null;
+  expires_at: string;
 };
 
 type MentorshipUpdate = {
@@ -151,6 +181,42 @@ export function MentorshipWorkspace({
 
   const [actionItems, setActionItems] =
     useState<MentorshipActionItem[]>([]);
+
+  const [
+    extensionRequest,
+    setExtensionRequest,
+  ] = useState<MentorshipExtensionRequest | null>(
+    null
+  );
+
+  const [
+    acceptedExtension,
+    setAcceptedExtension,
+  ] = useState<MentorshipExtensionRequest | null>(
+    null
+  );
+
+  const [
+    extensionDuration,
+    setExtensionDuration,
+  ] = useState<
+    MentorshipExtensionRequest["requested_duration"]
+  >("3_months");
+
+  const [
+    extensionReason,
+    setExtensionReason,
+  ] = useState("");
+
+  const [
+    extensionResponseNote,
+    setExtensionResponseNote,
+  ] = useState("");
+
+  const [
+    extensionAction,
+    setExtensionAction,
+  ] = useState<string | null>(null);
 
   const [updateType, setUpdateType] =
     useState<MentorshipUpdate["update_type"]>(
@@ -364,6 +430,8 @@ export function MentorshipWorkspace({
           setUpdates([]);
           setMilestones([]);
           setActionItems([]);
+          setExtensionRequest(null);
+          setAcceptedExtension(null);
           setMessage(
             "This mentorship is unavailable or you do not have access to it."
           );
@@ -378,6 +446,8 @@ export function MentorshipWorkspace({
           updatesResult,
           milestonesResult,
           actionItemsResult,
+          extensionResult,
+          acceptedExtensionResult,
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -418,6 +488,31 @@ export function MentorshipWorkspace({
             .order("created_at", {
               ascending: false,
             }),
+
+          supabase
+            .from("mentorship_extension_requests")
+            .select(
+              "id, mentorship_id, requested_by, requested_duration, reason, status, responded_by, previous_duration, previous_end_date, proposed_end_date, requested_at, responded_at, expires_at"
+            )
+            .eq("mentorship_id", mentorshipId)
+            .order("requested_at", {
+              ascending: false,
+            })
+            .limit(1)
+            .maybeSingle(),
+
+          supabase
+            .from("mentorship_extension_requests")
+            .select(
+              "id, mentorship_id, requested_by, requested_duration, reason, status, responded_by, previous_duration, previous_end_date, proposed_end_date, requested_at, responded_at, expires_at"
+            )
+            .eq("mentorship_id", mentorshipId)
+            .eq("status", "accepted")
+            .order("responded_at", {
+              ascending: false,
+            })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         if (profileResult.error) {
@@ -436,6 +531,14 @@ export function MentorshipWorkspace({
           throw actionItemsResult.error;
         }
 
+        if (extensionResult.error) {
+          throw extensionResult.error;
+        }
+
+        if (acceptedExtensionResult.error) {
+          throw acceptedExtensionResult.error;
+        }
+
         setMentorship(loadedMentorship);
         setProfiles(
           (profileResult.data ?? []) as Profile[]
@@ -451,6 +554,16 @@ export function MentorshipWorkspace({
         setActionItems(
           (actionItemsResult.data ??
             []) as MentorshipActionItem[]
+        );
+        setExtensionRequest(
+          extensionResult.data
+            ? extensionResult.data as MentorshipExtensionRequest
+            : null
+        );
+        setAcceptedExtension(
+          acceptedExtensionResult.data
+            ? acceptedExtensionResult.data as MentorshipExtensionRequest
+            : null
         );
         setMessage(null);
       } catch (error) {
@@ -523,6 +636,18 @@ export function MentorshipWorkspace({
           event: "*",
           schema: "public",
           table: "mentorship_action_items",
+          filter: `mentorship_id=eq.${mentorshipId}`,
+        },
+        () => {
+          void loadWorkspace();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mentorship_extension_requests",
           filter: `mentorship_id=eq.${mentorshipId}`,
         },
         () => {
@@ -843,6 +968,117 @@ export function MentorshipWorkspace({
       setMessage(getErrorMessage(error));
     } finally {
       setUpdatingActionItemId(null);
+    }
+  }
+
+  async function submitExtensionRequest() {
+    if (!mentorship || !currentUserId) {
+      return;
+    }
+
+    const reason = extensionReason.trim();
+
+    if (reason.length < 10) {
+      setMessage(
+        "Enter an extension reason of at least 10 characters."
+      );
+      return;
+    }
+
+    setExtensionAction("request");
+    setMessage(null);
+
+    try {
+      const supabase =
+        getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "request_mentorship_extension",
+        {
+          target_mentorship_id:
+            mentorship.id,
+          requested_extension_duration:
+            extensionDuration,
+          extension_reason: reason,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      setExtensionReason("");
+      setExtensionDuration("3_months");
+
+      await loadWorkspace();
+
+      setMessage(
+        "Mentorship extension requested."
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setExtensionAction(null);
+    }
+  }
+
+  async function respondToExtension(
+    action: "accept" | "decline"
+  ) {
+    if (
+      !extensionRequest ||
+      !currentUserId
+    ) {
+      return;
+    }
+
+    const note =
+      extensionResponseNote.trim();
+
+    if (
+      action === "decline" &&
+      note.length < 2
+    ) {
+      setMessage(
+        "Enter a reason before declining the extension."
+      );
+      return;
+    }
+
+    setExtensionAction(action);
+    setMessage(null);
+
+    try {
+      const supabase =
+        getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "respond_to_mentorship_extension",
+        {
+          target_extension_request_id:
+            extensionRequest.id,
+          response_action: action,
+          response_note: note || null,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      setExtensionResponseNote("");
+
+      await loadWorkspace();
+
+      setMessage(
+        action === "accept"
+          ? "Mentorship extension accepted."
+          : "Mentorship extension declined."
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setExtensionAction(null);
     }
   }
 
@@ -1205,6 +1441,39 @@ export function MentorshipWorkspace({
                 : "Ongoing"
             }
           />
+
+          {acceptedExtension && (
+            <>
+              <SummaryItem
+                label="Extended by"
+                value={formatStatus(
+                  acceptedExtension.requested_duration
+                )}
+              />
+
+              <SummaryItem
+                label="Previous end"
+                value={
+                  acceptedExtension.previous_end_date
+                    ? formatDate(
+                        acceptedExtension.previous_end_date
+                      )
+                    : "Ongoing"
+                }
+              />
+
+              <SummaryItem
+                label="Extended end"
+                value={
+                  acceptedExtension.proposed_end_date
+                    ? formatDate(
+                        acceptedExtension.proposed_end_date
+                      )
+                    : "Ongoing"
+                }
+              />
+            </>
+          )}
         </div>
 
         <div className="mt-5">
@@ -1242,12 +1511,22 @@ export function MentorshipWorkspace({
           completionResponseNote
         }
         currentUserId={currentUserId}
+        extensionAction={extensionAction}
+        extensionDuration={extensionDuration}
+        extensionReason={extensionReason}
+        extensionRequest={extensionRequest}
+        extensionResponseNote={
+          extensionResponseNote
+        }
         earlyEndingReason={
           earlyEndingReason
         }
         lifecycleAction={lifecycleAction}
         mentorship={mentorship}
         pauseReason={pauseReason}
+        respondToExtension={
+          respondToExtension
+        }
         runLifecycleAction={
           runLifecycleAction
         }
@@ -1257,12 +1536,24 @@ export function MentorshipWorkspace({
         setCompletionResponseNote={
           setCompletionResponseNote
         }
+        setExtensionDuration={
+          setExtensionDuration
+        }
+        setExtensionReason={
+          setExtensionReason
+        }
+        setExtensionResponseNote={
+          setExtensionResponseNote
+        }
         setEarlyEndingReason={
           setEarlyEndingReason
         }
         setPauseReason={setPauseReason}
         unfinishedActionItemCount={
           unfinishedActionItemCount
+        }
+        submitExtensionRequest={
+          submitExtensionRequest
         }
         unfinishedMilestoneCount={
           unfinishedMilestoneCount
@@ -1750,25 +2041,45 @@ function LifecyclePanel({
   completionRequestNote,
   completionResponseNote,
   currentUserId,
+  extensionAction,
+  extensionDuration,
+  extensionReason,
+  extensionRequest,
+  extensionResponseNote,
   earlyEndingReason,
   lifecycleAction,
   mentorship,
   pauseReason,
+  respondToExtension,
   runLifecycleAction,
   setCompletionRequestNote,
   setCompletionResponseNote,
+  setExtensionDuration,
+  setExtensionReason,
+  setExtensionResponseNote,
   setEarlyEndingReason,
   setPauseReason,
+  submitExtensionRequest,
   unfinishedActionItemCount,
   unfinishedMilestoneCount,
 }: {
   completionRequestNote: string;
   completionResponseNote: string;
   currentUserId: string | null;
+  extensionAction: string | null;
+  extensionDuration:
+    MentorshipExtensionRequest["requested_duration"];
+  extensionReason: string;
+  extensionRequest:
+    MentorshipExtensionRequest | null;
+  extensionResponseNote: string;
   earlyEndingReason: string;
   lifecycleAction: string | null;
   mentorship: Mentorship;
   pauseReason: string;
+  respondToExtension: (
+    action: "accept" | "decline"
+  ) => Promise<void>;
   runLifecycleAction: (
     action:
       | "pause"
@@ -1784,10 +2095,21 @@ function LifecyclePanel({
   setCompletionResponseNote: (
     value: string
   ) => void;
+  setExtensionDuration: (
+    value:
+      MentorshipExtensionRequest["requested_duration"]
+  ) => void;
+  setExtensionReason: (
+    value: string
+  ) => void;
+  setExtensionResponseNote: (
+    value: string
+  ) => void;
   setEarlyEndingReason: (
     value: string
   ) => void;
   setPauseReason: (value: string) => void;
+  submitExtensionRequest: () => Promise<void>;
   unfinishedActionItemCount: number;
   unfinishedMilestoneCount: number;
 }) {
@@ -1807,6 +2129,45 @@ function LifecyclePanel({
     unfinishedMilestoneCount > 0 ||
     unfinishedActionItemCount > 0;
 
+  const expectedEndDate =
+    mentorship.expected_end_date
+      ? new Date(
+          `${mentorship.expected_end_date}T00:00:00`
+        )
+      : null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const extensionDaysRemaining =
+    expectedEndDate
+      ? Math.ceil(
+          (
+            expectedEndDate.getTime() -
+            today.getTime()
+          ) /
+            86_400_000
+        )
+      : null;
+
+  const isFixedDuration =
+    mentorship.agreed_duration !== "ongoing" &&
+    expectedEndDate !== null;
+
+  const canRequestExtension =
+    (
+      mentorship.status === "active" ||
+      mentorship.status === "ending"
+    ) &&
+    isFixedDuration &&
+    extensionDaysRemaining !== null &&
+    extensionDaysRemaining >= 0 &&
+    extensionDaysRemaining <= 30;
+
+  const extensionRequestedByCurrentUser =
+    extensionRequest?.requested_by ===
+    currentUserId;
+
   return (
     <section className="rounded-2xl border bg-white p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -1824,6 +2185,114 @@ function LifecyclePanel({
           {formatStatus(mentorship.status)}
         </span>
       </div>
+
+      {mentorship.status ===
+        "extension_pending" &&
+        extensionRequest?.status ===
+          "pending" && (
+          <div className="mt-4 rounded-xl border border-dashed p-4">
+            <p className="text-sm font-semibold">
+              Extension requested
+            </p>
+
+            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Requested term
+                </dt>
+
+                <dd className="mt-1 capitalize">
+                  {formatStatus(
+                    extensionRequest.requested_duration
+                  )}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Proposed end
+                </dt>
+
+                <dd className="mt-1">
+                  {extensionRequest.proposed_end_date
+                    ? formatDate(
+                        extensionRequest.proposed_end_date
+                      )
+                    : "Ongoing"}
+                </dd>
+              </div>
+            </dl>
+
+            <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
+              {extensionRequest.reason}
+            </p>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Requested{" "}
+              {formatDateTime(
+                extensionRequest.requested_at
+              )}
+            </p>
+
+            {extensionRequestedByCurrentUser ? (
+              <p className="mt-4 text-sm text-gray-600">
+                Waiting for the other participant to respond.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-3">
+                <textarea
+                  className="min-h-24 resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setExtensionResponseNote(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Optional acceptance note, or required reason when declining."
+                  value={extensionResponseNote}
+                />
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    disabled={
+                      extensionAction !== null
+                    }
+                    onClick={() =>
+                      void respondToExtension(
+                        "accept"
+                      )
+                    }
+                    type="button"
+                  >
+                    {extensionAction === "accept"
+                      ? "Accepting..."
+                      : "Accept extension"}
+                  </button>
+
+                  <button
+                    className="min-h-10 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    disabled={
+                      extensionAction !== null ||
+                      extensionResponseNote.trim()
+                        .length < 2
+                    }
+                    onClick={() =>
+                      void respondToExtension(
+                        "decline"
+                      )
+                    }
+                    type="button"
+                  >
+                    {extensionAction === "decline"
+                      ? "Declining..."
+                      : "Decline extension"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       {mentorship.status === "paused" && (
         <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-700">
@@ -2112,6 +2581,100 @@ function LifecyclePanel({
           </button>
         </details>
       )}
+
+      {!isTerminal &&
+        mentorship.status !==
+          "extension_pending" && (
+          <div className="mt-5 rounded-xl border p-4">
+            <h3 className="font-semibold">
+              Request extension
+            </h3>
+
+            {!isFixedDuration ? (
+              <p className="mt-3 text-sm text-gray-600">
+                Ongoing mentorships do not require an extension.
+              </p>
+            ) : !canRequestExtension ? (
+              <div className="mt-3 rounded-xl border border-dashed p-3 text-sm text-gray-700">
+                <p className="font-semibold">
+                  Extension is not yet available
+                </p>
+
+                <p className="mt-1 text-gray-600">
+                  An extension may only be requested within 30 days of the expected end date.
+                </p>
+
+                {extensionDaysRemaining !== null &&
+                  extensionDaysRemaining > 30 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      {extensionDaysRemaining} days remain in the current term.
+                    </p>
+                  )}
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-3">
+                <label className="grid gap-2 text-sm font-medium">
+                  Requested term
+
+                  <select
+                    className="min-h-11 rounded-xl border bg-white px-4 py-2 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                    onChange={(event) =>
+                      setExtensionDuration(
+                        event.target.value as MentorshipExtensionRequest["requested_duration"]
+                      )
+                    }
+                    value={extensionDuration}
+                  >
+                    <option value="3_months">
+                      3 months
+                    </option>
+
+                    <option value="6_months">
+                      6 months
+                    </option>
+
+                    <option value="1_year">
+                      1 year
+                    </option>
+
+                    <option value="ongoing">
+                      Ongoing
+                    </option>
+                  </select>
+                </label>
+
+                <textarea
+                  className="min-h-24 resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setExtensionReason(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Explain why the mentorship should continue."
+                  value={extensionReason}
+                />
+
+                <button
+                  className="w-fit min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={
+                    extensionAction !== null ||
+                    extensionReason.trim().length <
+                      10
+                  }
+                  onClick={() =>
+                    void submitExtensionRequest()
+                  }
+                  type="button"
+                >
+                  {extensionAction === "request"
+                    ? "Requesting..."
+                    : "Request extension"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
       {isTerminal && (
         <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-600">
