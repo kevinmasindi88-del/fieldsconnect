@@ -33,14 +33,16 @@ type Notification = {
   | "fc_team_leave_approved"
   | "fc_team_leave_requested"
   | "fc_feedback_unassigned"
-    | "suspension_revoked";
+    | "suspension_revoked"
+    | "mentorship_completion_feedback";
   entity_type:
     | "connection"
     | "conversation"
     | "message"
     | "post"
     | "comment"
-    | "moderation_ticket";
+    | "moderation_ticket"
+    | "mentorship";
   entity_id: string | null;
   title: string;
   body: string | null;
@@ -409,6 +411,22 @@ export function NotificationsWorkflow() {
                         {renderNotificationBody(notification, postId)}
                       </p>
                     )}
+
+                    {notification.notification_type ===
+                      "mentorship_completion_feedback" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/mentorships/${notification.entity_id}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View mentorship
+                        </button>
+                      )}
 
                     {notification.notification_type ===
                       "new_fc_feedback" &&

@@ -67,6 +67,15 @@ type Mentorship = {
   end_reason: string | null;
 };
 
+type MentorshipCompletionFeedback = {
+  id: string;
+  mentorship_id: string;
+  author_id: string;
+  author_role: "mentor" | "mentee";
+  feedback: string;
+  submitted_at: string;
+};
+
 type MentorshipExtensionRequest = {
   id: string;
   mentorship_id: string;
@@ -195,6 +204,21 @@ export function MentorshipWorkspace({
   ] = useState<MentorshipExtensionRequest | null>(
     null
   );
+
+  const [
+    completionFeedback,
+    setCompletionFeedback,
+  ] = useState<MentorshipCompletionFeedback[]>([]);
+
+  const [
+    completionFeedbackText,
+    setCompletionFeedbackText,
+  ] = useState("");
+
+  const [
+    submittingCompletionFeedback,
+    setSubmittingCompletionFeedback,
+  ] = useState(false);
 
   const [
     extensionDuration,
@@ -448,6 +472,7 @@ export function MentorshipWorkspace({
           actionItemsResult,
           extensionResult,
           acceptedExtensionResult,
+          completionFeedbackResult,
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -513,6 +538,16 @@ export function MentorshipWorkspace({
             })
             .limit(1)
             .maybeSingle(),
+
+          supabase
+            .from("mentorship_completion_feedback")
+            .select(
+              "id, mentorship_id, author_id, author_role, feedback, submitted_at"
+            )
+            .eq("mentorship_id", mentorshipId)
+            .order("submitted_at", {
+              ascending: true,
+            }),
         ]);
 
         if (profileResult.error) {
@@ -537,6 +572,10 @@ export function MentorshipWorkspace({
 
         if (acceptedExtensionResult.error) {
           throw acceptedExtensionResult.error;
+        }
+
+        if (completionFeedbackResult.error) {
+          throw completionFeedbackResult.error;
         }
 
         setMentorship(loadedMentorship);
@@ -565,6 +604,11 @@ export function MentorshipWorkspace({
             ? acceptedExtensionResult.data as MentorshipExtensionRequest
             : null
         );
+
+        setCompletionFeedback(
+          (completionFeedbackResult.data ?? []) as MentorshipCompletionFeedback[]
+        );
+
         setMessage(null);
       } catch (error) {
         setMessage(getErrorMessage(error));
@@ -648,6 +692,18 @@ export function MentorshipWorkspace({
           event: "*",
           schema: "public",
           table: "mentorship_extension_requests",
+          filter: `mentorship_id=eq.${mentorshipId}`,
+        },
+        () => {
+          void loadWorkspace();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mentorship_completion_feedback",
           filter: `mentorship_id=eq.${mentorshipId}`,
         },
         () => {
@@ -968,6 +1024,50 @@ export function MentorshipWorkspace({
       setMessage(getErrorMessage(error));
     } finally {
       setUpdatingActionItemId(null);
+    }
+  }
+
+  async function submitCompletionFeedback() {
+    if (!mentorship || !currentUserId) {
+      return;
+    }
+
+    const feedback = completionFeedbackText.trim();
+
+    if (feedback.length < 10) {
+      setMessage(
+        "Completion feedback must be at least 10 characters."
+      );
+      return;
+    }
+
+    setSubmittingCompletionFeedback(true);
+    setMessage(null);
+
+    try {
+      const supabase =
+        getSupabaseBrowserClient();
+
+      const { error } = await supabase.rpc(
+        "submit_mentorship_completion_feedback",
+        {
+          target_mentorship_id: mentorship.id,
+          feedback_text: feedback,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      setCompletionFeedbackText("");
+      setMessage("Completion feedback submitted.");
+
+      await loadWorkspace();
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setSubmittingCompletionFeedback(false);
     }
   }
 
@@ -1497,8 +1597,8 @@ export function MentorshipWorkspace({
             This mentorship has ended. Its updates,
             milestones, action items, completion evidence
             and reviews remain available as a permanent
-            record, but no further workspace changes can
-            be made.
+            record. Completion feedback may still be
+            submitted below.
           </p>
         </div>
       )}
@@ -1549,6 +1649,20 @@ export function MentorshipWorkspace({
           setEarlyEndingReason
         }
         setPauseReason={setPauseReason}
+        completionFeedback={completionFeedback}
+        completionFeedbackText={
+          completionFeedbackText
+        }
+        profileById={profileById}
+        setCompletionFeedbackText={
+          setCompletionFeedbackText
+        }
+        submitCompletionFeedback={
+          submitCompletionFeedback
+        }
+        submittingCompletionFeedback={
+          submittingCompletionFeedback
+        }
         unfinishedActionItemCount={
           unfinishedActionItemCount
         }
@@ -2037,10 +2151,116 @@ function SummaryItem({
   );
 }
 
+function CompletionFeedbackPanel({
+  currentUserId,
+  feedbackEntries,
+  feedbackText,
+  profileById,
+  setFeedbackText,
+  submitting,
+  submitFeedback,
+}: {
+  currentUserId: string | null;
+  feedbackEntries: MentorshipCompletionFeedback[];
+  feedbackText: string;
+  profileById: Map<string, Profile>;
+  setFeedbackText: (value: string) => void;
+  submitting: boolean;
+  submitFeedback: () => Promise<void>;
+}) {
+  const currentUserFeedback =
+    feedbackEntries.find(
+      (entry) => entry.author_id === currentUserId
+    ) ?? null;
+
+  return (
+    <div className="mt-5 rounded-xl border p-4">
+      <h3 className="font-semibold">
+        Completion feedback
+      </h3>
+
+      <p className="mt-2 text-sm text-gray-600">
+        Share a final reflection on the mentorship cycle.
+      </p>
+
+      {feedbackEntries.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {feedbackEntries.map((entry) => (
+            <div
+              className="rounded-xl border bg-gray-50 p-4"
+              key={entry.id}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {
+                    profileById.get(entry.author_id)
+                      ?.display_name ??
+                    (entry.author_role === "mentor"
+                      ? "Mentor"
+                      : "Mentee")
+                  }
+                </p>
+
+                <p className="text-xs text-gray-500">
+                  {formatDateTime(entry.submitted_at)}
+                </p>
+              </div>
+
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                {entry.feedback}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {currentUserFeedback ? (
+        <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-600">
+          Your completion feedback has been submitted and
+          is now read-only.
+        </p>
+      ) : (
+        <div className="mt-4">
+          <textarea
+            className="min-h-28 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            maxLength={2000}
+            onChange={(event) =>
+              setFeedbackText(event.target.value)
+            }
+            placeholder="Share your final reflection on this mentorship."
+            value={feedbackText}
+          />
+
+          <div className="mt-3 flex justify-end">
+            <button
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={
+                submitting ||
+                feedbackText.trim().length < 10
+              }
+              onClick={() => {
+                void submitFeedback();
+              }}
+              type="button"
+            >
+              {submitting
+                ? "Submitting..."
+                : "Submit feedback"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LifecyclePanel({
+  completionFeedback,
+  completionFeedbackText,
   completionRequestNote,
   completionResponseNote,
   currentUserId,
+  profileById,
   extensionAction,
   extensionDuration,
   extensionReason,
@@ -2052,6 +2272,7 @@ function LifecyclePanel({
   pauseReason,
   respondToExtension,
   runLifecycleAction,
+  setCompletionFeedbackText,
   setCompletionRequestNote,
   setCompletionResponseNote,
   setExtensionDuration,
@@ -2059,13 +2280,18 @@ function LifecyclePanel({
   setExtensionResponseNote,
   setEarlyEndingReason,
   setPauseReason,
+  submitCompletionFeedback,
   submitExtensionRequest,
+  submittingCompletionFeedback,
   unfinishedActionItemCount,
   unfinishedMilestoneCount,
 }: {
+  completionFeedback: MentorshipCompletionFeedback[];
+  completionFeedbackText: string;
   completionRequestNote: string;
   completionResponseNote: string;
   currentUserId: string | null;
+  profileById: Map<string, Profile>;
   extensionAction: string | null;
   extensionDuration:
     MentorshipExtensionRequest["requested_duration"];
@@ -2089,6 +2315,9 @@ function LifecyclePanel({
       | "decline_completion"
       | "end_early"
   ) => Promise<void>;
+  setCompletionFeedbackText: (
+    value: string
+  ) => void;
   setCompletionRequestNote: (
     value: string
   ) => void;
@@ -2109,7 +2338,9 @@ function LifecyclePanel({
     value: string
   ) => void;
   setPauseReason: (value: string) => void;
+  submitCompletionFeedback: () => Promise<void>;
   submitExtensionRequest: () => Promise<void>;
+  submittingCompletionFeedback: boolean;
   unfinishedActionItemCount: number;
   unfinishedMilestoneCount: number;
 }) {
@@ -2675,6 +2906,18 @@ function LifecyclePanel({
             )}
           </div>
         )}
+
+      {mentorship.status === "completed" && (
+        <CompletionFeedbackPanel
+          currentUserId={currentUserId}
+          feedbackEntries={completionFeedback}
+          feedbackText={completionFeedbackText}
+          profileById={profileById}
+          setFeedbackText={setCompletionFeedbackText}
+          submitting={submittingCompletionFeedback}
+          submitFeedback={submitCompletionFeedback}
+        />
+      )}
 
       {isTerminal && (
         <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-600">
