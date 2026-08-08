@@ -357,7 +357,7 @@ export function NotificationsWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:p-8">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <button
           className="w-fit rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
@@ -446,7 +446,7 @@ export function NotificationsWorkflow() {
                     {notification.notification_type ===
                       "fc_team_recruitment" && (
                         <button
-                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                           onClick={() =>
                             router.push("/feedback/team")
                           }
@@ -458,7 +458,7 @@ export function NotificationsWorkflow() {
                     {notification.notification_type ===
                       "fc_team_recruitment_accepted" && (
                         <button
-                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                           onClick={() =>
                             router.push("/feedback/team")
                           }
@@ -471,7 +471,7 @@ export function NotificationsWorkflow() {
                     {notification.notification_type ===
                       "fc_team_activated" && (
                         <button
-                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                           onClick={() =>
                             router.push("/feedback/team")
                           }
@@ -485,7 +485,7 @@ export function NotificationsWorkflow() {
                       "fc_feedback_assignment" &&
                       notification.entity_id && (
                         <button
-                          className="mt-3 ml-2 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
                           onClick={() =>
                             router.push(
                               `/feedback/manage?ticket=${encodeURIComponent(

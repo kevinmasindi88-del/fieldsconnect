@@ -776,7 +776,7 @@ export function ConnectionWorkflow() {
         className="flex flex-col gap-4 rounded-xl border bg-white p-4"
       >
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <ProfileAvatar
               avatarPath={otherProfile?.avatar_url}
               displayName={otherProfile?.display_name}
@@ -911,7 +911,7 @@ export function ConnectionWorkflow() {
                     key={request.id}
                     className="flex flex-col gap-4 rounded-xl border bg-white p-4"
                   >
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
                       <ProfileAvatar
                         avatarPath={mentee?.avatar_url}
                         displayName={mentee?.display_name}
@@ -1147,7 +1147,7 @@ export function ConnectionWorkflow() {
                     key={request.id}
                     className="flex flex-col gap-3 rounded-xl border bg-white p-4"
                   >
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
                       <ProfileAvatar
                         avatarPath={mentor?.avatar_url}
                         displayName={mentor?.display_name}
@@ -1245,7 +1245,7 @@ export function ConnectionWorkflow() {
                 const profile = profileById.get(connection.requester_id);
                 return (
                   <ConnectionCard key={connection.id} profile={profile}>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
                         disabled={isWorking}
@@ -1492,7 +1492,7 @@ function ConnectionCard({
           {identity}
         </Link>
       ) : (
-        <div className="flex gap-3">{identity}</div>
+        <div className="flex flex-col gap-3 sm:flex-row">{identity}</div>
       )}
       <div>{children}</div>
     </article>

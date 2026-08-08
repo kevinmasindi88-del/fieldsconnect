@@ -3018,7 +3018,7 @@ function MentorshipWorkboard({
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <WorkSummaryCard
           label="Milestones"
           value={milestones.length}
@@ -3655,7 +3655,7 @@ function ActionItemList({
                   }
                   type="button"
                 >
-                  <div className="flex justify-between gap-3">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                     <h3 className="font-semibold">
                       {item.title}
                     </h3>
@@ -3994,7 +3994,7 @@ function WorkspaceList({
               className="rounded-xl border p-4"
               key={item.id}
             >
-              <div className="flex justify-between gap-3">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <h3 className="font-semibold">
                   {item.title}
                 </h3>
