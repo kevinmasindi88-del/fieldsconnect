@@ -544,7 +544,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
   if (isLoading) {
     return (
-      <section className="mx-auto w-full max-w-5xl p-8">
+      <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:p-8">
         <p className="text-sm text-gray-600">Loading profile...</p>
       </section>
     );
@@ -552,7 +552,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
   if (!profile) {
     return (
-      <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-8">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:p-8">
         <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
           This profile is not available. It may be private, connection-only, or removed.
         </p>
@@ -565,7 +565,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:p-8">
       <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href="/connections">
         ← Back to connections
       </Link>

@@ -681,7 +681,7 @@ export function TimelineWorkflow() {
             </button>
 
             {isEmojiPickerOpen && (
-              <div className="absolute left-full top-1/2 z-10 ml-2 grid w-max -translate-y-1/2 grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+              <div className="absolute left-0 top-full z-10 mt-2 grid w-max grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg sm:left-full sm:top-1/2 sm:ml-2 sm:mt-0 sm:-translate-y-1/2">
                 {postEmojis.map((emoji) => (
                   <button
                     aria-label={`Add ${emoji}`}
