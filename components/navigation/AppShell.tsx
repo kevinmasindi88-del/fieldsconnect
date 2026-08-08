@@ -34,6 +34,132 @@ const navItems = [
   { href: "/library", label: "Library" },
 ];
 
+type MobileNavIconName =
+  | "home"
+  | "connections"
+  | "messages"
+  | "notifications"
+  | "skills"
+  | "library";
+
+const mobileNavItems: Array<{
+  href: string;
+  label: string;
+  icon: MobileNavIconName;
+}> = [
+  {
+    href: "/timeline",
+    label: "Home",
+    icon: "home",
+  },
+  {
+    href: "/connections",
+    label: "Connect",
+    icon: "connections",
+  },
+  {
+    href: "/messages",
+    label: "Messages",
+    icon: "messages",
+  },
+  {
+    href: "/notifications",
+    label: "Alerts",
+    icon: "notifications",
+  },
+  {
+    href: "/skills",
+    label: "Skills",
+    icon: "skills",
+  },
+  {
+    href: "/library",
+    label: "Library",
+    icon: "library",
+  },
+];
+
+function MobileNavIcon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: MobileNavIconName | "account";
+  className?: string;
+}) {
+  const commonProps = {
+    className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  switch (name) {
+    case "home":
+      return (
+        <svg {...commonProps}>
+          <path d="M3 11.5 12 4l9 7.5" />
+          <path d="M5.5 10.5V20h13v-9.5" />
+          <path d="M9.5 20v-6h5v6" />
+        </svg>
+      );
+
+    case "connections":
+      return (
+        <svg {...commonProps}>
+          <circle cx="9" cy="8" r="3" />
+          <circle cx="17" cy="9" r="2.5" />
+          <path d="M3.5 19c.5-3.5 2.6-5.5 5.5-5.5S14 15.5 14.5 19" />
+          <path d="M14 14.5c2.7-.4 5.2 1.2 5.8 4.5" />
+        </svg>
+      );
+
+    case "messages":
+      return (
+        <svg {...commonProps}>
+          <path d="M4 5.5h16v11H9l-5 3v-14Z" />
+          <path d="M8 10h8" />
+          <path d="M8 13h5" />
+        </svg>
+      );
+
+    case "notifications":
+      return (
+        <svg {...commonProps}>
+          <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 5 2 5.5 2 5.5h-15S6.5 15 6.5 10Z" />
+          <path d="M10 19h4" />
+        </svg>
+      );
+
+    case "skills":
+      return (
+        <svg {...commonProps}>
+          <path d="m12 3 2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.5 5-.7L12 3Z" />
+        </svg>
+      );
+
+    case "library":
+      return (
+        <svg {...commonProps}>
+          <path d="M5 4h5.5A2.5 2.5 0 0 1 13 6.5V20a3.5 3.5 0 0 0-3-1.5H5V4Z" />
+          <path d="M19 4h-5.5A2.5 2.5 0 0 0 11 6.5" />
+          <path d="M19 4v14.5h-5a3.5 3.5 0 0 0-3 1.5" />
+        </svg>
+      );
+
+    case "account":
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5.5 20c.6-4.2 3-6.5 6.5-6.5s5.9 2.3 6.5 6.5" />
+        </svg>
+      );
+  }
+}
+
 type ActiveSuspension = {
   suspension_id: string;
   report_id: string;
@@ -398,7 +524,166 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
       <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2.5 sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="inline-flex shrink-0 items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            >
+              <span className="text-blue-700">Fields</span>
+              <span className="text-gray-950">Connect</span>
+            </Link>
+
+            <div className="flex items-center">
+              {isLoadingAuth ? (
+                <span className="text-xs text-gray-500">
+                  Checking...
+                </span>
+              ) : user ? (
+                <details className="group relative">
+                  <summary
+                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                    aria-label={`Account menu for ${welcomeName ?? "user"}`}
+                  >
+                    <MobileNavIcon
+                      name="account"
+                      className="h-5 w-5"
+                    />
+                  </summary>
+
+                  <div className="absolute right-0 top-full z-30 mt-2 min-w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                    <div className="border-b border-gray-100 px-3 py-2">
+                      <p className="text-xs text-gray-500">
+                        Signed in as
+                      </p>
+
+                      <p className="max-w-44 truncate text-sm font-semibold text-gray-950">
+                        {welcomeName ?? user.email ?? "Account"}
+                      </p>
+                    </div>
+
+                    <Link
+                      className={[
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname === "/profile"
+                          ? "bg-gray-100 font-medium text-gray-950"
+                          : "text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                      href="/profile"
+                      onClick={(event) => {
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
+                      }}
+                    >
+                      Profile
+                    </Link>
+
+                    <Link
+                      className={[
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname.startsWith("/moderation")
+                          ? "bg-gray-100 font-medium text-gray-950"
+                          : "text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                      href="/moderation"
+                      onClick={(event) => {
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
+                      }}
+                    >
+                      Moderation
+                    </Link>
+
+                    <button
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      type="button"
+                      onClick={handleLogout}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </details>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    className="rounded-lg border px-2.5 py-2 text-xs font-medium"
+                    href="/login"
+                  >
+                    Login
+                  </Link>
+
+                  <Link
+                    className="rounded-lg bg-black px-2.5 py-2 text-xs font-medium text-white"
+                    href="/signup"
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <nav
+            className="grid grid-cols-6 gap-1"
+            aria-label="Primary navigation"
+          >
+            {mobileNavItems.map((item) => {
+              const isActive = pathname === item.href;
+
+              const unreadCount =
+                item.href === "/messages"
+                  ? unreadMessageCount
+                  : item.href === "/notifications"
+                    ? unreadNotificationCount
+                    : 0;
+
+              return (
+                <Link
+                  key={item.href}
+                  className={[
+                    "relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-0.5 py-2 text-[10px] font-medium leading-none transition",
+                    isActive
+                      ? "border-black bg-black text-white"
+                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+                  ].join(" ")}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  title={item.label}
+                >
+                  <span className="relative flex h-5 w-5 items-center justify-center">
+                    <MobileNavIcon
+                      name={item.icon}
+                      className="h-5 w-5"
+                    />
+
+                    {unreadCount > 0 && (
+                      <span
+                        className={[
+                          "absolute -right-3 -top-2 inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none",
+                          isActive
+                            ? "bg-white text-black"
+                            : "bg-black text-white",
+                        ].join(" ")}
+                      >
+                        {unreadCount > 99
+                          ? "99+"
+                          : unreadCount}
+                      </span>
+                    )}
+                  </span>
+
+                  <span className="w-full truncate text-center">
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="mx-auto hidden max-w-6xl flex-col gap-3 px-4 py-3 sm:flex sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <Link href="/" className="inline-flex shrink-0 items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
               <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span>
