@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
@@ -45,6 +45,8 @@ type UnreadMessageNotification = {
   read_at: string | null;
 };
 
+const MESSAGE_PAGE_SIZE = 10;
+
 export function MessagingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -59,6 +61,12 @@ export function MessagingWorkflow() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] =
+    useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] =
+    useState(false);
+  const messageScrollRef =
+    useRef<HTMLDivElement | null>(null);
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -107,35 +115,228 @@ export function MessagingWorkflow() {
     );
   }
 
-  async function loadConversationMessages(conversationId: string) {
-    if (!isSupabaseConfigured()) return;
+  function scrollMessagesToBottom() {
+    window.requestAnimationFrame(() => {
+      const container = messageScrollRef.current;
 
-    const supabase = getSupabaseBrowserClient();
+      if (!container) return;
 
-    const { data, error } = await supabase
-      .from("messages")
-      .select("id, conversation_id, sender_id, body, created_at")
-      .eq("conversation_id", conversationId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Unable to refresh conversation messages:", error);
-      return;
-    }
-
-    setMessages((currentMessages) => {
-      const otherConversationMessages = currentMessages.filter(
-        (item) => item.conversation_id !== conversationId
-      );
-
-      return [
-        ...otherConversationMessages,
-        ...((data ?? []) as Message[]),
-      ];
+      container.scrollTop =
+        container.scrollHeight;
     });
   }
 
+  function mergeMessages(
+    current: Message[],
+    incoming: Message[]
+  ) {
+    const byId = new Map<string, Message>();
+
+    current.forEach((item) => {
+      byId.set(item.id, item);
+    });
+
+    incoming.forEach((item) => {
+      byId.set(item.id, item);
+    });
+
+    return Array.from(byId.values()).sort(
+      (left, right) =>
+        new Date(left.created_at).getTime() -
+        new Date(right.created_at).getTime()
+    );
+  }
+
+  async function loadLatestConversationMessages(
+    conversationId: string,
+    preserveExisting = false,
+    shouldScrollToBottom = true
+  ) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase =
+      getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select(
+        "id, conversation_id, sender_id, body, created_at"
+      )
+      .eq(
+        "conversation_id",
+        conversationId
+      )
+      .is("deleted_at", null)
+      .order(
+        "created_at",
+        { ascending: false }
+      )
+      .limit(MESSAGE_PAGE_SIZE);
+
+    if (error) {
+      console.error(
+        "Unable to refresh conversation messages:",
+        error
+      );
+      return;
+    }
+
+    const latestMessages =
+      ((data ?? []) as Message[])
+        .reverse();
+
+    if (preserveExisting) {
+      setMessages((current) =>
+        mergeMessages(
+          current.filter(
+            (item) =>
+              item.conversation_id ===
+              conversationId
+          ),
+          latestMessages
+        )
+      );
+    } else {
+      setMessages(latestMessages);
+
+      setHasOlderMessages(
+        latestMessages.length ===
+          MESSAGE_PAGE_SIZE
+      );
+    }
+
+    if (shouldScrollToBottom) {
+      scrollMessagesToBottom();
+    }
+  }
+
+  async function loadOlderMessages(
+    conversationId: string
+  ) {
+    if (
+      !isSupabaseConfigured() ||
+      isLoadingOlderMessages ||
+      !hasOlderMessages
+    ) {
+      return;
+    }
+
+    const conversationMessages =
+      messages
+        .filter(
+          (item) =>
+            item.conversation_id ===
+            conversationId
+        )
+        .sort(
+          (left, right) =>
+            new Date(
+              left.created_at
+            ).getTime() -
+            new Date(
+              right.created_at
+            ).getTime()
+        );
+
+    const oldestMessage =
+      conversationMessages[0];
+
+    if (!oldestMessage) return;
+
+    const container =
+      messageScrollRef.current;
+
+    const previousScrollHeight =
+      container?.scrollHeight ?? 0;
+
+    setIsLoadingOlderMessages(true);
+
+    try {
+      const supabase =
+        getSupabaseBrowserClient();
+
+      const { data, error } =
+        await supabase
+          .from("messages")
+          .select(
+            "id, conversation_id, sender_id, body, created_at"
+          )
+          .eq(
+            "conversation_id",
+            conversationId
+          )
+          .is("deleted_at", null)
+          .lt(
+            "created_at",
+            oldestMessage.created_at
+          )
+          .order(
+            "created_at",
+            { ascending: false }
+          )
+          .limit(MESSAGE_PAGE_SIZE);
+
+      if (error) throw error;
+
+      const olderMessages =
+        ((data ?? []) as Message[])
+          .reverse();
+
+      setMessages((current) =>
+        mergeMessages(
+          current,
+          olderMessages
+        )
+      );
+
+      setHasOlderMessages(
+        olderMessages.length ===
+          MESSAGE_PAGE_SIZE
+      );
+
+      window.requestAnimationFrame(
+        () => {
+          const nextContainer =
+            messageScrollRef.current;
+
+          if (!nextContainer) return;
+
+          const addedHeight =
+            nextContainer.scrollHeight -
+            previousScrollHeight;
+
+          nextContainer.scrollTop +=
+            addedHeight;
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Unable to load earlier messages:",
+        error
+      );
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+  }
+
+  function handleMessageScroll() {
+    const container =
+      messageScrollRef.current;
+
+    if (
+      !container ||
+      container.scrollTop > 40 ||
+      !activeConversationId ||
+      !hasOlderMessages ||
+      isLoadingOlderMessages
+    ) {
+      return;
+    }
+
+    void loadOlderMessages(
+      activeConversationId
+    );
+  }
   async function loadData() {
     setMessage(null);
 
@@ -212,23 +413,8 @@ export function MessagingWorkflow() {
       const visibleConversations = (conversationData ?? []) as Conversation[];
       setConversations(visibleConversations);
 
-      const conversationIds = visibleConversations.map((conversation) => conversation.id);
-
-      if (conversationIds.length === 0) {
-        setMessages([]);
-        return;
-      }
-
-      const { data: messageData, error: messageError } = await supabase
-        .from("messages")
-        .select("id, conversation_id, sender_id, body, created_at")
-        .in("conversation_id", conversationIds)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: true });
-
-      if (messageError) throw messageError;
-
-      setMessages((messageData ?? []) as Message[]);
+      setMessages([]);
+      setHasOlderMessages(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load messaging data.");
     } finally {
@@ -282,7 +468,21 @@ export function MessagingWorkflow() {
           filter: `conversation_id=eq.${activeConversationId}`,
         },
         () => {
-          void loadConversationMessages(activeConversationId);
+          const container =
+            messageScrollRef.current;
+
+          const isNearBottom =
+            !container ||
+            container.scrollHeight -
+              container.scrollTop -
+              container.clientHeight <
+              80;
+
+          void loadLatestConversationMessages(
+            activeConversationId,
+            true,
+            isNearBottom
+          );
         }
       )
       .subscribe();
@@ -329,8 +529,22 @@ export function MessagingWorkflow() {
       const existing = conversationByConnectionId.get(connection.id);
 
       if (existing) {
-        setActiveConnectionId(connection.id);
-        setActiveConversationId(existing.id);
+        setActiveConnectionId(
+          connection.id
+        );
+        setActiveConversationId(
+          existing.id
+        );
+
+        setMessages([]);
+        setHasOlderMessages(false);
+
+        await loadLatestConversationMessages(
+          existing.id,
+          false,
+          true
+        );
+
         return;
       }
 
@@ -347,13 +561,40 @@ export function MessagingWorkflow() {
         throw new Error("The conversation could not be created.");
       }
 
-      setActiveConnectionId(connection.id);
-      setActiveConversationId(conversationId);
+      const createdConversation:
+        Conversation = {
+          id: conversationId,
+          connection_id: connection.id,
+        };
 
-      await loadData();
+      setConversations((current) =>
+        current.some(
+          (item) =>
+            item.id === conversationId
+        )
+          ? current
+          : [
+              ...current,
+              createdConversation,
+            ]
+      );
 
-      setActiveConnectionId(connection.id);
-      setActiveConversationId(conversationId);
+      setActiveConnectionId(
+        connection.id
+      );
+
+      setActiveConversationId(
+        conversationId
+      );
+
+      setMessages([]);
+      setHasOlderMessages(false);
+
+      await loadLatestConversationMessages(
+        conversationId,
+        false,
+        true
+      );
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -384,7 +625,9 @@ export function MessagingWorkflow() {
           sender_id: currentUserId,
           body: messageBody,
         })
-        .select("id")
+        .select(
+          "id, conversation_id, sender_id, body, created_at"
+        )
         .single();
 
       if (error) throw error;
@@ -416,8 +659,15 @@ export function MessagingWorkflow() {
         }
       }
 
+      setMessages((current) =>
+        mergeMessages(
+          current,
+          [createdMessage as Message]
+        )
+      );
+
       setDraftMessage("");
-      await loadData();
+      scrollMessagesToBottom();
     } catch (error) {
       setMessage(getActionErrorMessage(error, "send message"));
     } finally {
@@ -478,7 +728,7 @@ export function MessagingWorkflow() {
         </div>
       </aside>
 
-      <main className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:min-h-[520px]">
+      <main className="flex h-[70vh] min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px]">
         <div className="flex items-center gap-3 border-b p-4">
           {activeProfile ? (
             <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${activeProfile.id}`}>
@@ -496,7 +746,11 @@ export function MessagingWorkflow() {
           )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+        <div
+          ref={messageScrollRef}
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
+          onScroll={handleMessageScroll}
+        >
           {!activeConversationId ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
               Choose an accepted connection to start or continue a conversation.
@@ -506,7 +760,29 @@ export function MessagingWorkflow() {
               No messages yet. Send the first message in this 1:1 conversation.
             </p>
           ) : (
-            activeMessages.map((item) => {
+            <>
+              {hasOlderMessages && (
+                <button
+                  className="self-center rounded-full border px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  disabled={
+                    isLoadingOlderMessages
+                  }
+                  onClick={() =>
+                    activeConversationId &&
+                    void loadOlderMessages(
+                      activeConversationId
+                    )
+                  }
+                  type="button"
+                >
+                  {isLoadingOlderMessages
+                    ? "Loading earlier messages..."
+                    : "Load earlier messages"}
+                </button>
+              )}
+
+              {activeMessages.map(
+                (item) => {
               const isOwn = item.sender_id === currentUserId;
               const sender = profileById.get(item.sender_id);
 
@@ -544,8 +820,10 @@ export function MessagingWorkflow() {
                     <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
                   </div>
                 </article>
-              );
-            })
+                  );
+                }
+              )}
+            </>
           )}
         </div>
 
