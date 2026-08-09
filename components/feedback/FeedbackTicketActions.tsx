@@ -252,21 +252,21 @@ export function FeedbackTicketActions({
 
   if (isLoading) {
     return (
-      <section className="rounded-2xl border bg-white p-5 text-sm text-gray-600">
+      <section className="rounded-2xl border bg-white p-4 text-sm text-gray-600 sm:p-5">
         Loading ticket actions...
       </section>
     );
   }
 
   return (
-    <section className="grid gap-5">
+    <section className="grid gap-4 sm:gap-5">
       {canAction && !isCompleted ? (
         <form
-          className="grid gap-5 rounded-2xl border bg-white p-5 sm:p-6"
+          className="grid gap-4 rounded-2xl border bg-white p-4 sm:gap-5 sm:p-6"
           onSubmit={updateTicket}
         >
           <div>
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-lg font-semibold sm:text-xl">
               Action ticket
             </h2>
 
@@ -342,7 +342,7 @@ export function FeedbackTicketActions({
                 />
               </label>
 
-              <label className="flex items-start gap-3 rounded-xl border bg-gray-50 p-4 text-sm">
+              <label className="flex items-start gap-3 rounded-xl border bg-gray-50 p-3 text-sm sm:p-4">
                 <input
                   checked={fcNewsRequired}
                   className="mt-1"
@@ -383,14 +383,14 @@ export function FeedbackTicketActions({
           {message && (
             <p
               aria-live="polite"
-              className="rounded-xl border bg-gray-50 p-4 text-sm text-gray-700"
+              className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700 sm:p-4"
             >
               {message}
             </p>
           )}
         </form>
       ) : (
-        <div className="rounded-2xl border border-dashed bg-white p-5 text-sm text-gray-600">
+        <div className="rounded-2xl border border-dashed bg-white p-4 text-sm text-gray-600 sm:p-5">
           {isCompleted
             ? "This ticket has been completed."
             : ticket.assigned_to
@@ -402,9 +402,9 @@ export function FeedbackTicketActions({
         </div>
       )}
 
-      <section className="rounded-2xl border bg-white p-5 sm:p-6">
+      <section className="rounded-2xl border bg-white p-4 sm:p-6">
         <div>
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-lg font-semibold sm:text-xl">
             Ticket activity
           </h2>
 
@@ -415,14 +415,14 @@ export function FeedbackTicketActions({
         </div>
 
         {activities.length === 0 ? (
-          <p className="mt-5 rounded-xl border border-dashed p-4 text-sm text-gray-600">
+          <p className="mt-4 rounded-xl border border-dashed p-3 text-sm text-gray-600 sm:mt-5 sm:p-4">
             No ticket activity has been recorded.
           </p>
         ) : (
           <div className="mt-5 grid gap-3">
             {activities.map((activity) => (
               <article
-                className="rounded-xl border bg-gray-50 p-4"
+                className="rounded-xl border bg-gray-50 p-3 sm:p-4"
                 key={activity.id}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -444,7 +444,7 @@ export function FeedbackTicketActions({
                 </div>
 
                 {activity.notes && (
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:leading-6">
                     {activity.notes}
                   </p>
                 )}
