@@ -258,7 +258,7 @@ export function SkillsWorkflow() {
 function SkillSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
       <div className="grid gap-3">{children}</div>
     </section>
   );
@@ -277,21 +277,27 @@ function SkillCard({
     <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold">{skill.name}</h3>
-          <span className="rounded-full border px-2 py-1 text-xs">
+          <h3 className="text-sm font-semibold leading-snug sm:text-base">
+            {skill.name}
+          </h3>
+          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             Rating: {skill.rating ?? "Not rated"}
           </span>
-          <span className="rounded-full border px-2 py-1 text-xs">
+          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {skill.is_published ? "Published" : "Unpublished"}
           </span>
         </div>
 
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
           {profile?.display_name ?? "Unknown profile"}
           {profile?.field ? ` - ${profile.field}` : ""}
         </p>
 
-        {skill.description && <p className="mt-2 max-w-2xl text-sm text-gray-700">{skill.description}</p>}
+        {skill.description && (
+          <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-700">
+            {skill.description}
+          </p>
+        )}
       </div>
 
       {children && <div>{children}</div>}

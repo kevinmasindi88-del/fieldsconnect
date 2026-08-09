@@ -1746,7 +1746,7 @@ export function ConnectionWorkflow() {
 function ConnectionSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
       <div className="grid gap-3">{children}</div>
     </section>
   );
@@ -1765,12 +1765,14 @@ function ConnectionCard({
     <>
       <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={40} />
       <div>
-        <h3 className="font-semibold">{profile?.display_name ?? "Unknown profile"}</h3>
-        <p className="text-sm text-gray-600">
+        <h3 className="text-sm font-semibold leading-snug sm:text-base">
+          {profile?.display_name ?? "Unknown profile"}
+        </h3>
+        <p className="text-xs leading-snug text-gray-600 sm:text-sm">
           {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
         </p>
         {profile?.bio && (
-          <p className="mt-2 max-w-2xl text-sm text-gray-700">
+          <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-700">
             {profile.bio}
           </p>
         )}
@@ -1782,7 +1784,7 @@ function ConnectionCard({
         )}
 
         {profile?.mentor_available && (
-          <p className="mt-2 text-sm font-medium">
+          <p className="mt-2 text-xs font-medium sm:text-sm">
             Available as mentor
           </p>
         )}

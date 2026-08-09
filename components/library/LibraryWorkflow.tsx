@@ -1438,7 +1438,7 @@ export function LibraryWorkflow() {
 function DocumentSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
       <div className="grid gap-3">{children}</div>
     </section>
   );
@@ -1467,29 +1467,39 @@ function DocumentCard({
     >
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold">{document.title}</h3>
+          <h3 className="text-sm font-semibold leading-snug sm:text-base">
+            {document.title}
+          </h3>
 
-          <span className="rounded-full border px-2 py-1 text-xs">
+          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {document.resource_type === "external_link"
               ? "Online link"
               : "File"}
           </span>
 
-          <span className="rounded-full border px-2 py-1 text-xs">
+          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {document.is_published ? "Published" : "Unpublished"}
           </span>
-          <span className="rounded-full border px-2 py-1 text-xs">
+          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {document.visibility === "public" ? "Public" : "Connections"}
           </span>
-          {owner?.role_type && <span className="rounded-full border px-2 py-1 text-xs">{formatRole(owner.role_type)}</span>}
+          {owner?.role_type && (
+            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+              {formatRole(owner.role_type)}
+            </span>
+          )}
         </div>
 
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
           {owner?.display_name ?? "Unknown profile"}
           {owner?.field ? ` - ${owner.field}` : ""}
         </p>
 
-        {document.description && <p className="mt-2 max-w-2xl text-sm text-gray-700">{document.description}</p>}
+        {document.description && (
+          <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-700">
+            {document.description}
+          </p>
+        )}
 
         {document.resource_type === "external_link" ? (
           <div className="mt-2 space-y-1 text-xs text-gray-500">

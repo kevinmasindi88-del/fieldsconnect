@@ -730,8 +730,10 @@ export function TimelineWorkflow() {
                     <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${author.id}`}>
                       <ProfileAvatar avatarPath={author.avatar_url} displayName={author.display_name} size={40} />
                       <div>
-                        <h2 className="font-semibold">{author.display_name}</h2>
-                        <p className="text-sm text-gray-600">
+                        <h2 className="text-sm font-semibold leading-snug sm:text-base">
+                          {author.display_name}
+                        </h2>
+                        <p className="text-xs leading-snug text-gray-600 sm:text-sm">
                           {[author.role_type, author.field].filter(Boolean).join(" - ") || "Profile"}
                         </p>
                       </div>
@@ -740,14 +742,18 @@ export function TimelineWorkflow() {
                     <div className="flex items-center gap-3">
                       <ProfileAvatar avatarPath={null} displayName={null} size={40} />
                       <div>
-                        <h2 className="font-semibold">Unknown profile</h2>
-                        <p className="text-sm text-gray-600">Profile</p>
+                        <h2 className="text-sm font-semibold leading-snug sm:text-base">
+                          Unknown profile
+                        </h2>
+                        <p className="text-xs leading-snug text-gray-600 sm:text-sm">
+                          Profile
+                        </p>
                       </div>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2">
-                    <span className="w-fit rounded-full border px-3 py-1 text-xs">
+                    <span className="w-fit rounded-full border px-2.5 py-0.5 text-[11px] sm:px-3 sm:py-1 sm:text-xs">
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
                     {isOwnPost && !isEditing ? (
@@ -801,7 +807,7 @@ export function TimelineWorkflow() {
                   </div>
                 ) : (
                   <>
-                    <p className="mt-4 whitespace-pre-wrap text-sm text-gray-800">{post.body}</p>
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-snug text-gray-800">{post.body}</p>
                     {post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
                   </>
                 )}
@@ -839,7 +845,7 @@ export function TimelineWorkflow() {
 
                   <span>{getPostLikeCount(post.id)}</span>
                 </button>
-                <span className="text-sm text-gray-600">{postComments.length} comments</span>
+                <span className="text-xs text-gray-600 sm:text-sm">{postComments.length} comments</span>
               </div>
 
               <div className="flex flex-col gap-3 border-t pt-4">
@@ -861,13 +867,13 @@ export function TimelineWorkflow() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             {commenter ? (
-                              <Link className="text-sm font-medium hover:underline" href={`/profile/${commenter.id}`}>
+                              <Link className="text-xs font-medium hover:underline sm:text-sm" href={`/profile/${commenter.id}`}>
                                 {commenter.display_name}
                               </Link>
                             ) : (
-                              <p className="text-sm font-medium">Unknown profile</p>
+                              <p className="text-xs font-medium sm:text-sm">Unknown profile</p>
                             )}
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">{comment.body}</p>
                           </div>
                           {!isOwnComment && currentUserId && (
                             <ReportMenu
