@@ -145,8 +145,15 @@ async function loadAvatarImage(
   ) {
     try {
       return await createImageBitmap(file);
-    } catch {
-      // Fall back to the standard browser image decoder.
+    } catch (error) {
+      const bitmapMessage =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      throw new Error(
+        `Profile picture decoder failed: ${bitmapMessage}`
+      );
     }
   }
 
