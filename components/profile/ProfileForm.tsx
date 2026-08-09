@@ -871,13 +871,13 @@ export function ProfileForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4 rounded-xl border p-4 sm:p-6"
+      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-6"
     >
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading profile...</p>
       ) : (
         <>
-          <section className="flex min-w-0 flex-col gap-4 rounded-xl border p-3 sm:p-4">
+          <section className="flex min-w-0 flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
             <h2 className="text-lg font-semibold">
               Profile picture
             </h2>
@@ -1087,7 +1087,7 @@ export function ProfileForm() {
             </select>
           </label>
 
-          <section className="flex flex-col gap-4 rounded-xl border p-4">
+          <section className="flex flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
             <div>
               <h2 className="text-lg font-semibold">
                 Mentorship

@@ -565,7 +565,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:p-8">
       <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href="/connections">
         ← Back to connections
       </Link>
@@ -576,34 +576,34 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         </p>
       )}
 
-      <header className="flex flex-col gap-4 rounded-xl border p-6 md:flex-row md:items-center">
+      <header className="flex flex-col gap-3 rounded-xl border p-4 sm:gap-4 sm:p-6 md:flex-row md:items-center">
         <ProfileAvatar avatarPath={profile.avatar_url} displayName={profile.display_name} size={88} />
 
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-semibold">{profile.display_name}</h1>
-            <span className="rounded-full border px-3 py-1 text-xs">
+            <h1 className="text-xl font-semibold leading-snug sm:text-3xl">{profile.display_name}</h1>
+            <span className="rounded-full border px-2.5 py-0.5 text-[11px] sm:px-3 sm:py-1 sm:text-xs">
               {profile.profile_visibility}
             </span>
           </div>
 
-          {profile.username && <p className="mt-1 text-sm text-gray-600">@{profile.username}</p>}
+          {profile.username && <p className="mt-1 text-xs text-gray-600 sm:text-sm">@{profile.username}</p>}
 
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
             {[profile.role_type, profile.field].filter(Boolean).join(" - ") || "Profile"}
           </p>
 
-          {profile.mentor_available && <p className="mt-2 text-sm font-medium">Available as mentor</p>}
+          {profile.mentor_available && <p className="mt-2 text-xs font-medium sm:text-sm">Available as mentor</p>}
 
-          {profile.bio && <p className="mt-4 max-w-3xl whitespace-pre-wrap text-sm text-gray-700">{profile.bio}</p>}
+          {profile.bio && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:mt-4">{profile.bio}</p>}
         </div>
       </header>
 
       {profile.mentor_available && mentorProfile && (
-        <section className="flex flex-col gap-5 rounded-xl border p-5">
+        <section className="flex flex-col gap-4 rounded-xl border p-4 sm:gap-5 sm:p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg font-semibold sm:text-xl">
                 Mentorship
               </h2>
 
@@ -730,7 +730,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
               onSubmit={submitMentorshipRequest}
             >
               <div>
-                <h3 className="text-lg font-semibold">
+                <h3 className="text-base font-semibold sm:text-lg">
                   Request mentorship
                 </h3>
 
@@ -881,7 +881,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       )}
 
       <section className="rounded-xl border p-4">
-        <h2 className="text-xl font-semibold">Published skills</h2>
+        <h2 className="text-lg font-semibold sm:text-xl">Published skills</h2>
 
         {skills.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed p-4 text-sm text-gray-600">
@@ -892,12 +892,12 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             {skills.map((skill) => (
               <article key={skill.id} className="rounded-xl border p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{skill.name}</h3>
-                  <span className="rounded-full border px-2 py-1 text-xs">
+                  <h3 className="text-sm font-semibold leading-snug sm:text-base">{skill.name}</h3>
+                  <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
                     Rating: {skill.rating ?? "Not rated"}
                   </span>
                 </div>
-                {skill.description && <p className="mt-2 text-sm text-gray-700">{skill.description}</p>}
+                {skill.description && <p className="mt-2 text-sm leading-snug text-gray-700">{skill.description}</p>}
               </article>
             ))}
           </div>
@@ -905,7 +905,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       </section>
 
       <section className="rounded-xl border p-4">
-        <h2 className="text-xl font-semibold">Visible library documents</h2>
+        <h2 className="text-lg font-semibold sm:text-xl">Visible library documents</h2>
 
         {documents.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed p-4 text-sm text-gray-600">
@@ -920,7 +920,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
               >
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{document.title}</h3>
+                    <h3 className="text-sm font-semibold leading-snug sm:text-base">{document.title}</h3>
 
                     <span className="rounded-full border px-2 py-1 text-xs">
                       {document.resource_type === "external_link"
@@ -935,7 +935,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                     </span>
                   </div>
 
-                  {document.description && <p className="mt-2 text-sm text-gray-700">{document.description}</p>}
+                  {document.description && <p className="mt-2 text-sm leading-snug text-gray-700">{document.description}</p>}
 
                   {document.resource_type === "external_link" ? (
                     <div className="mt-2 space-y-1 text-xs text-gray-500">
