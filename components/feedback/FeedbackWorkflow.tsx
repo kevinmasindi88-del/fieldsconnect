@@ -96,13 +96,13 @@ export function FeedbackWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-10">
       <header>
-<h1 className="mt-1 text-3xl font-semibold tracking-tight text-gray-950">
+<h1 className="mt-1 text-xl font-semibold tracking-tight text-gray-950 sm:text-3xl">
           Share feedback
         </h1>
 
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">
+        <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-600 sm:mt-3 sm:leading-6">
           Share an idea, improvement, concern or observation. Your feedback
           will be reviewed by the FieldsConnect team and may inform future
           platform improvements.
@@ -110,7 +110,7 @@ export function FeedbackWorkflow() {
       </header>
 
       <form
-        className="grid gap-5 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7"
+        className="grid gap-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:gap-5 sm:p-7"
         onSubmit={submitFeedback}
       >
         <label className="grid gap-2 text-sm font-medium text-gray-900">
@@ -173,7 +173,7 @@ export function FeedbackWorkflow() {
           <div
             aria-live="polite"
             className={[
-              "rounded-xl border p-4 text-sm leading-6",
+              "rounded-xl border p-3 text-sm leading-snug sm:p-4 sm:leading-6",
               isSuccessful
                 ? "border-green-200 bg-green-50 text-green-900"
                 : "border-amber-200 bg-amber-50 text-amber-900",
