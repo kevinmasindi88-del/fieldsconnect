@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
+import { useOnlinePresence } from "@/components/navigation/AppShell";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -45,10 +46,6 @@ type UnreadMessageNotification = {
   read_at: string | null;
 };
 
-type OnlinePresence = {
-  user_id?: string;
-  online_at?: string;
-};
 
 const MESSAGE_PAGE_SIZE = 10;
 
@@ -70,10 +67,8 @@ export function MessagingWorkflow() {
     useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] =
     useState(false);
-  const [onlineUserIds, setOnlineUserIds] =
-    useState<Set<string>>(
-      () => new Set()
-    );
+  const onlineUserIds =
+    useOnlinePresence();
   const messageScrollRef =
     useRef<HTMLDivElement | null>(null);
 
@@ -458,80 +453,6 @@ export function MessagingWorkflow() {
 
     return () => {
       void supabase.removeChannel(channel);
-    };
-  }, [currentUserId]);
-
-  useEffect(() => {
-    if (
-      !currentUserId ||
-      !isSupabaseConfigured()
-    ) {
-      setOnlineUserIds(new Set());
-      return;
-    }
-
-    const supabase =
-      getSupabaseBrowserClient();
-
-    const channel = supabase.channel(
-      "fieldsconnect-online"
-    );
-
-    function syncOnlineUsers() {
-      const presenceState =
-        channel.presenceState() as Record<
-          string,
-          OnlinePresence[]
-        >;
-
-      const nextOnlineUserIds =
-        new Set<string>();
-
-      Object.values(
-        presenceState
-      ).forEach((presences) => {
-        presences.forEach(
-          (presence) => {
-            if (
-              typeof presence.user_id ===
-                "string" &&
-              presence.user_id
-            ) {
-              nextOnlineUserIds.add(
-                presence.user_id
-              );
-            }
-          }
-        );
-      });
-
-      setOnlineUserIds(
-        nextOnlineUserIds
-      );
-    }
-
-    channel
-      .on(
-        "presence",
-        { event: "sync" },
-        syncOnlineUsers
-      )
-      .on(
-        "presence",
-        { event: "join" },
-        syncOnlineUsers
-      )
-      .on(
-        "presence",
-        { event: "leave" },
-        syncOnlineUsers
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(
-        channel
-      );
     };
   }, [currentUserId]);
 

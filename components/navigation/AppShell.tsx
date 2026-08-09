@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
@@ -9,6 +14,22 @@ import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/browser";
+
+type OnlinePresence = {
+  user_id?: string;
+  online_at?: string;
+};
+
+const OnlinePresenceContext =
+  createContext<ReadonlySet<string>>(
+    new Set()
+  );
+
+export function useOnlinePresence() {
+  return useContext(
+    OnlinePresenceContext
+  );
+}
 
 const authRoutes = new Set(["/login", "/signup", "/reset-password"]);
 
@@ -188,6 +209,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     useState<string | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [onlineUserIds, setOnlineUserIds] =
+    useState<Set<string>>(
+      () => new Set()
+    );
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -219,7 +244,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [isLoadingAuth, user, isPublicRoute, router]);
 
   useEffect(() => {
-    if (!user || !isSupabaseConfigured()) {
+    if (
+      !user ||
+      !isSupabaseConfigured()
+    ) {
+      setOnlineUserIds(new Set());
       return;
     }
 
@@ -230,32 +259,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       "fieldsconnect-online"
     );
 
-    channel.subscribe(async (status) => {
-      if (status !== "SUBSCRIBED") {
-        return;
-      }
+    function syncOnlineUsers() {
+      const presenceState =
+        channel.presenceState() as Record<
+          string,
+          OnlinePresence[]
+        >;
 
-      const presenceTrackStatus =
-        await channel.track({
-          user_id: user.id,
-          online_at:
-            new Date().toISOString(),
-        });
+      const nextOnlineUserIds =
+        new Set<string>();
 
-      if (presenceTrackStatus !== "ok") {
-        console.warn(
-          "Unable to publish online presence:",
-          presenceTrackStatus
+      Object.values(
+        presenceState
+      ).forEach((presences) => {
+        presences.forEach(
+          (presence) => {
+            if (
+              typeof presence.user_id ===
+                "string" &&
+              presence.user_id
+            ) {
+              nextOnlineUserIds.add(
+                presence.user_id
+              );
+            }
+          }
         );
-      }
-    });
+      });
+
+      setOnlineUserIds(
+        nextOnlineUserIds
+      );
+    }
+
+    channel
+      .on(
+        "presence",
+        { event: "sync" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "join" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "leave" },
+        syncOnlineUsers
+      )
+      .subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") {
+          return;
+        }
+
+        const presenceTrackStatus =
+          await channel.track({
+            user_id: user.id,
+            online_at:
+              new Date().toISOString(),
+          });
+
+        if (
+          presenceTrackStatus !== "ok"
+        ) {
+          console.warn(
+            "Unable to publish online presence:",
+            presenceTrackStatus
+          );
+        }
+      });
 
     return () => {
       void channel.untrack();
-      void supabase.removeChannel(channel);
+      void supabase.removeChannel(
+        channel
+      );
     };
   }, [user]);
-
   useEffect(() => {
     const isWaitingForProtectedAccess =
       !isPublicRoute &&
@@ -560,7 +641,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
+    <OnlinePresenceContext.Provider
+      value={onlineUserIds}
+    >
+      <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
       <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2.5 sm:hidden">
           <div className="flex items-center justify-between gap-3">
@@ -866,8 +950,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {children}
-    </div>
+        {children}
+      </div>
+    </OnlinePresenceContext.Provider>
   );
 }
 
