@@ -357,10 +357,10 @@ export function NotificationsWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:p-8">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:p-8">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <button
-          className="w-fit rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="min-h-10 w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50 sm:w-fit"
           disabled={unreadCount === 0 || isWorking}
           onClick={markAllAsRead}
           type="button"
@@ -378,7 +378,7 @@ export function NotificationsWorkflow() {
           No notifications yet.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:gap-3">
           {notifications.map((notification) => {
             const actor = notification.actor_id ? profileById.get(notification.actor_id) : null;
             const isUnread = !notification.read_at;
@@ -387,7 +387,7 @@ export function NotificationsWorkflow() {
             return (
               <article
                 key={notification.id}
-                className={`flex gap-3 rounded-xl border p-4 ${isUnread ? "bg-gray-50" : ""}`}
+                className={`flex min-w-0 gap-3 rounded-xl border p-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
               >
                 <ProfileAvatar
                   avatarPath={actor?.avatar_url}
@@ -397,17 +397,19 @@ export function NotificationsWorkflow() {
 
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{getNotificationTitle(notification)}</h2>
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <h2 className="min-w-0 text-sm font-semibold leading-snug sm:text-base">
+                        {getNotificationTitle(notification)}
+                      </h2>
                       {isUnread && (
-                        <span className="rounded-full border px-2 py-1 text-xs font-medium">
+                        <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:py-1 sm:text-xs">
                           New
                         </span>
                       )}
                     </div>
 
                     {notification.body && (
-                      <p className="mt-1 text-sm text-gray-700">
+                      <p className="mt-1 text-sm leading-snug text-gray-700">
                         {renderNotificationBody(notification, postId)}
                       </p>
                     )}
@@ -499,21 +501,24 @@ export function NotificationsWorkflow() {
                         </button>
                       )}
 
-                    <p className="mt-2 text-xs text-gray-500">
-                      {formatDate(notification.created_at)}
-                    </p>
                   </div>
 
-                  {isUnread && (
-                    <button
-                      className="w-fit rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-                      disabled={isWorking}
-                      onClick={() => markAsRead(notification.id)}
-                      type="button"
-                    >
-                      Mark as read
-                    </button>
-                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-gray-500">
+                      {formatDate(notification.created_at)}
+                    </p>
+
+                    {isUnread && (
+                      <button
+                        className="min-h-9 shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 sm:text-sm"
+                        disabled={isWorking}
+                        onClick={() => markAsRead(notification.id)}
+                        type="button"
+                      >
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
