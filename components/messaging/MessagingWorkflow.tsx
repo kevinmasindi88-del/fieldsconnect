@@ -48,6 +48,7 @@ type UnreadMessageNotification = {
 
 
 const MESSAGE_PAGE_SIZE = 10;
+const MOBILE_THREAD_PAGE_SIZE = 10;
 
 export function MessagingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -67,6 +68,8 @@ export function MessagingWorkflow() {
     useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] =
     useState(false);
+  const [mobileThreadOffset, setMobileThreadOffset] =
+    useState(0);
   const onlineUserIds =
     useOnlinePresence();
   const messageScrollRef =
@@ -80,7 +83,38 @@ export function MessagingWorkflow() {
     return new Map(conversations.map((conversation) => [conversation.connection_id, conversation]));
   }, [conversations]);
 
-  const activeMessages = messages.filter((item) => item.conversation_id === activeConversationId);
+  const activeMessages = messages.filter(
+    (item) =>
+      item.conversation_id ===
+      activeConversationId
+  );
+
+  const chatConnections = useMemo(() => {
+    return connections.filter(
+      (connection) =>
+        conversationByConnectionId.has(
+          connection.id
+        )
+    );
+  }, [
+    connections,
+    conversationByConnectionId,
+  ]);
+
+  const visibleMobileChatConnections =
+    chatConnections.slice(
+      mobileThreadOffset,
+      mobileThreadOffset +
+        MOBILE_THREAD_PAGE_SIZE
+    );
+
+  const hasPreviousMobileChatConnections =
+    mobileThreadOffset > 0;
+
+  const hasMoreMobileChatConnections =
+    mobileThreadOffset +
+      MOBILE_THREAD_PAGE_SIZE <
+    chatConnections.length;
 
   const unreadMessagesBySender = useMemo(() => {
     const counts = new Map<string, number>();
@@ -610,6 +644,13 @@ export function MessagingWorkflow() {
     }
   }
 
+  function closeMobileConversation() {
+    setActiveConnectionId(null);
+    setActiveConversationId(null);
+    setMessages([]);
+    setHasOlderMessages(false);
+  }
+
   async function sendMessage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -683,110 +724,339 @@ export function MessagingWorkflow() {
   const activeProfile = activeConnection ? getOtherProfile(activeConnection) : null;
 
   return (
-    <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="min-w-0 rounded-xl border bg-white p-4">
-        {message && <p className={`mt-4 ${getMessageAlertClass(message)}`}>{message}</p>}
+    <section className="mx-auto grid w-full max-w-6xl gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside
+        className={`min-w-0 rounded-xl border bg-white p-3 sm:p-4 ${
+          activeConversationId
+            ? "hidden lg:block"
+            : "block"
+        }`}
+      >
+        {message && (
+          <p
+            className={`mb-3 ${getMessageAlertClass(
+              message
+            )}`}
+          >
+            {message}
+          </p>
+        )}
 
-        <div className="mt-6 flex flex-col gap-3">
-          {isLoading ? (
-            <p className="text-sm text-gray-600">Loading accepted connections...</p>
-          ) : connections.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-              No accepted connections yet. Connect with someone before messaging.
-            </p>
-          ) : (
-            connections.map((connection) => {
-              const profile = getOtherProfile(connection);
-              const isActive = activeConnectionId === connection.id;
-              const otherUserId =
-                connection.requester_id === currentUserId
-                  ? connection.recipient_id
-                  : connection.requester_id;
-              const unreadCount = unreadMessagesBySender.get(otherUserId) ?? 0;
+        {isLoading ? (
+          <p className="text-sm text-gray-600">
+            Loading messages...
+          </p>
+        ) : connections.length === 0 ? (
+          <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+            No accepted connections yet.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 lg:hidden">
+              {chatConnections.length === 0 ? (
+                <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+                  No conversations yet.
+                </p>
+              ) : (
+                <>
+                  {visibleMobileChatConnections.map(
+                    (connection) => {
+                      const profile =
+                        getOtherProfile(
+                          connection
+                        );
 
-              return (
-                <button
-                  key={connection.id}
-                  className={`rounded-xl border p-3 text-left text-sm ${isActive ? "bg-gray-100" : ""}`}
-                  disabled={isWorking}
-                  onClick={() => openConversation(connection)}
-                >
-                  <span className="flex w-full items-center gap-3">
-                    <span className="relative shrink-0">
-                      <ProfileAvatar
-                        avatarPath={profile?.avatar_url}
-                        displayName={profile?.display_name}
-                        size={32}
-                      />
+                      const otherUserId =
+                        connection.requester_id ===
+                        currentUserId
+                          ? connection.recipient_id
+                          : connection.requester_id;
 
-                      {onlineUserIds.has(otherUserId) && (
-                        <span
-                          className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
-                          aria-label="Online"
-                          title="Online"
-                        />
-                      )}
-                    </span>
-                    <span>
-                      <span className="block font-semibold">{profile?.display_name ?? "Unknown profile"}</span>
-                      <span className="text-gray-600">
-                        {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "Accepted connection"}
+                      const unreadCount =
+                        unreadMessagesBySender.get(
+                          otherUserId
+                        ) ?? 0;
+
+                      return (
+                        <button
+                          key={
+                            connection.id
+                          }
+                          className="w-full rounded-xl border p-3 text-left"
+                          disabled={isWorking}
+                          onClick={() =>
+                            openConversation(
+                              connection
+                            )
+                          }
+                          type="button"
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span className="relative shrink-0">
+                              <ProfileAvatar
+                                avatarPath={
+                                  profile?.avatar_url
+                                }
+                                displayName={
+                                  profile?.display_name
+                                }
+                                size={36}
+                              />
+
+                              {onlineUserIds.has(
+                                otherUserId
+                              ) && (
+                                <span
+                                  aria-label="Online"
+                                  className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
+                                  title="Online"
+                                />
+                              )}
+                            </span>
+
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold leading-snug">
+                                {profile?.display_name ??
+                                  "Unknown profile"}
+                              </span>
+
+                              <span className="mt-0.5 block truncate text-xs text-gray-600">
+                                {[
+                                  profile?.role_type,
+                                  profile?.field,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" - ") ||
+                                  "Connection"}
+                              </span>
+                            </span>
+
+                            {unreadCount > 0 && (
+                              <span className="ml-auto inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
+                                {unreadCount > 99
+                                  ? "99+"
+                                  : unreadCount}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
+
+                  {(hasPreviousMobileChatConnections ||
+                    hasMoreMobileChatConnections) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-40"
+                        disabled={
+                          !hasPreviousMobileChatConnections
+                        }
+                        onClick={() =>
+                          setMobileThreadOffset(
+                            (current) =>
+                              Math.max(
+                                0,
+                                current -
+                                  MOBILE_THREAD_PAGE_SIZE
+                              )
+                          )
+                        }
+                        type="button"
+                      >
+                        Previous
+                      </button>
+
+                      <button
+                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-40"
+                        disabled={
+                          !hasMoreMobileChatConnections
+                        }
+                        onClick={() =>
+                          setMobileThreadOffset(
+                            (current) =>
+                              current +
+                              MOBILE_THREAD_PAGE_SIZE
+                          )
+                        }
+                        type="button"
+                      >
+                        Load more
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="hidden flex-col gap-3 lg:flex">
+              {connections.map(
+                (connection) => {
+                  const profile =
+                    getOtherProfile(
+                      connection
+                    );
+
+                  const isActive =
+                    activeConnectionId ===
+                    connection.id;
+
+                  const otherUserId =
+                    connection.requester_id ===
+                    currentUserId
+                      ? connection.recipient_id
+                      : connection.requester_id;
+
+                  const unreadCount =
+                    unreadMessagesBySender.get(
+                      otherUserId
+                    ) ?? 0;
+
+                  return (
+                    <button
+                      key={connection.id}
+                      className={`rounded-xl border p-3 text-left text-sm ${
+                        isActive
+                          ? "bg-gray-100"
+                          : ""
+                      }`}
+                      disabled={isWorking}
+                      onClick={() =>
+                        openConversation(
+                          connection
+                        )
+                      }
+                      type="button"
+                    >
+                      <span className="flex w-full items-center gap-3">
+                        <span className="relative shrink-0">
+                          <ProfileAvatar
+                            avatarPath={
+                              profile?.avatar_url
+                            }
+                            displayName={
+                              profile?.display_name
+                            }
+                            size={32}
+                          />
+
+                          {onlineUserIds.has(
+                            otherUserId
+                          ) && (
+                            <span
+                              aria-label="Online"
+                              className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
+                              title="Online"
+                            />
+                          )}
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">
+                            {profile?.display_name ??
+                              "Unknown profile"}
+                          </span>
+
+                          <span className="block truncate text-gray-600">
+                            {[
+                              profile?.role_type,
+                              profile?.field,
+                            ]
+                              .filter(Boolean)
+                              .join(" - ") ||
+                              "Accepted connection"}
+                          </span>
+                        </span>
+
+                        {unreadCount > 0 && (
+                          <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
+                            {unreadCount > 99
+                              ? "99+"
+                              : unreadCount}
+                          </span>
+                        )}
                       </span>
-                    </span>
-                    {unreadCount > 0 && (
-                      <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
-                        {unreadCount > 99 ? "99+" : unreadCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          </>
+        )}
       </aside>
 
-      <main className="flex h-[70vh] min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px]">
-        <div className="flex items-center gap-3 border-b p-4">
+      <main
+        className={`h-[70vh] min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px] lg:flex ${
+          activeConversationId
+            ? "flex"
+            : "hidden"
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-3 border-b p-3 sm:p-4">
+          {activeConversationId && (
+            <button
+              aria-label="Back to messages"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg lg:hidden"
+              onClick={
+                closeMobileConversation
+              }
+              type="button"
+            >
+              ←
+            </button>
+          )}
+
           {activeProfile ? (
-            <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${activeProfile.id}`}>
+            <Link
+              className="flex min-w-0 items-center gap-3 rounded-lg hover:bg-gray-50"
+              href={`/profile/${activeProfile.id}`}
+            >
               <span className="relative shrink-0">
                 <ProfileAvatar
-                  avatarPath={activeProfile.avatar_url}
-                  displayName={activeProfile.display_name}
+                  avatarPath={
+                    activeProfile.avatar_url
+                  }
+                  displayName={
+                    activeProfile.display_name
+                  }
                   size={40}
                 />
 
-                {onlineUserIds.has(activeProfile.id) && (
+                {onlineUserIds.has(
+                  activeProfile.id
+                ) && (
                   <span
-                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500"
                     aria-label="Online"
+                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500"
                     title="Online"
                   />
                 )}
               </span>
-              <div>
-                <h2 className="text-xl font-semibold">{activeProfile.display_name}</h2>
+
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold leading-snug sm:text-xl">
+                  {
+                    activeProfile.display_name
+                  }
+                </h2>
               </div>
             </Link>
           ) : (
-            <div>
-              <h2 className="text-xl font-semibold">Select an accepted connection</h2>
-              <p className="mt-1 text-sm text-gray-600">Only accepted connections can be opened here.</p>
+            <div className="hidden lg:block">
+              <h2 className="text-xl font-semibold">
+                Select a connection
+              </h2>
             </div>
           )}
         </div>
 
         <div
           ref={messageScrollRef}
-          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4"
           onScroll={handleMessageScroll}
         >
-          {!activeConversationId ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-              Choose an accepted connection to start or continue a conversation.
-            </p>
-          ) : activeMessages.length === 0 ? (
+          {!activeConversationId ? null : activeMessages.length ===
+            0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
               No messages yet. Send the first message in this 1:1 conversation.
             </p>
@@ -814,43 +1084,86 @@ export function MessagingWorkflow() {
 
               {activeMessages.map(
                 (item) => {
-              const isOwn = item.sender_id === currentUserId;
-              const sender = profileById.get(item.sender_id);
+                  const isOwn =
+                    item.sender_id ===
+                    currentUserId;
 
-              return (
-                <article
-                  key={item.id}
-                  className={`flex max-w-2xl gap-3 rounded-xl border p-3 text-sm ${isOwn ? "self-end bg-gray-100" : "self-start"}`}
-                >
-                  {sender ? (
-                    <Link className="shrink-0 rounded-full" href={`/profile/${sender.id}`}>
-                      <ProfileAvatar avatarPath={sender.avatar_url} displayName={isOwn ? "You" : sender.display_name} size={28} />
-                    </Link>
-                  ) : (
-                    <ProfileAvatar avatarPath={null} displayName="Connection" size={28} />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
+                  const sender =
+                    profileById.get(
+                      item.sender_id
+                    );
+
+                  return (
+                    <article
+                      key={item.id}
+                      className={`flex max-w-[88%] gap-2 rounded-xl border p-3 text-sm sm:max-w-2xl sm:gap-3 ${
+                        isOwn
+                          ? "self-end bg-gray-100"
+                          : "self-start"
+                      }`}
+                    >
                       {sender ? (
-                        <Link className="font-medium hover:underline" href={`/profile/${sender.id}`}>
-                          {isOwn ? "You" : sender.display_name}
+                        <Link
+                          className="shrink-0 rounded-full"
+                          href={`/profile/${sender.id}`}
+                        >
+                          <ProfileAvatar
+                            avatarPath={
+                              sender.avatar_url
+                            }
+                            displayName={
+                              isOwn
+                                ? "You"
+                                : sender.display_name
+                            }
+                            size={28}
+                          />
                         </Link>
                       ) : (
-                        <p className="font-medium">Connection</p>
-                      )}
-                      {!isOwn && (
-                        <ReportMenu
-                          targetType="message"
-                          targetId={item.id}
-                          reportedUserId={item.sender_id}
-                          label="message"
-                          disabled={isWorking}
+                        <ProfileAvatar
+                          avatarPath={null}
+                          displayName="Connection"
+                          size={28}
                         />
                       )}
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap text-gray-800">{item.body}</p>
-                  </div>
-                </article>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          {sender ? (
+                            <Link
+                              className="text-xs font-medium hover:underline sm:text-sm"
+                              href={`/profile/${sender.id}`}
+                            >
+                              {isOwn
+                                ? "You"
+                                : sender.display_name}
+                            </Link>
+                          ) : (
+                            <p className="text-xs font-medium sm:text-sm">
+                              Connection
+                            </p>
+                          )}
+
+                          {!isOwn && (
+                            <ReportMenu
+                              targetType="message"
+                              targetId={item.id}
+                              reportedUserId={
+                                item.sender_id
+                              }
+                              label="message"
+                              disabled={
+                                isWorking
+                              }
+                            />
+                          )}
+                        </div>
+
+                        <p className="mt-1 whitespace-pre-wrap leading-snug text-gray-800">
+                          {item.body}
+                        </p>
+                      </div>
+                    </article>
                   );
                 }
               )}
@@ -858,17 +1171,32 @@ export function MessagingWorkflow() {
           )}
         </div>
 
-        <form onSubmit={sendMessage} className="flex flex-col gap-3 border-t p-4 sm:flex-row">
+        <form
+          onSubmit={sendMessage}
+          className="flex flex-col gap-3 border-t p-3 sm:flex-row sm:p-4"
+        >
           <input
             className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
-            disabled={!activeConversationId || isWorking}
+            disabled={
+              !activeConversationId ||
+              isWorking
+            }
             value={draftMessage}
-            onChange={(event) => setDraftMessage(event.target.value)}
+            onChange={(event) =>
+              setDraftMessage(
+                event.target.value
+              )
+            }
             placeholder="Write a message..."
           />
+
           <button
             className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-            disabled={!activeConversationId || !draftMessage.trim() || isWorking}
+            disabled={
+              !activeConversationId ||
+              !draftMessage.trim() ||
+              isWorking
+            }
             type="submit"
           >
             Send
