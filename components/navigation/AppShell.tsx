@@ -219,6 +219,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [isLoadingAuth, user, isPublicRoute, router]);
 
   useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      return;
+    }
+
+    const supabase =
+      getSupabaseBrowserClient();
+
+    const channel = supabase.channel(
+      "fieldsconnect-online"
+    );
+
+    channel.subscribe(async (status) => {
+      if (status !== "SUBSCRIBED") {
+        return;
+      }
+
+      const presenceTrackStatus =
+        await channel.track({
+          user_id: user.id,
+          online_at:
+            new Date().toISOString(),
+        });
+
+      if (presenceTrackStatus !== "ok") {
+        console.warn(
+          "Unable to publish online presence:",
+          presenceTrackStatus
+        );
+      }
+    });
+
+    return () => {
+      void channel.untrack();
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
     const isWaitingForProtectedAccess =
       !isPublicRoute &&
       (isLoadingAuth || !user);

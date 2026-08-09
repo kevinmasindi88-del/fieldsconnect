@@ -45,6 +45,11 @@ type UnreadMessageNotification = {
   read_at: string | null;
 };
 
+type OnlinePresence = {
+  user_id?: string;
+  online_at?: string;
+};
+
 const MESSAGE_PAGE_SIZE = 10;
 
 export function MessagingWorkflow() {
@@ -65,6 +70,10 @@ export function MessagingWorkflow() {
     useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] =
     useState(false);
+  const [onlineUserIds, setOnlineUserIds] =
+    useState<Set<string>>(
+      () => new Set()
+    );
   const messageScrollRef =
     useRef<HTMLDivElement | null>(null);
 
@@ -453,6 +462,80 @@ export function MessagingWorkflow() {
   }, [currentUserId]);
 
   useEffect(() => {
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured()
+    ) {
+      setOnlineUserIds(new Set());
+      return;
+    }
+
+    const supabase =
+      getSupabaseBrowserClient();
+
+    const channel = supabase.channel(
+      "fieldsconnect-online"
+    );
+
+    function syncOnlineUsers() {
+      const presenceState =
+        channel.presenceState() as Record<
+          string,
+          OnlinePresence[]
+        >;
+
+      const nextOnlineUserIds =
+        new Set<string>();
+
+      Object.values(
+        presenceState
+      ).forEach((presences) => {
+        presences.forEach(
+          (presence) => {
+            if (
+              typeof presence.user_id ===
+                "string" &&
+              presence.user_id
+            ) {
+              nextOnlineUserIds.add(
+                presence.user_id
+              );
+            }
+          }
+        );
+      });
+
+      setOnlineUserIds(
+        nextOnlineUserIds
+      );
+    }
+
+    channel
+      .on(
+        "presence",
+        { event: "sync" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "join" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "leave" },
+        syncOnlineUsers
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(
+        channel
+      );
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (!activeConversationId || !isSupabaseConfigured()) return;
 
     const supabase = getSupabaseBrowserClient();
@@ -708,7 +791,21 @@ export function MessagingWorkflow() {
                   onClick={() => openConversation(connection)}
                 >
                   <span className="flex w-full items-center gap-3">
-                    <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={32} />
+                    <span className="relative shrink-0">
+                      <ProfileAvatar
+                        avatarPath={profile?.avatar_url}
+                        displayName={profile?.display_name}
+                        size={32}
+                      />
+
+                      {onlineUserIds.has(otherUserId) && (
+                        <span
+                          className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
+                          aria-label="Online"
+                          title="Online"
+                        />
+                      )}
+                    </span>
                     <span>
                       <span className="block font-semibold">{profile?.display_name ?? "Unknown profile"}</span>
                       <span className="text-gray-600">
@@ -732,7 +829,21 @@ export function MessagingWorkflow() {
         <div className="flex items-center gap-3 border-b p-4">
           {activeProfile ? (
             <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${activeProfile.id}`}>
-              <ProfileAvatar avatarPath={activeProfile.avatar_url} displayName={activeProfile.display_name} size={40} />
+              <span className="relative shrink-0">
+                <ProfileAvatar
+                  avatarPath={activeProfile.avatar_url}
+                  displayName={activeProfile.display_name}
+                  size={40}
+                />
+
+                {onlineUserIds.has(activeProfile.id) && (
+                  <span
+                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500"
+                    aria-label="Online"
+                    title="Online"
+                  />
+                )}
+              </span>
               <div>
                 <h2 className="text-xl font-semibold">{activeProfile.display_name}</h2>
               </div>
