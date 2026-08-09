@@ -735,7 +735,6 @@ export function MessagingWorkflow() {
               <ProfileAvatar avatarPath={activeProfile.avatar_url} displayName={activeProfile.display_name} size={40} />
               <div>
                 <h2 className="text-xl font-semibold">{activeProfile.display_name}</h2>
-                <p className="mt-1 text-sm text-gray-600">This is a controlled 1:1 MVP conversation.</p>
               </div>
             </Link>
           ) : (
