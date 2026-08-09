@@ -724,7 +724,7 @@ export function MessagingWorkflow() {
   const activeProfile = activeConnection ? getOtherProfile(activeConnection) : null;
 
   return (
-    <section className="mx-auto grid w-full max-w-6xl gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <section className="mx-auto grid w-full max-w-6xl gap-4 px-3 pb-1 pt-4 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside
         className={`min-w-0 rounded-xl border bg-white p-3 sm:p-4 ${
           activeConversationId
@@ -986,7 +986,7 @@ export function MessagingWorkflow() {
       </aside>
 
       <main
-        className={`h-[70vh] min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px] lg:flex ${
+        className={`h-[78dvh] min-h-[500px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px] lg:flex ${
           activeConversationId
             ? "flex"
             : "hidden"
