@@ -116,32 +116,64 @@ function drawCroppedAvatar(
 }
 
 async function loadAvatarImage(file: File) {
-  const objectUrl = URL.createObjectURL(file);
+  const dataUrl = await new Promise<string>(
+    (resolve, reject) => {
+      const reader = new FileReader();
 
-  try {
-    return await new Promise<HTMLImageElement>(
-      (resolve, reject) => {
-        const image = new Image();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
 
-        image.onload = () => resolve(image);
-        image.onerror = () =>
+        reject(
+          new Error(
+            "Unable to read the selected profile picture."
+          )
+        );
+      };
+
+      reader.onerror = () =>
+        reject(
+          new Error(
+            "Unable to read the selected profile picture."
+          )
+        );
+
+      reader.readAsDataURL(file);
+    }
+  );
+
+  return await new Promise<HTMLImageElement>(
+    (resolve, reject) => {
+      const image = new Image();
+
+      image.onload = async () => {
+        try {
+          if (typeof image.decode === "function") {
+            await image.decode().catch(() => undefined);
+          }
+
+          resolve(image);
+        } catch {
           reject(
             new Error(
-              "Unable to read the selected profile picture."
+              "Unable to decode the selected profile picture."
             )
           );
+        }
+      };
 
-        image.src = objectUrl;
-      }
-    );
-  } finally {
-    // The image has decoded by the time the promise resolves.
-    // Revoking prevents temporary browser-memory leaks.
-    window.setTimeout(
-      () => URL.revokeObjectURL(objectUrl),
-      0
-    );
-  }
+      image.onerror = () =>
+        reject(
+          new Error(
+            "Unable to decode the selected profile picture."
+          )
+        );
+
+      image.src = dataUrl;
+    }
+  );
 }
 
 async function createProcessedAvatarFile(
