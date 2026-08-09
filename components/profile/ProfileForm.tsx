@@ -139,47 +139,83 @@ function drawCroppedAvatar(
 async function loadAvatarImage(
   file: File
 ): Promise<AvatarImageSource> {
+  let bytes: ArrayBuffer;
+
+  try {
+    bytes = await file.arrayBuffer();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    throw new Error(
+      `Unable to read profile picture bytes: ${message}`
+    );
+  }
+
+  if (bytes.byteLength < 4) {
+    throw new Error(
+      "The selected profile picture is empty or incomplete."
+    );
+  }
+
+  const signature = new Uint8Array(
+    bytes,
+    0,
+    Math.min(4, bytes.byteLength)
+  );
+
+  const isJpeg =
+    signature[0] === 0xff &&
+    signature[1] === 0xd8 &&
+    signature[2] === 0xff;
+
+  const normalizedType =
+    isJpeg
+      ? "image/jpeg"
+      : file.type || "application/octet-stream";
+
+  const normalizedBlob = new Blob(
+    [bytes],
+    {
+      type: normalizedType,
+    }
+  );
+
   if (
     typeof window !== "undefined" &&
     "createImageBitmap" in window
   ) {
     try {
-      return await createImageBitmap(file);
-    } catch (error) {
-      const bitmapMessage =
-        error instanceof Error
-          ? error.message
-          : String(error);
-
-      throw new Error(
-        `Profile picture decoder failed: ${bitmapMessage}`
+      return await createImageBitmap(
+        normalizedBlob
       );
+    } catch {
+      // Fall through to the DOM image decoder.
     }
   }
 
-  const objectUrl = URL.createObjectURL(file);
+  const objectUrl =
+    URL.createObjectURL(normalizedBlob);
 
   try {
-    const image =
-      await new Promise<HTMLImageElement>(
-        (resolve, reject) => {
-          const element = new Image();
+    return await new Promise<HTMLImageElement>(
+      (resolve, reject) => {
+        const image = new Image();
 
-          element.onload = () =>
-            resolve(element);
+        image.onload = () => resolve(image);
 
-          element.onerror = () =>
-            reject(
-              new Error(
-                "Unable to decode the selected profile picture."
-              )
-            );
+        image.onerror = () =>
+          reject(
+            new Error(
+              `Unable to decode profile picture. File: ${file.name}, type: ${normalizedType}, size: ${bytes.byteLength} bytes.`
+            )
+          );
 
-          element.src = objectUrl;
-        }
-      );
-
-    return image;
+        image.src = objectUrl;
+      }
+    );
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
