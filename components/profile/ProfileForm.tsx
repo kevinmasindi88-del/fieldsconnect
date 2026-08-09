@@ -551,7 +551,7 @@ export function ProfileForm() {
     avatarZoom,
   ]);
 
-  function handleAvatarSelection(
+  async function handleAvatarSelection(
     file: File | null
   ) {
     setMessage(null);
@@ -573,10 +573,36 @@ export function ProfileForm() {
       return;
     }
 
-    setSelectedAvatarFile(file);
-    setAvatarCropX(50);
-    setAvatarCropY(50);
-    setAvatarZoom(1);
+    try {
+      // Read the picker-backed file immediately while the
+      // browser still has access to its underlying bytes.
+      const bytes = await file.arrayBuffer();
+
+      const safeFile = new File(
+        [bytes],
+        file.name || "profile-picture",
+        {
+          type: file.type || "application/octet-stream",
+          lastModified: file.lastModified || Date.now(),
+        }
+      );
+
+      setSelectedAvatarFile(safeFile);
+      setAvatarCropX(50);
+      setAvatarCropY(50);
+      setAvatarZoom(1);
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      setSelectedAvatarFile(null);
+
+      setMessage(
+        `Unable to copy the selected profile picture: ${detail}`
+      );
+    }
   }
 
   function validateAvatarFile(file: File) {
@@ -884,12 +910,13 @@ export function ProfileForm() {
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   className="block w-full min-w-0 max-w-full rounded-lg border px-2 py-2 text-sm"
                   type="file"
-                  onChange={(event) =>
-                    handleAvatarSelection(
+                  onChange={(event) => {
+                    const file =
                       event.target.files?.[0] ??
-                        null
-                    )
-                  }
+                      null;
+
+                    void handleAvatarSelection(file);
+                  }}
                 />
 
                 {selectedAvatarFile && (
