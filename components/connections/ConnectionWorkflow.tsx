@@ -773,10 +773,10 @@ export function ConnectionWorkflow() {
     return (
       <article
         key={mentorship.id}
-        className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+        className="flex flex-col gap-3 rounded-xl border bg-white p-3 sm:gap-4 sm:p-4"
       >
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-          <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
             <ProfileAvatar
               avatarPath={otherProfile?.avatar_url}
               displayName={otherProfile?.display_name}
@@ -803,42 +803,42 @@ export function ConnectionWorkflow() {
             </div>
           </div>
 
-          <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium capitalize">
+          <span className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize sm:px-3 sm:text-xs">
             {mentorship.status.replace("_", " ")}
           </span>
         </div>
 
-        <div>
-          <h3 className="text-sm font-semibold">
+        <div className="rounded-lg bg-gray-50 px-3 py-2 sm:bg-transparent sm:px-0 sm:py-0">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 sm:text-sm sm:normal-case sm:tracking-normal sm:text-gray-950">
             Objective
           </h3>
 
-          <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">
             {mentorship.objective}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full border px-3 py-1">
+        <div className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap">
+          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
             {formatMentorshipDuration(
               mentorship.agreed_duration
             )}
           </span>
 
-          <span className="rounded-full border px-3 py-1">
+          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
             {formatMentorshipFrequency(
               mentorship.agreed_frequency
             )}
           </span>
 
-          <span className="rounded-full border px-3 py-1">
+          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
             Started{" "}
             {formatMentorshipDate(
               mentorship.start_date
             )}
           </span>
 
-          <span className="rounded-full border px-3 py-1">
+          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
             {mentorship.expected_end_date
               ? `Expected end ${formatMentorshipDate(
                   mentorship.expected_end_date
@@ -848,7 +848,7 @@ export function ConnectionWorkflow() {
         </div>
 
         <Link
-          className="inline-flex min-h-10 w-fit items-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+          className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 sm:w-fit"
           href={`/mentorships/${mentorship.id}`}
         >
           {isHistorical
