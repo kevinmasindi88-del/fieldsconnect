@@ -526,13 +526,13 @@ export function FcTeamWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-8">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-3xl">
           FC Team
         </h1>
 
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+        <p className="mt-2 max-w-3xl text-sm leading-snug text-gray-600 sm:leading-6">
           Recruit and activate FieldsConnect team members who
           can receive and action internal feedback tickets.
         </p>
@@ -550,11 +550,11 @@ export function FcTeamWorkflow() {
       {isAdmin && (
         <>
           <form
-            className="grid gap-5 rounded-2xl border bg-white p-5 sm:p-6"
+            className="grid gap-4 rounded-2xl border bg-white p-4 sm:gap-5 sm:p-6"
             onSubmit={sendRecruitment}
           >
             <div>
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg font-semibold sm:text-xl">
                 Recruit FC Team member
               </h2>
 
@@ -639,7 +639,7 @@ export function FcTeamWorkflow() {
 
           <section className="grid gap-3">
             <div>
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg font-semibold sm:text-xl">
                 Awaiting final approval
               </h2>
 
@@ -813,14 +813,14 @@ export function FcTeamWorkflow() {
 
         return (
           <article
-            className="rounded-2xl border bg-white p-5 sm:p-6"
+            className="rounded-2xl border bg-white p-4 sm:p-6"
             key={request.id}
           >
             <p className="text-sm font-semibold text-blue-700">
               Private FieldsConnect invitation
             </p>
 
-            <h2 className="mt-1 text-xl font-semibold">
+            <h2 className="mt-1 text-lg font-semibold leading-snug sm:text-xl">
               You have been invited to join the FC Team
             </h2>
 
@@ -831,7 +831,7 @@ export function FcTeamWorkflow() {
             </p>
 
             {request.invitation_message && (
-              <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm leading-6 text-gray-700">
+              <div className="mt-3 rounded-xl bg-gray-50 p-3 text-sm leading-snug text-gray-700 sm:mt-4 sm:p-4 sm:leading-6">
                 {request.invitation_message}
               </div>
             )}
@@ -846,7 +846,7 @@ export function FcTeamWorkflow() {
               ).toLocaleDateString()}.
             </p>
 
-            <div className="mt-5 grid gap-3 text-sm">
+            <div className="mt-4 grid gap-3 text-sm sm:mt-5">
               <label className="flex items-start gap-3">
                 <input
                   checked={
@@ -914,9 +914,9 @@ export function FcTeamWorkflow() {
               </label>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-4 grid gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:gap-3">
               <button
-                className="rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                 disabled={isWorking}
                 onClick={() =>
                   void respondToRecruitment(
@@ -930,7 +930,7 @@ export function FcTeamWorkflow() {
               </button>
 
               <button
-                className="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                className="w-full rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50 sm:w-auto"
                 disabled={isWorking}
                 onClick={() =>
                   void respondToRecruitment(
@@ -950,7 +950,7 @@ export function FcTeamWorkflow() {
       {!isAdmin &&
         !isActiveFcTeamMember &&
         myPendingRequests.length === 0 && (
-        <p className="rounded-2xl border border-dashed bg-white p-6 text-sm text-gray-600">
+        <p className="rounded-2xl border border-dashed bg-white p-4 text-sm text-gray-600 sm:p-6">
           There are no FC Team invitations requiring your
           response.
         </p>
@@ -962,7 +962,7 @@ export function FcTeamWorkflow() {
 
       {isAdmin && (
         <section className="grid gap-3">
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-lg font-semibold sm:text-xl">
             Recruitment history
           </h2>
 
