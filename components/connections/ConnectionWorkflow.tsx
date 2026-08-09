@@ -104,6 +104,14 @@ type Skill = {
   name: string;
 };
 
+type PeopleSearchCriteria = {
+  term: string;
+  role: string;
+  mentor: string;
+};
+
+const PEOPLE_SEARCH_PAGE_SIZE = 20;
+
 export function ConnectionWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -115,6 +123,20 @@ export function ConnectionWorkflow() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mentorFilter, setMentorFilter] = useState("all");
+  const [peopleSearchResults, setPeopleSearchResults] =
+    useState<Profile[]>([]);
+  const [peopleSearchCriteria, setPeopleSearchCriteria] =
+    useState<PeopleSearchCriteria | null>(null);
+  const [peopleSearchOffset, setPeopleSearchOffset] =
+    useState(0);
+  const [hasMorePeople, setHasMorePeople] =
+    useState(false);
+  const [hasSearchedPeople, setHasSearchedPeople] =
+    useState(false);
+  const [isSearchingPeople, setIsSearchingPeople] =
+    useState(false);
+  const [peopleSearchError, setPeopleSearchError] =
+    useState<string | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [connectionSearch, setConnectionSearch] = useState("");
   const [connectionSort, setConnectionSort] =
@@ -151,39 +173,6 @@ export function ConnectionWorkflow() {
     return skillMap;
   }, [skills]);
 
-  const discoverableProfiles = useMemo(() => {
-    return profiles.filter((profile) => {
-      if (!currentUserId || profile.id === currentUserId) return false;
-
-      return !connections.some(
-        (connection) =>
-          (connection.status === "pending" || connection.status === "accepted") &&
-          ((connection.requester_id === currentUserId && connection.recipient_id === profile.id) ||
-            (connection.requester_id === profile.id && connection.recipient_id === currentUserId))
-      );
-    });
-  }, [profiles, connections, currentUserId]);
-
-  const filteredDiscoverableProfiles = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
-    return discoverableProfiles.filter((profile) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [profile.display_name, profile.username, profile.field, profile.role_type]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(normalizedSearch));
-
-      const matchesRole =
-        roleFilter === "all" || profile.role_type.trim().toLowerCase() === roleFilter;
-      const matchesMentor =
-        mentorFilter === "all" ||
-        (mentorFilter === "mentors" && profile.mentor_available) ||
-        (mentorFilter === "non-mentors" && !profile.mentor_available);
-
-      return matchesSearch && matchesRole && matchesMentor;
-    });
-  }, [discoverableProfiles, searchTerm, roleFilter, mentorFilter]);
 
   const participantMentorships = mentorships.filter(
     (mentorship) =>
@@ -382,7 +371,6 @@ export function ConnectionWorkflow() {
       setCurrentUserId(userId);
 
       const [
-        { data: profilesData, error: profilesError },
         { data: connectionsData, error: connectionsError },
         {
           data: mentorshipRequestData,
@@ -392,15 +380,7 @@ export function ConnectionWorkflow() {
           data: mentorshipData,
           error: mentorshipError,
         },
-        { data: skillsData, error: skillsError },
       ] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select(
-            "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
-          )
-          .is("deleted_at", null)
-          .order("display_name", { ascending: true }),
         supabase
           .from("connections")
           .select(
@@ -432,14 +412,8 @@ export function ConnectionWorkflow() {
           .order("created_at", {
             ascending: false,
           }),
-        supabase
-          .from("skills")
-          .select("profile_id, name")
-          .eq("is_published", true)
-          .is("deleted_at", null),
       ]);
 
-      if (profilesError) throw profilesError;
       if (connectionsError) throw connectionsError;
       if (mentorshipRequestError) {
         throw mentorshipRequestError;
@@ -447,17 +421,101 @@ export function ConnectionWorkflow() {
       if (mentorshipError) {
         throw mentorshipError;
       }
-      if (skillsError) throw skillsError;
 
-      setProfiles((profilesData ?? []) as Profile[]);
-      setConnections((connectionsData ?? []) as Connection[]);
+      const connectionRows =
+        (connectionsData ?? []) as Connection[];
+      const mentorshipRequestRows =
+        (mentorshipRequestData ?? []) as MentorshipRequest[];
+      const mentorshipRows =
+        (mentorshipData ?? []) as Mentorship[];
+
+      const relatedProfileIds =
+        new Set<string>([userId]);
+
+      connectionRows.forEach((connection) => {
+        relatedProfileIds.add(connection.requester_id);
+        relatedProfileIds.add(connection.recipient_id);
+      });
+
+      mentorshipRequestRows.forEach((request) => {
+        relatedProfileIds.add(request.mentee_id);
+        relatedProfileIds.add(request.mentor_id);
+      });
+
+      mentorshipRows.forEach((mentorship) => {
+        relatedProfileIds.add(mentorship.mentor_id);
+        relatedProfileIds.add(mentorship.mentee_id);
+      });
+
+      let profilesData: Profile[] = [];
+
+      if (relatedProfileIds.size > 0) {
+        const {
+          data: relatedProfilesData,
+          error: relatedProfilesError,
+        } = await supabase
+          .from("profiles")
+          .select(
+            "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
+          )
+          .in("id", Array.from(relatedProfileIds))
+          .is("deleted_at", null)
+          .order("display_name", {
+            ascending: true,
+          });
+
+        if (relatedProfilesError) {
+          throw relatedProfilesError;
+        }
+
+        profilesData =
+          (relatedProfilesData ?? []) as Profile[];
+      }
+
+      const acceptedProfileIds =
+        Array.from(
+          new Set(
+            connectionRows
+              .filter(
+                (connection) =>
+                  connection.status === "accepted"
+              )
+              .map((connection) =>
+                connection.requester_id === userId
+                  ? connection.recipient_id
+                  : connection.requester_id
+              )
+          )
+        );
+
+      let skillsData: Skill[] = [];
+
+      if (acceptedProfileIds.length > 0) {
+        const {
+          data: relatedSkillsData,
+          error: relatedSkillsError,
+        } = await supabase
+          .from("skills")
+          .select("profile_id, name")
+          .in("profile_id", acceptedProfileIds)
+          .eq("is_published", true)
+          .is("deleted_at", null);
+
+        if (relatedSkillsError) {
+          throw relatedSkillsError;
+        }
+
+        skillsData =
+          (relatedSkillsData ?? []) as Skill[];
+      }
+
+      setProfiles(profilesData);
+      setConnections(connectionRows);
       setMentorshipRequests(
-        (mentorshipRequestData ?? []) as MentorshipRequest[]
+        mentorshipRequestRows
       );
-      setMentorships(
-        (mentorshipData ?? []) as Mentorship[]
-      );
-      setSkills((skillsData ?? []) as Skill[]);
+      setMentorships(mentorshipRows);
+      setSkills(skillsData);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load connection data.");
     } finally {
@@ -484,7 +542,7 @@ export function ConnectionWorkflow() {
           table: "connections",
         },
         () => {
-          void loadConnections(currentUserId);
+          void loadData();
         }
       )
       .on(
@@ -495,7 +553,7 @@ export function ConnectionWorkflow() {
           table: "mentorship_requests",
         },
         () => {
-          void loadMentorshipRequests(currentUserId);
+          void loadData();
         }
       )
       .on(
@@ -506,7 +564,7 @@ export function ConnectionWorkflow() {
           table: "mentorships",
         },
         () => {
-          void loadMentorships(currentUserId);
+          void loadData();
         }
       )
       .subscribe();
@@ -662,6 +720,17 @@ export function ConnectionWorkflow() {
       }
 
       setMessage("Connection request sent.");
+      setPeopleSearchResults(
+        (currentResults) =>
+          currentResults.filter(
+            (profile) =>
+              profile.id !== profileId
+          )
+      );
+      setPeopleSearchOffset(
+        (currentOffset) =>
+          Math.max(0, currentOffset - 1)
+      );
       await loadData();
     } catch (error) {
       setMessage(getActionErrorMessage(error, "send connection request"));
@@ -859,13 +928,176 @@ export function ConnectionWorkflow() {
     );
   }
 
-  function clearSearchFilters() {
-    setSearchTerm("");
-    setRoleFilter("all");
-    setMentorFilter("all");
-  }
+  async function searchPeople(
+    append: boolean
+  ) {
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured() ||
+      isSearchingPeople
+    ) {
+      return;
+    }
 
-  const hasActiveSearch = searchTerm.trim() || roleFilter !== "all" || mentorFilter !== "all";
+    const criteria: PeopleSearchCriteria =
+      append && peopleSearchCriteria
+        ? peopleSearchCriteria
+        : {
+            term: searchTerm.trim(),
+            role: roleFilter,
+            mentor: mentorFilter,
+          };
+
+    const offset =
+      append ? peopleSearchOffset : 0;
+
+    setIsSearchingPeople(true);
+    setPeopleSearchError(null);
+
+    if (!append) {
+      setPeopleSearchCriteria(criteria);
+      setPeopleSearchResults([]);
+      setPeopleSearchOffset(0);
+      setHasMorePeople(false);
+      setHasSearchedPeople(true);
+    }
+
+    try {
+      const supabase =
+        getSupabaseBrowserClient();
+
+      let query = supabase
+        .from("profiles")
+        .select(
+          "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
+        )
+        .is("deleted_at", null)
+        .order("display_name", {
+          ascending: true,
+        })
+        .order("id", {
+          ascending: true,
+        });
+
+      const safeSearchTerm =
+        criteria.term
+          .replace(/[,%()]/g, " ")
+          .trim();
+
+      if (safeSearchTerm) {
+        query = query.or(
+          `display_name.ilike.%${safeSearchTerm}%,username.ilike.%${safeSearchTerm}%,field.ilike.%${safeSearchTerm}%`
+        );
+      }
+
+      if (criteria.role !== "all") {
+        query = query.eq(
+          "role_type",
+          criteria.role
+        );
+      }
+
+      if (criteria.mentor === "mentors") {
+        query = query.eq(
+          "mentor_available",
+          true
+        );
+      } else if (
+        criteria.mentor === "non-mentors"
+      ) {
+        query = query.eq(
+          "mentor_available",
+          false
+        );
+      }
+
+      const excludedProfileIds =
+        new Set<string>([currentUserId]);
+
+      connections.forEach((connection) => {
+        if (
+          connection.status !== "pending" &&
+          connection.status !== "accepted"
+        ) {
+          return;
+        }
+
+        const otherProfileId =
+          connection.requester_id === currentUserId
+            ? connection.recipient_id
+            : connection.requester_id;
+
+        excludedProfileIds.add(
+          otherProfileId
+        );
+      });
+
+      query = query.not(
+        "id",
+        "in",
+        `(${Array.from(
+          excludedProfileIds
+        ).join(",")})`
+      );
+
+      const {
+        data,
+        error,
+      } = await query.range(
+        offset,
+        offset + PEOPLE_SEARCH_PAGE_SIZE
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      const returnedProfiles =
+        (data ?? []) as Profile[];
+
+      const page =
+        returnedProfiles.slice(
+          0,
+          PEOPLE_SEARCH_PAGE_SIZE
+        );
+
+      setHasMorePeople(
+        returnedProfiles.length >
+          PEOPLE_SEARCH_PAGE_SIZE
+      );
+
+      setPeopleSearchOffset(
+        offset + page.length
+      );
+
+      setPeopleSearchResults(
+        (currentResults) => {
+          const combined =
+            append
+              ? [...currentResults, ...page]
+              : page;
+
+          return Array.from(
+            new Map(
+              combined.map((profile) => [
+                profile.id,
+                profile,
+              ])
+            ).values()
+          );
+        }
+      );
+    } catch (error) {
+      setPeopleSearchError(
+        getActionErrorMessage(
+          error,
+          "search people"
+        )
+      );
+    } finally {
+      setIsSearchingPeople(false);
+    }
+  }
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
@@ -1361,14 +1593,24 @@ export function ConnectionWorkflow() {
           </ConnectionSection>
 
           <ConnectionSection title="Find people">
-            <div className="rounded-xl border bg-white p-4">
+            <form
+              className="rounded-xl border bg-white p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void searchPeople(false);
+              }}
+            >
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Search people
                   <input
                     className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search by name, field, or role..."
+                    onChange={(event) =>
+                      setSearchTerm(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Search by name or field..."
                     type="search"
                     value={searchTerm}
                   />
@@ -1378,13 +1620,25 @@ export function ConnectionWorkflow() {
                   Role type
                   <select
                     className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) => setRoleFilter(event.target.value)}
+                    onChange={(event) =>
+                      setRoleFilter(
+                        event.target.value
+                      )
+                    }
                     value={roleFilter}
                   >
-                    <option value="all">All role types</option>
-                    <option value="student">Student</option>
-                    <option value="professional">Professional</option>
-                    <option value="institution">Institution</option>
+                    <option value="all">
+                      All role types
+                    </option>
+                    <option value="student">
+                      Student
+                    </option>
+                    <option value="professional">
+                      Professional
+                    </option>
+                    <option value="institution">
+                      Institution
+                    </option>
                   </select>
                 </label>
 
@@ -1392,44 +1646,95 @@ export function ConnectionWorkflow() {
                   Mentor status
                   <select
                     className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) => setMentorFilter(event.target.value)}
+                    onChange={(event) =>
+                      setMentorFilter(
+                        event.target.value
+                      )
+                    }
                     value={mentorFilter}
                   >
-                    <option value="all">Everyone</option>
-                    <option value="mentors">Available mentors</option>
-                    <option value="non-mentors">Not mentoring</option>
+                    <option value="all">
+                      Everyone
+                    </option>
+                    <option value="mentors">
+                      Available mentors
+                    </option>
+                    <option value="non-mentors">
+                      Not mentoring
+                    </option>
                   </select>
                 </label>
 
                 <button
-                  className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-                  disabled={!hasActiveSearch}
-                  onClick={clearSearchFilters}
-                  type="button"
+                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                  disabled={isSearchingPeople}
+                  type="submit"
                 >
-                  Clear
+                  {isSearchingPeople
+                    ? "Searching..."
+                    : "Search"}
                 </button>
               </div>
 
               <p className="mt-3 text-xs text-gray-500">
-                {filteredDiscoverableProfiles.length} of {discoverableProfiles.length} people shown
+                {hasSearchedPeople
+                  ? `${peopleSearchResults.length} ${
+                      peopleSearchResults.length === 1
+                        ? "result"
+                        : "results"
+                    } loaded`
+                  : "Search FieldsConnect by name, field, role type, or mentor availability."}
               </p>
-            </div>
 
-            {filteredDiscoverableProfiles.length === 0 ? (
-              <EmptyState text="No results available." />
+              {peopleSearchError && (
+                <p className="mt-2 text-sm text-red-700">
+                  {peopleSearchError}
+                </p>
+              )}
+            </form>
+
+            {!hasSearchedPeople ? (
+              <EmptyState text="Search for people to view matching profiles." />
+            ) : peopleSearchResults.length === 0 ? (
+              <EmptyState text="No matching people found." />
             ) : (
-              filteredDiscoverableProfiles.map((profile) => (
-                <ConnectionCard key={profile.id} profile={profile}>
+              <>
+                {peopleSearchResults.map(
+                  (profile) => (
+                    <ConnectionCard
+                      key={profile.id}
+                      profile={profile}
+                    >
+                      <button
+                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() =>
+                          sendRequest(
+                            profile.id
+                          )
+                        }
+                      >
+                        Connect
+                      </button>
+                    </ConnectionCard>
+                  )
+                )}
+
+                {hasMorePeople && (
                   <button
-                    className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                    disabled={isWorking}
-                    onClick={() => sendRequest(profile.id)}
+                    className="min-h-10 w-full rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-50 sm:w-fit"
+                    disabled={isSearchingPeople}
+                    onClick={() =>
+                      void searchPeople(true)
+                    }
+                    type="button"
                   >
-                    Connect
+                    {isSearchingPeople
+                      ? "Loading..."
+                      : "Load more"}
                   </button>
-                </ConnectionCard>
-              ))
+                )}
+              </>
             )}
           </ConnectionSection>
         </>
