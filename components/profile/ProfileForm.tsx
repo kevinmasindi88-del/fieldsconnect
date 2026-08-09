@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import {
   getActionErrorMessage,
@@ -63,7 +63,159 @@ const initialMentorSettings: MentorSettingsState = {
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
-const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const AVATAR_OUTPUT_SIZE = 512;
+const ALLOWED_AVATAR_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+function drawCroppedAvatar(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  outputSize: number,
+  cropX: number,
+  cropY: number,
+  zoom: number
+) {
+  const baseScale = Math.max(
+    outputSize / image.naturalWidth,
+    outputSize / image.naturalHeight
+  );
+
+  const scale = baseScale * zoom;
+  const renderedWidth = image.naturalWidth * scale;
+  const renderedHeight = image.naturalHeight * scale;
+
+  const maxHorizontalOffset = Math.max(
+    0,
+    (renderedWidth - outputSize) / 2
+  );
+
+  const maxVerticalOffset = Math.max(
+    0,
+    (renderedHeight - outputSize) / 2
+  );
+
+  const horizontalOffset =
+    ((cropX - 50) / 50) * maxHorizontalOffset;
+
+  const verticalOffset =
+    ((cropY - 50) / 50) * maxVerticalOffset;
+
+  context.clearRect(0, 0, outputSize, outputSize);
+
+  context.drawImage(
+    image,
+    (outputSize - renderedWidth) / 2 - horizontalOffset,
+    (outputSize - renderedHeight) / 2 - verticalOffset,
+    renderedWidth,
+    renderedHeight
+  );
+}
+
+async function loadAvatarImage(file: File) {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    return await new Promise<HTMLImageElement>(
+      (resolve, reject) => {
+        const image = new Image();
+
+        image.onload = () => resolve(image);
+        image.onerror = () =>
+          reject(
+            new Error(
+              "Unable to read the selected profile picture."
+            )
+          );
+
+        image.src = objectUrl;
+      }
+    );
+  } finally {
+    // The image has decoded by the time the promise resolves.
+    // Revoking prevents temporary browser-memory leaks.
+    window.setTimeout(
+      () => URL.revokeObjectURL(objectUrl),
+      0
+    );
+  }
+}
+
+async function createProcessedAvatarFile(
+  file: File,
+  cropX: number,
+  cropY: number,
+  zoom: number
+) {
+  const image = await loadAvatarImage(file);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_OUTPUT_SIZE;
+  canvas.height = AVATAR_OUTPUT_SIZE;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error(
+      "Your browser could not prepare the profile picture."
+    );
+  }
+
+  drawCroppedAvatar(
+    context,
+    image,
+    AVATAR_OUTPUT_SIZE,
+    cropX,
+    cropY,
+    zoom
+  );
+
+  let quality = 0.9;
+  let blob: Blob | null = null;
+
+  while (quality >= 0.5) {
+    blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(
+        resolve,
+        "image/webp",
+        quality
+      );
+    });
+
+    if (
+      blob &&
+      blob.size <= MAX_AVATAR_SIZE_BYTES
+    ) {
+      break;
+    }
+
+    quality -= 0.1;
+  }
+
+  if (!blob) {
+    throw new Error(
+      "The profile picture could not be processed."
+    );
+  }
+
+  if (blob.size > MAX_AVATAR_SIZE_BYTES) {
+    throw new Error(
+      "The processed profile picture is still larger than 2 MB."
+    );
+  }
+
+  return new File(
+    [blob],
+    "profile-avatar.webp",
+    {
+      type: "image/webp",
+      lastModified: Date.now(),
+    }
+  );
+}
 
 export function ProfileForm() {
   const [form, setForm] = useState<ProfileFormState>(initialState);
@@ -72,7 +224,16 @@ export function ProfileForm() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] =
+    useState<File | null>(null);
+  const [avatarCropX, setAvatarCropX] =
+    useState(50);
+  const [avatarCropY, setAvatarCropY] =
+    useState(50);
+  const [avatarZoom, setAvatarZoom] =
+    useState(1);
+  const avatarCanvasRef =
+    useRef<HTMLCanvasElement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,14 +416,89 @@ export function ProfileForm() {
     setAvatarPreviewUrl(data?.signedUrl ?? null);
   }
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function renderSelectedAvatar() {
+      if (!selectedAvatarFile) return;
+
+      try {
+        const image =
+          await loadAvatarImage(
+            selectedAvatarFile
+          );
+
+        if (cancelled) return;
+
+        const canvas =
+          avatarCanvasRef.current;
+
+        if (!canvas) return;
+
+        const context =
+          canvas.getContext("2d");
+
+        if (!context) return;
+
+        drawCroppedAvatar(
+          context,
+          image,
+          canvas.width,
+          avatarCropX,
+          avatarCropY,
+          avatarZoom
+        );
+      } catch {
+        // Validation/upload will surface a useful
+        // message if the file cannot be decoded.
+      }
+    }
+
+    void renderSelectedAvatar();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedAvatarFile,
+    avatarCropX,
+    avatarCropY,
+    avatarZoom,
+  ]);
+
+  function handleAvatarSelection(
+    file: File | null
+  ) {
+    setMessage(null);
+
+    if (!file) {
+      setSelectedAvatarFile(null);
+      setAvatarCropX(50);
+      setAvatarCropY(50);
+      setAvatarZoom(1);
+      return;
+    }
+
+    const validationError =
+      validateAvatarFile(file);
+
+    if (validationError) {
+      setSelectedAvatarFile(null);
+      setMessage(validationError);
+      return;
+    }
+
+    setSelectedAvatarFile(file);
+    setAvatarCropX(50);
+    setAvatarCropY(50);
+    setAvatarZoom(1);
+  }
+
   function validateAvatarFile(file: File) {
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
       return "Profile picture must be a JPG, PNG, WebP, or GIF image.";
     }
 
-    if (file.size > MAX_AVATAR_SIZE_BYTES) {
-      return "Profile picture is too large. Maximum size is 2 MB.";
-    }
 
     return null;
   }
@@ -270,7 +506,10 @@ export function ProfileForm() {
   async function uploadAvatar() {
     if (!currentUserId || !selectedAvatarFile || !isSupabaseConfigured()) return;
 
-    const validationError = validateAvatarFile(selectedAvatarFile);
+    const validationError =
+      validateAvatarFile(
+        selectedAvatarFile
+      );
 
     if (validationError) {
       setMessage(validationError);
@@ -280,18 +519,34 @@ export function ProfileForm() {
     setIsAvatarWorking(true);
     setMessage(null);
 
-    const supabase = getSupabaseBrowserClient();
+    const supabase =
+      getSupabaseBrowserClient();
     const oldAvatarPath = avatarPath;
-    const safeFileName = selectedAvatarFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const newAvatarPath = `${currentUserId}/${crypto.randomUUID()}-${safeFileName}`;
 
     try {
-      const { error: uploadError } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(newAvatarPath, selectedAvatarFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const processedAvatarFile =
+        await createProcessedAvatarFile(
+          selectedAvatarFile,
+          avatarCropX,
+          avatarCropY,
+          avatarZoom
+        );
+
+      const newAvatarPath =
+        `${currentUserId}/${crypto.randomUUID()}-profile-avatar.webp`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from(AVATAR_BUCKET)
+          .upload(
+            newAvatarPath,
+            processedAvatarFile,
+            {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: "image/webp",
+            }
+          );
 
       if (uploadError) throw uploadError;
 
@@ -312,6 +567,9 @@ export function ProfileForm() {
 
       setAvatarPath(newAvatarPath);
       setSelectedAvatarFile(null);
+      setAvatarCropX(50);
+      setAvatarCropY(50);
+      setAvatarZoom(1);
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
@@ -500,44 +758,138 @@ export function ProfileForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-xl border p-6">
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4 rounded-xl border p-4 sm:p-6"
+    >
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading profile...</p>
       ) : (
         <>
-          <section className="flex flex-col gap-3 rounded-xl border p-4">
-            <h2 className="text-lg font-semibold">Profile picture</h2>
+          <section className="flex min-w-0 flex-col gap-4 rounded-xl border p-3 sm:p-4">
+            <h2 className="text-lg font-semibold">
+              Profile picture
+            </h2>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500">
-                {avatarPreviewUrl ? (
-                  <img alt="Profile preview" className="h-full w-full object-cover" src={avatarPreviewUrl} />
-                ) : (
-                  <span>No photo</span>
-                )}
+            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="flex shrink-0 justify-center sm:justify-start">
+                <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500">
+                  {selectedAvatarFile ? (
+                    <canvas
+                      ref={avatarCanvasRef}
+                      aria-label="Selected profile picture crop preview"
+                      className="h-full w-full"
+                      height={256}
+                      width={256}
+                    />
+                  ) : avatarPreviewUrl ? (
+                    <img
+                      alt="Profile preview"
+                      className="h-full w-full object-cover"
+                      src={avatarPreviewUrl}
+                    />
+                  ) : (
+                    <span>No photo</span>
+                  )}
+                </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
                 <input
                   accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="rounded-lg border px-3 py-2 text-sm"
+                  className="block w-full min-w-0 max-w-full rounded-lg border px-2 py-2 text-sm"
                   type="file"
-                  onChange={(event) => setSelectedAvatarFile(event.target.files?.[0] ?? null)}
+                  onChange={(event) =>
+                    handleAvatarSelection(
+                      event.target.files?.[0] ??
+                        null
+                    )
+                  }
                 />
 
-                <div className="flex flex-wrap gap-2">
+                {selectedAvatarFile && (
+                  <div className="grid min-w-0 gap-3 rounded-xl border bg-gray-50 p-3">
+                    <p className="text-sm font-medium">
+                      Choose how your picture is shown
+                    </p>
+
+                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
+                      Horizontal position
+                      <input
+                        className="w-full"
+                        max={100}
+                        min={0}
+                        onChange={(event) =>
+                          setAvatarCropX(
+                            Number(
+                              event.target.value
+                            )
+                          )
+                        }
+                        type="range"
+                        value={avatarCropX}
+                      />
+                    </label>
+
+                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
+                      Vertical position
+                      <input
+                        className="w-full"
+                        max={100}
+                        min={0}
+                        onChange={(event) =>
+                          setAvatarCropY(
+                            Number(
+                              event.target.value
+                            )
+                          )
+                        }
+                        type="range"
+                        value={avatarCropY}
+                      />
+                    </label>
+
+                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
+                      Zoom
+                      <input
+                        className="w-full"
+                        max={2.5}
+                        min={1}
+                        onChange={(event) =>
+                          setAvatarZoom(
+                            Number(
+                              event.target.value
+                            )
+                          )
+                        }
+                        step={0.05}
+                        type="range"
+                        value={avatarZoom}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap">
                   <button
-                    className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={!selectedAvatarFile || isAvatarWorking}
+                    className="w-full min-w-0 rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
+                    disabled={
+                      !selectedAvatarFile ||
+                      isAvatarWorking
+                    }
                     onClick={uploadAvatar}
                     type="button"
                   >
-                    {avatarPath ? "Replace picture" : "Upload picture"}
+                    {isAvatarWorking
+                      ? "Processing..."
+                      : avatarPath
+                        ? "Replace picture"
+                        : "Upload picture"}
                   </button>
 
                   {avatarPath && (
                     <button
-                      className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                      className="w-full min-w-0 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50 sm:w-auto"
                       disabled={isAvatarWorking}
                       onClick={deleteAvatar}
                       type="button"
@@ -547,7 +899,12 @@ export function ProfileForm() {
                   )}
                 </div>
 
-                <p className="text-xs text-gray-500">JPG, PNG, WebP, or GIF. Maximum size: 2 MB.</p>
+                <p className="max-w-full break-words text-xs leading-5 text-gray-500">
+                  JPG, PNG, WebP, or GIF. FieldsConnect will
+                  crop your selected framing to a square and
+                  automatically compress the uploaded profile
+                  picture to below 2 MB.
+                </p>
               </div>
             </div>
           </section>

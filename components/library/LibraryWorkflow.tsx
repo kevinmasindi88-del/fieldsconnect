@@ -900,9 +900,9 @@ export function LibraryWorkflow() {
               </span>
             </label>
 
-            <section className="grid gap-4 rounded-xl border bg-gray-50 p-4">
-              <div>
-                <h3 className="font-semibold">
+            <section className="grid min-w-0 gap-4 overflow-hidden rounded-xl border bg-gray-50 p-3 sm:p-4">
+              <div className="min-w-0">
+                <h3 className="break-words font-semibold">
                   Rights and uploader declaration
                 </h3>
 
@@ -916,7 +916,7 @@ export function LibraryWorkflow() {
                 Rights basis
 
                 <select
-                  className="rounded-lg border bg-white px-3 py-2"
+                  className="min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2"
                   onChange={(event) =>
                     setRightsBasis(event.target.value)
                   }
@@ -955,7 +955,7 @@ export function LibraryWorkflow() {
                     Source and attribution
 
                     <textarea
-                      className="min-h-20 rounded-lg border bg-white px-3 py-2 font-normal"
+                      className="min-h-20 min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2 font-normal"
                       maxLength={2000}
                       onChange={(event) =>
                         setSourceAttribution(
@@ -977,7 +977,7 @@ export function LibraryWorkflow() {
                   Permission or licence details
 
                   <textarea
-                    className="min-h-20 rounded-lg border bg-white px-3 py-2 font-normal"
+                    className="min-h-20 min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2 font-normal"
                     maxLength={4000}
                     onChange={(event) =>
                       setLicencePermissionDetails(
@@ -997,7 +997,7 @@ export function LibraryWorkflow() {
                   Legal-exception explanation
 
                   <textarea
-                    className="min-h-24 rounded-lg border bg-white px-3 py-2 font-normal"
+                    className="min-h-24 min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2 font-normal"
                     maxLength={4000}
                     onChange={(event) =>
                       setStatutoryExceptionExplanation(
@@ -1013,10 +1013,10 @@ export function LibraryWorkflow() {
                 </label>
               )}
 
-              <label className="flex items-start gap-3 text-sm leading-6">
+              <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
                 <input
                   checked={privacyConfirmed}
-                  className="mt-1"
+                  className="mt-1 shrink-0"
                   onChange={(event) =>
                     setPrivacyConfirmed(
                       event.target.checked
@@ -1033,10 +1033,10 @@ export function LibraryWorkflow() {
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 text-sm leading-6">
+              <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
                 <input
                   checked={securityConfirmed}
-                  className="mt-1"
+                  className="mt-1 shrink-0"
                   onChange={(event) =>
                     setSecurityConfirmed(
                       event.target.checked
@@ -1053,10 +1053,10 @@ export function LibraryWorkflow() {
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 text-sm leading-6">
+              <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
                 <input
                   checked={accuracyConfirmed}
-                  className="mt-1"
+                  className="mt-1 shrink-0"
                   onChange={(event) =>
                     setAccuracyConfirmed(
                       event.target.checked
@@ -1089,7 +1089,7 @@ export function LibraryWorkflow() {
               Secure resource link
 
               <input
-                className="rounded-lg border bg-white px-3 py-2"
+                className="min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2"
                 maxLength={2048}
                 onChange={(event) =>
                   setExternalUrl(event.target.value)
@@ -1105,7 +1105,7 @@ export function LibraryWorkflow() {
               Original page or resource title
 
               <input
-                className="rounded-lg border bg-white px-3 py-2"
+                className="min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2"
                 maxLength={300}
                 minLength={3}
                 onChange={(event) =>
@@ -1120,7 +1120,7 @@ export function LibraryWorkflow() {
               Author, organisation or publisher
 
               <input
-                className="rounded-lg border bg-white px-3 py-2"
+                className="min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2"
                 maxLength={300}
                 minLength={2}
                 onChange={(event) =>
@@ -1131,12 +1131,12 @@ export function LibraryWorkflow() {
               />
             </label>
 
-            <label className="flex items-start gap-3 text-sm leading-6">
+            <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
               <input
                 checked={
                   noAccessRestrictionBypassConfirmed
                 }
-                className="mt-1"
+                className="mt-1 shrink-0"
                 onChange={(event) =>
                   setNoAccessRestrictionBypassConfirmed(
                     event.target.checked
@@ -1152,10 +1152,10 @@ export function LibraryWorkflow() {
               </span>
             </label>
 
-            <label className="flex items-start gap-3 text-sm leading-6">
+            <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
               <input
                 checked={privacyConfirmed}
-                className="mt-1"
+                className="mt-1 shrink-0"
                 onChange={(event) =>
                   setPrivacyConfirmed(
                     event.target.checked
@@ -1171,10 +1171,10 @@ export function LibraryWorkflow() {
               </span>
             </label>
 
-            <label className="flex items-start gap-3 text-sm leading-6">
+            <label className="flex min-w-0 items-start gap-3 text-sm leading-6">
               <input
                 checked={accuracyConfirmed}
-                className="mt-1"
+                className="mt-1 shrink-0"
                 onChange={(event) =>
                   setAccuracyConfirmed(
                     event.target.checked

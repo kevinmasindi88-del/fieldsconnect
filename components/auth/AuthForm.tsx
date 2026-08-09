@@ -173,17 +173,19 @@ export function AuthForm({ mode }: AuthFormProps) {
           <span className="text-gray-950">Connect</span>
         </Link>
 
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-950">
-          {title}
-        </h1>
+        {mode !== "login" && (
+          <>
+            <h1 className="mt-6 text-2xl font-semibold tracking-tight text-gray-950">
+              {title}
+            </h1>
 
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-600">
-          {mode === "signup"
-            ? "Create your account, then verify your email before signing in."
-            : mode === "reset"
-              ? "Enter your email address and we will send you a password reset link."
-              : "Log in to continue to FieldsConnect."}
-        </p>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-600">
+              {mode === "signup"
+                ? "Create your account, then verify your email before signing in."
+                : "Enter your email address and we will send you a password reset link."}
+            </p>
+          </>
+        )}
       </div>
 
       <label className="flex flex-col gap-2 text-sm font-medium">
