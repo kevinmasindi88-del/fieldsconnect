@@ -71,22 +71,43 @@ const ALLOWED_AVATAR_TYPES = [
   "image/gif",
 ];
 
+type AvatarImageSource = HTMLImageElement | ImageBitmap;
+
+function getAvatarImageDimensions(
+  image: AvatarImageSource
+) {
+  if (image instanceof HTMLImageElement) {
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+  }
+
+  return {
+    width: image.width,
+    height: image.height,
+  };
+}
+
 function drawCroppedAvatar(
   context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
+  image: AvatarImageSource,
   outputSize: number,
   cropX: number,
   cropY: number,
   zoom: number
 ) {
+  const dimensions =
+    getAvatarImageDimensions(image);
+
   const baseScale = Math.max(
-    outputSize / image.naturalWidth,
-    outputSize / image.naturalHeight
+    outputSize / dimensions.width,
+    outputSize / dimensions.height
   );
 
   const scale = baseScale * zoom;
-  const renderedWidth = image.naturalWidth * scale;
-  const renderedHeight = image.naturalHeight * scale;
+  const renderedWidth = dimensions.width * scale;
+  const renderedHeight = dimensions.height * scale;
 
   const maxHorizontalOffset = Math.max(
     0,
@@ -115,67 +136,47 @@ function drawCroppedAvatar(
   );
 }
 
-async function loadAvatarImage(file: File) {
-  const dataUrl = await new Promise<string>(
-    (resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-          return;
-        }
-
-        reject(
-          new Error(
-            "Unable to read the selected profile picture."
-          )
-        );
-      };
-
-      reader.onerror = () =>
-        reject(
-          new Error(
-            "Unable to read the selected profile picture."
-          )
-        );
-
-      reader.readAsDataURL(file);
+async function loadAvatarImage(
+  file: File
+): Promise<AvatarImageSource> {
+  if (
+    typeof window !== "undefined" &&
+    "createImageBitmap" in window
+  ) {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Fall back to the standard browser image decoder.
     }
-  );
+  }
 
-  return await new Promise<HTMLImageElement>(
-    (resolve, reject) => {
-      const image = new Image();
+  const objectUrl = URL.createObjectURL(file);
 
-      image.onload = async () => {
-        try {
-          if (typeof image.decode === "function") {
-            await image.decode().catch(() => undefined);
-          }
+  try {
+    const image =
+      await new Promise<HTMLImageElement>(
+        (resolve, reject) => {
+          const element = new Image();
 
-          resolve(image);
-        } catch {
-          reject(
-            new Error(
-              "Unable to decode the selected profile picture."
-            )
-          );
+          element.onload = () =>
+            resolve(element);
+
+          element.onerror = () =>
+            reject(
+              new Error(
+                "Unable to decode the selected profile picture."
+              )
+            );
+
+          element.src = objectUrl;
         }
-      };
+      );
 
-      image.onerror = () =>
-        reject(
-          new Error(
-            "Unable to decode the selected profile picture."
-          )
-        );
-
-      image.src = dataUrl;
-    }
-  );
+    return image;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
-
 async function createProcessedAvatarFile(
   file: File,
   cropX: number,
@@ -239,7 +240,7 @@ async function createProcessedAvatarFile(
     );
   }
 
-  return new File(
+  const processedFile = new File(
     [blob],
     "profile-avatar.webp",
     {
@@ -247,6 +248,15 @@ async function createProcessedAvatarFile(
       lastModified: Date.now(),
     }
   );
+
+  if (
+    typeof ImageBitmap !== "undefined" &&
+    image instanceof ImageBitmap
+  ) {
+    image.close();
+  }
+
+  return processedFile;
 }
 
 export function ProfileForm() {
