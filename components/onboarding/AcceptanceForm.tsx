@@ -79,10 +79,10 @@ export function AcceptanceForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-xl border p-6">
+    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-xl border p-4 sm:gap-4 sm:p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Required onboarding acceptance</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <h1 className="text-xl font-semibold leading-snug sm:text-2xl">Required onboarding acceptance</h1>
+        <p className="mt-2 text-sm leading-snug text-gray-600">
           FieldsConnect MVP requires policy acceptance and 18+ confirmation before core features are enabled.
         </p>
       </div>
@@ -112,7 +112,7 @@ export function AcceptanceForm() {
       </label>
 
       <button
-        className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-fit"
         type="submit"
         disabled={!canSubmit || isSubmitting}
       >
