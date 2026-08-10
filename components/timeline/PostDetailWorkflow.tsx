@@ -101,14 +101,14 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   }, [postId]);
 
   if (isLoading) {
-    return <main className="mx-auto w-full max-w-4xl p-8 text-sm text-gray-600">Loading post...</main>;
+    return <main className="mx-auto w-full max-w-4xl px-4 py-6 text-sm text-gray-600 sm:p-8">Loading post...</main>;
   }
 
   if (message) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 p-8">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:p-8">
         <p className="rounded-xl border p-4 text-sm text-gray-700">{message}</p>
-        <Link className="w-fit rounded-lg border px-3 py-2 text-sm font-medium" href="/">
+        <Link className="w-full rounded-lg border px-3 py-2 text-center text-sm font-medium sm:w-fit" href="/">
           Back to timeline
         </Link>
       </main>
@@ -117,9 +117,9 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
   if (!post) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 p-8">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:p-8">
         <p className="rounded-xl border p-4 text-sm text-gray-700">This post is unavailable or you do not have access to it.</p>
-        <Link className="w-fit rounded-lg border px-3 py-2 text-sm font-medium" href="/">
+        <Link className="w-full rounded-lg border px-3 py-2 text-center text-sm font-medium sm:w-fit" href="/">
           Back to timeline
         </Link>
       </main>
@@ -129,8 +129,8 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   const author = profileById.get(post.author_id);
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
-      <Link className="w-fit rounded-lg border px-3 py-2 text-sm font-medium" href="/">
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:p-8">
+      <Link className="w-full rounded-lg border px-3 py-2 text-center text-sm font-medium sm:w-fit" href="/">
         Back to timeline
       </Link>
 
