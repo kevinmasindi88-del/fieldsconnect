@@ -727,7 +727,7 @@ export function ModerationDashboard() {
   if (!hasAccess) {
     return (
       <section className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
-        <h1 className="text-3xl font-semibold">Moderation dashboard</h1>
+        <h1 className="text-xl font-semibold leading-snug sm:text-3xl">Moderation dashboard</h1>
 
         <p className="mt-4 rounded-xl border p-4 text-sm text-gray-700">
           This dashboard is available only to active FieldsConnect moderators
@@ -745,7 +745,7 @@ export function ModerationDashboard() {
             Role: {role.replaceAll("_", " ")}
           </p>
 
-          <h1 className="text-3xl font-semibold">Moderation dashboard</h1>
+          <h1 className="text-xl font-semibold leading-snug sm:text-3xl">Moderation dashboard</h1>
 
           <p className="mt-2 text-sm text-gray-600">
             Incoming reports and traceable moderation tickets.
@@ -887,14 +887,14 @@ export function ModerationDashboard() {
 
         <div className="grid max-h-[190px] gap-3 overflow-y-auto pr-2">
           {visibleTickets.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+            <p className="rounded-xl border border-dashed p-3 text-sm text-gray-600 sm:p-4">
               No tickets match this filter.
             </p>
           ) : (
             visibleTickets.map((ticket) => (
               <button
                 key={ticket.id}
-                className={`rounded-xl border p-4 text-left ${
+                className={`rounded-xl border p-3 text-left sm:p-4 ${
                   selectedTicketId === ticket.id
                     ? "bg-gray-100"
                     : "bg-white"
@@ -1348,7 +1348,7 @@ function SummaryCard({
   onClick?: () => void;
 }) {
   const className = [
-    "rounded-xl border p-4 text-left",
+    "rounded-xl border p-3 text-left sm:p-4",
     active ? "border-blue-700 bg-blue-700 text-white" : "bg-white",
     onClick ? "cursor-pointer hover:bg-gray-50" : "",
     active && onClick ? "hover:bg-blue-800" : "",
@@ -1360,7 +1360,7 @@ function SummaryCard({
         {label}
       </p>
 
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-xl font-semibold sm:text-2xl">{value}</p>
     </>
   );
 
