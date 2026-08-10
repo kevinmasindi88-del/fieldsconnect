@@ -74,6 +74,8 @@ export function MessagingWorkflow() {
     useOnlinePresence();
   const messageScrollRef =
     useRef<HTMLDivElement | null>(null);
+  const handledConnectionDeepLinkRef =
+    useRef<string | null>(null);
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -90,16 +92,8 @@ export function MessagingWorkflow() {
   );
 
   const chatConnections = useMemo(() => {
-    return connections.filter(
-      (connection) =>
-        conversationByConnectionId.has(
-          connection.id
-        )
-    );
-  }, [
-    connections,
-    conversationByConnectionId,
-  ]);
+    return connections;
+  }, [connections]);
 
   const visibleMobileChatConnections =
     chatConnections.slice(
@@ -463,6 +457,52 @@ export function MessagingWorkflow() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      !currentUserId ||
+      activeConnectionId ||
+      isWorking ||
+      connections.length === 0
+    ) {
+      return;
+    }
+
+    const requestedConnectionId =
+      new URLSearchParams(window.location.search).get("connection");
+
+    if (!requestedConnectionId) return;
+
+    if (
+      handledConnectionDeepLinkRef.current ===
+      requestedConnectionId
+    ) {
+      return;
+    }
+
+    handledConnectionDeepLinkRef.current =
+      requestedConnectionId;
+
+    const requestedConnection = connections.find(
+      (connection) => connection.id === requestedConnectionId
+    );
+
+    if (!requestedConnection) {
+      setMessage(
+        "That connection is not available for messaging."
+      );
+      return;
+    }
+
+    void openConversation(requestedConnection);
+  }, [
+    isLoading,
+    currentUserId,
+    activeConnectionId,
+    isWorking,
+    connections,
+  ]);
 
   useEffect(() => {
     if (!currentUserId || !isSupabaseConfigured()) return;

@@ -1560,7 +1560,15 @@ export function ConnectionWorkflow() {
                           key={connection.id}
                           profile={profile}
                           skills={profileSkills}
+                          showBio={false}
                         >
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                              href={`/messages?connection=${encodeURIComponent(connection.id)}`}
+                            >
+                              Message
+                            </Link>
                           <button
                             className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
                             disabled={isWorking}
@@ -1571,6 +1579,7 @@ export function ConnectionWorkflow() {
                           >
                             Disconnect
                           </button>
+                          </div>
                         </ConnectionCard>
                       );
                     })}
@@ -1755,10 +1764,12 @@ function ConnectionSection({ title, children }: { title: string; children: React
 function ConnectionCard({
   profile,
   skills = [],
+  showBio = true,
   children,
 }: {
   profile?: Profile;
   skills?: string[];
+  showBio?: boolean;
   children: React.ReactNode;
 }) {
   const identity = (
@@ -1771,7 +1782,7 @@ function ConnectionCard({
         <p className="text-xs leading-snug text-gray-600 sm:text-sm">
           {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
         </p>
-        {profile?.bio && (
+        {showBio && profile?.bio && (
           <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-700">
             {profile.bio}
           </p>
