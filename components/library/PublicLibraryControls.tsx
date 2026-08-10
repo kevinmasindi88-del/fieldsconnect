@@ -28,7 +28,7 @@ export function PublicLibraryControls() {
         const button = document.createElement("button");
         button.type = "button";
         button.dataset.publicLibrarySearchButton = "true";
-        button.className = "mt-2 w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white";
+        button.className = "mt-2 w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white sm:w-fit";
         button.textContent = "Search";
 
         const runSearch = () => {

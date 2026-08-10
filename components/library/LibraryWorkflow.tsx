@@ -1195,7 +1195,7 @@ export function LibraryWorkflow() {
         <label className="flex flex-col gap-2 text-sm font-medium">
           Visibility
           <select
-            className="w-fit rounded-lg border px-3 py-2"
+            className="w-full rounded-lg border px-3 py-2 sm:w-fit"
             value={visibility}
             onChange={(event) => setVisibility(event.target.value as "public" | "connections")}
           >
@@ -1214,7 +1214,7 @@ export function LibraryWorkflow() {
         </label>
 
         <button
-          className="w-fit min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+          className="min-h-10 w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 sm:w-fit"
           disabled={
             !title.trim() ||
             (resourceType === "uploaded_file"
