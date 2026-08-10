@@ -1237,8 +1237,8 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           </p>
         )}
       </div>
-      <div className="rounded-xl border p-4">
-        <h2 className="text-xl font-semibold">Moderation decision</h2>
+      <div className="rounded-xl border p-3 sm:p-4">
+        <h2 className="text-lg font-semibold sm:text-xl">Moderation decision</h2>
 
         <label className="mt-4 flex flex-col gap-2 text-sm font-medium">
           Internal moderator notes
@@ -1251,9 +1251,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           />
         </label>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap sm:gap-3">
           <button
-            className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50 sm:w-auto"
             disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
             onClick={() => takeAction("dismissed")}
             type="button"
@@ -1262,7 +1262,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           </button>
 
           <button
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
             disabled={isWorking || ticket.status === "actioned" || ticket.status === "dismissed"}
             onClick={() => takeAction("warned")}
             type="button"
@@ -1271,7 +1271,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           </button>
 
           <button
-            className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50 sm:w-auto"
             disabled={
               isWorking ||
               ticket.status === "actioned" ||
@@ -1286,7 +1286,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           {["post", "comment", "library_document", "message"].includes(ticket.target_type) && (
             <>
               <button
-                className="rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+                className="w-full rounded-lg border border-amber-600 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50 sm:w-auto"
                 disabled={
                   isWorking ||
                   ticket.status === "actioned" ||
@@ -1305,7 +1305,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               </button>
 
               <button
-                className="rounded-lg border border-red-700 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                className="w-full rounded-lg border border-red-700 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50 sm:w-auto"
                 disabled={
                   isWorking ||
                   ticket.status === "actioned" ||
@@ -1327,7 +1327,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         </div>
 
         {["senior_moderator", "admin"].includes(role) && (
-          <div className="mt-6 border-t pt-6">
+          <div className="mt-5 border-t pt-5 sm:mt-6 sm:pt-6">
             <h3 className="text-lg font-semibold">
               Account suspension
             </h3>
@@ -1337,7 +1337,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 Loading suspension record...
               </p>
             ) : suspension ? (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 sm:p-4">
                 <div className="grid gap-3 text-sm md:grid-cols-2">
                   <div>
                     <span className="font-medium">Duration:</span>{" "}
@@ -1430,7 +1430,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                     </p>
 
                     <button
-                      className="mt-3 rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                      className="mt-3 w-full rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50 sm:w-auto"
                       disabled={
                         isWorking || liftReason.trim().length < 10
                       }
@@ -1445,7 +1445,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 )}
               </div>
             ) : canApplySuspension ? (
-              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 sm:p-4">
                 <p className="text-sm text-amber-950">
                   This ticket has been escalated. Record a user-safe reason
                   before imposing an account suspension.
@@ -1469,9 +1469,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                   evidence, or internal moderator notes.
                 </p>
 
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap sm:gap-3">
                   <button
-                    className="rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    className="w-full rounded-lg border border-red-700 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50 sm:w-auto"
                     disabled={
                       isWorking || suspensionReason.trim().length < 10
                     }
@@ -1482,7 +1482,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                   </button>
 
                   <button
-                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    className="w-full rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
                     disabled={
                       isWorking || suspensionReason.trim().length < 10
                     }
@@ -1518,17 +1518,17 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      <div className="rounded-xl border p-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="rounded-xl border p-3 sm:p-4">
+        <div className="grid gap-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
           <div>
-            <h2 className="text-xl font-semibold">Audit history</h2>
+            <h2 className="text-lg font-semibold sm:text-xl">Audit history</h2>
             <p className="mt-1 text-sm text-gray-600">
               Internal record of moderation decisions for this ticket.
             </p>
           </div>
 
           <button
-            className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50 sm:w-auto"
             disabled={isAuditLoading}
             onClick={() => loadAuditHistory(ticket.id)}
             type="button"
@@ -1542,7 +1542,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
             Loading audit history...
           </p>
         ) : auditEntries.length === 0 ? (
-          <p className="mt-4 rounded-lg border border-dashed p-4 text-sm text-gray-600">
+          <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-gray-600 sm:p-4">
             No moderation actions have been recorded for this ticket.
           </p>
         ) : (
@@ -1556,7 +1556,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
               return (
                 <li
-                  className="rounded-xl border bg-gray-50 p-4"
+                  className="rounded-xl border bg-gray-50 p-3 sm:p-4"
                   key={entry.id}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
