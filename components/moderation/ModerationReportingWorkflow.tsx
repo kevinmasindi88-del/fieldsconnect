@@ -146,11 +146,11 @@ export function ModerationReportingWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-3 sm:gap-8 sm:p-8">
       {message && <p className="rounded-lg border p-3 text-sm text-gray-700">{message}</p>}
 
       <form onSubmit={submitReport} className="flex flex-col gap-4 rounded-xl border p-4">
-        <h2 className="text-xl font-semibold">Submit report</h2>
+        <h2 className="text-lg font-semibold sm:text-xl">Submit report</h2>
 
         <label className="flex flex-col gap-2 text-sm font-medium">
           Profile name
@@ -199,7 +199,7 @@ export function ModerationReportingWorkflow() {
         </label>
 
         <button
-          className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-fit"
           disabled={!selectedProfileId || !reason.trim() || isWorking}
           type="submit"
         >
@@ -208,12 +208,12 @@ export function ModerationReportingWorkflow() {
       </form>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold">My submitted reports</h2>
+        <h2 className="text-lg font-semibold sm:text-xl">My submitted reports</h2>
 
         {isLoading ? (
           <p className="text-sm text-gray-600">Loading reports...</p>
         ) : reports.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+          <p className="rounded-xl border border-dashed p-3 text-sm text-gray-600 sm:p-4">
             You have not submitted any reports yet.
           </p>
         ) : (
@@ -222,7 +222,7 @@ export function ModerationReportingWorkflow() {
               const targetProfile = profileById.get(report.target_id);
 
               return (
-                <article key={report.id} className="rounded-xl border p-4">
+                <article key={report.id} className="rounded-xl border p-3 sm:p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{targetProfile?.display_name ?? "Reported profile"}</h3>
                     <span className="rounded-full border px-2 py-1 text-xs">{report.status}</span>
@@ -230,7 +230,7 @@ export function ModerationReportingWorkflow() {
 
                   <p className="mt-2 text-sm text-gray-600">Reason: {report.reason}</p>
                   {targetProfile?.field && <p className="mt-1 text-xs text-gray-500">Field: {targetProfile.field}</p>}
-                  {report.details && <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">{report.details}</p>}
+                  {report.details && <p className="mt-3 whitespace-pre-wrap text-sm leading-snug text-gray-700">{report.details}</p>}
                 </article>
               );
             })}
