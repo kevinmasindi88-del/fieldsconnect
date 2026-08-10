@@ -266,14 +266,14 @@ export function RoleNominationWorkflow() {
   }
 
   if (isLoading) {
-    return <p className="p-8 text-sm text-gray-600">Loading nomination workflow...</p>;
+    return <p className="p-4 text-sm text-gray-600 sm:p-8">Loading nomination workflow...</p>;
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-8">
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-3 sm:gap-8 sm:p-8">
       <div>
         <p className="text-sm font-medium text-blue-700">Current platform role: {formatRole(currentRole)}</p>
-        <h1 className="mt-1 text-3xl font-semibold">Moderation role nominations</h1>
+        <h1 className="mt-1 text-xl font-semibold leading-snug sm:text-3xl">Moderation role nominations</h1>
         <p className="mt-2 max-w-3xl text-sm text-gray-600">
           Moderation privileges are granted only after nomination, candidate acknowledgement, and final administrative approval.
         </p>
@@ -282,9 +282,9 @@ export function RoleNominationWorkflow() {
       {message && <p className="rounded-xl border bg-white p-4 text-sm text-gray-700">{message}</p>}
 
       {canNominate && (
-        <form onSubmit={submitNomination} className="grid gap-4 rounded-2xl border bg-white p-5">
+        <form onSubmit={submitNomination} className="grid gap-3 rounded-2xl border bg-white p-4 sm:gap-4 sm:p-5">
           <div>
-            <h2 className="text-xl font-semibold">Create nomination</h2>
+            <h2 className="text-lg font-semibold sm:text-xl">Create nomination</h2>
             <p className="mt-1 text-sm text-gray-600">Record why this person is strategically suited to the proposed role.</p>
           </div>
 
@@ -378,7 +378,7 @@ export function RoleNominationWorkflow() {
           )}
 
           <button
-            className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-fit"
             disabled={isWorking || !nominationReady}
             type="submit"
           >
@@ -390,9 +390,9 @@ export function RoleNominationWorkflow() {
       {myPendingNominations.map((nomination) => {
         const nominator = profileById.get(nomination.nominated_by);
         return (
-          <article key={nomination.id} className="rounded-2xl border bg-white p-5">
+          <article key={nomination.id} className="rounded-2xl border bg-white p-4 sm:p-5">
             <p className="text-sm font-medium text-blue-700">Private nomination from FCModerators</p>
-            <h2 className="mt-1 text-xl font-semibold">You have been nominated as {formatRole(nomination.proposed_role)}</h2>
+            <h2 className="mt-1 text-lg font-semibold leading-snug sm:text-xl">You have been nominated as {formatRole(nomination.proposed_role)}</h2>
             <p className="mt-2 text-sm text-gray-600">
               Moderators review reports, apply the FieldsConnect Code of Conduct fairly, protect confidentiality and document every decision.
             </p>
@@ -407,7 +407,7 @@ export function RoleNominationWorkflow() {
               </Link>
             </div>
 
-            <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+            <div className="mt-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-700 sm:p-4">
               <p><span className="font-medium">Justification:</span> {nomination.justification}</p>
               {nomination.expected_availability && (
                 <p className="mt-2"><span className="font-medium">Expected availability:</span> {nomination.expected_availability}</p>
@@ -436,9 +436,9 @@ export function RoleNominationWorkflow() {
               ))}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap sm:gap-3">
               <button
-                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
                 disabled={isWorking}
                 onClick={() => void respondToNomination(nomination.id, true)}
                 type="button"
@@ -446,7 +446,7 @@ export function RoleNominationWorkflow() {
                 Accept nomination
               </button>
               <button
-                className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+                className="w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50 sm:w-auto"
                 disabled={isWorking}
                 onClick={() => void respondToNomination(nomination.id, false)}
                 type="button"
@@ -461,17 +461,17 @@ export function RoleNominationWorkflow() {
       {currentRole === "admin" && (
         <section className="grid gap-3">
           <div>
-            <h2 className="text-xl font-semibold">Awaiting final approval</h2>
+            <h2 className="text-lg font-semibold sm:text-xl">Awaiting final approval</h2>
             <p className="mt-1 text-sm text-gray-600">Accepted nominations remain inactive until you approve them.</p>
           </div>
 
           {awaitingApproval.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">No nominations are awaiting final approval.</p>
+            <p className="rounded-xl border border-dashed p-3 text-sm text-gray-600 sm:p-4">No nominations are awaiting final approval.</p>
           ) : (
             awaitingApproval.map((nomination) => {
               const nominee = profileById.get(nomination.nominee_id);
               return (
-                <article key={nomination.id} className="rounded-xl border bg-white p-4">
+                <article key={nomination.id} className="rounded-xl border bg-white p-3 sm:p-4">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h3 className="font-semibold">{nominee?.display_name ?? "Candidate"}</h3>
@@ -479,7 +479,7 @@ export function RoleNominationWorkflow() {
                       <p className="mt-2 max-w-2xl text-sm text-gray-700">{nomination.justification}</p>
                     </div>
                     <button
-                      className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
                       disabled={isWorking}
                       onClick={() => void approveNomination(nomination.id)}
                       type="button"
@@ -495,14 +495,14 @@ export function RoleNominationWorkflow() {
       )}
 
       <section className="grid gap-3">
-        <h2 className="text-xl font-semibold">Nomination history</h2>
+        <h2 className="text-lg font-semibold sm:text-xl">Nomination history</h2>
         {nominations.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">No nomination records are visible to this account.</p>
+          <p className="rounded-xl border border-dashed p-3 text-sm text-gray-600 sm:p-4">No nomination records are visible to this account.</p>
         ) : (
           nominations.map((nomination) => {
             const nominee = profileById.get(nomination.nominee_id);
             return (
-              <article key={nomination.id} className="rounded-xl border bg-white p-4 text-sm">
+              <article key={nomination.id} className="rounded-xl border bg-white p-3 text-sm sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold">{nominee?.display_name ?? "Candidate"}</p>
