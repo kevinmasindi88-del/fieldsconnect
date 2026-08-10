@@ -157,7 +157,7 @@ export function SkillsWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:gap-8 sm:p-8">
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       <form onSubmit={addSkill} className="flex flex-col gap-4 rounded-xl border p-4">
@@ -187,7 +187,7 @@ export function SkillsWorkflow() {
         <label className="flex flex-col gap-2 text-sm font-medium">
           Rating
           <select
-            className="w-fit rounded-lg border px-3 py-2"
+            className="w-full rounded-lg border px-3 py-2 sm:w-fit"
             value={rating}
             onChange={(event) => setRating(event.target.value)}
           >
@@ -209,7 +209,7 @@ export function SkillsWorkflow() {
         </label>
 
         <button
-          className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-fit"
           disabled={!name.trim() || isWorking}
           type="submit"
         >
