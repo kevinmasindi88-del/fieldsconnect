@@ -939,7 +939,7 @@ export function ModerationDashboard() {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white p-6">
+      <div className="rounded-2xl border bg-white p-4 sm:p-6">
         {!selectedTicket ? (
           <p className="text-sm text-gray-600">
             Select a ticket to review its details.
@@ -954,7 +954,7 @@ export function ModerationDashboard() {
                 {selectedTicket.ticket_number ?? "Legacy report"}
               </Link>
 
-              <h2 className="mt-1 text-2xl font-semibold">
+              <h2 className="mt-1 text-lg font-semibold leading-snug sm:text-2xl">
                 {selectedTicket.reason}
               </h2>
 
@@ -970,7 +970,7 @@ export function ModerationDashboard() {
               </div>
             </div>
 
-            <dl className="grid gap-4 text-sm md:grid-cols-2">
+            <dl className="grid gap-3 text-sm sm:gap-4 md:grid-cols-2">
               <div>
                 <dt className="font-medium">Target</dt>
                 <dd className="mt-1 text-gray-700">
@@ -1015,7 +1015,7 @@ export function ModerationDashboard() {
             </dl>
 
             {role === "admin" ? (
-              <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
+              <div className="grid gap-3 rounded-xl border p-3 sm:flex sm:flex-wrap sm:items-end sm:p-4">
                 <label className="flex w-full min-w-0 flex-col gap-2 text-sm font-medium sm:min-w-64 sm:w-auto">
                   Assign to
                   <select
@@ -1037,7 +1037,7 @@ export function ModerationDashboard() {
                 </label>
 
                 <button
-                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                  className="min-h-10 w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 sm:w-auto"
                   disabled={isWorking || !selectedAssigneeId}
                   onClick={() => assignTicket(selectedTicket.id)}
                   type="button"
@@ -1046,9 +1046,9 @@ export function ModerationDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                 <button
-                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                  className="min-h-10 w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 sm:w-auto"
                   disabled={
                     isWorking ||
                     selectedTicket.assigned_to === currentUserId
@@ -1068,13 +1068,13 @@ export function ModerationDashboard() {
             <div>
               <h3 className="font-medium">Reporter details</h3>
 
-              <p className="mt-2 whitespace-pre-wrap rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+              <p className="mt-2 whitespace-pre-wrap rounded-xl bg-gray-50 p-3 text-sm leading-snug text-gray-700 sm:p-4">
                 {selectedTicket.details ||
                   "No additional details supplied."}
               </p>
             </div>
 
-            <section className="rounded-xl border bg-white p-4">
+            <section className="rounded-xl border bg-white p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-semibold">Related reports</h3>
@@ -1112,7 +1112,7 @@ export function ModerationDashboard() {
                     return (
                       <div
                         key={ticket.id}
-                        className="rounded-lg border bg-gray-50 p-4"
+                        className="rounded-lg border bg-gray-50 p-3 sm:p-4"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -1163,7 +1163,7 @@ export function ModerationDashboard() {
                   selectedTicket.status
                 ) &&
                 activeRelatedTickets.length > 0 && (
-                  <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:mt-5 sm:p-4">
                     <h4 className="font-semibold text-amber-950">
                       Consolidate this ticket
                     </h4>
@@ -1206,7 +1206,7 @@ export function ModerationDashboard() {
                     </label>
 
                     <button
-                      className="mt-4 rounded-lg bg-amber-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      className="mt-4 w-full rounded-lg bg-amber-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
                       disabled={
                         isWorking ||
                         !consolidationPrimaryId ||
@@ -1223,7 +1223,7 @@ export function ModerationDashboard() {
                 )}
             </section>
 
-            <section className="rounded-xl border bg-white p-4">
+            <section className="rounded-xl border bg-white p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-semibold">Case history</h3>
@@ -1272,7 +1272,7 @@ export function ModerationDashboard() {
                     return (
                       <li
                         key={log.id}
-                        className="rounded-lg border bg-gray-50 p-4"
+                        className="rounded-lg border bg-gray-50 p-3 sm:p-4"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -1288,7 +1288,7 @@ export function ModerationDashboard() {
                           </time>
                         </div>
 
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:leading-6">
                           {log.notes}
                         </p>
                       </li>
@@ -1296,7 +1296,7 @@ export function ModerationDashboard() {
                   })}
 
                   {selectedTicketSuspension?.revoked_at && (
-                    <li className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <li className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <ActionBadge action="suspension_revoked" />
@@ -1313,7 +1313,7 @@ export function ModerationDashboard() {
                         </time>
                       </div>
 
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-blue-900">
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-snug text-blue-900 sm:leading-6">
                         {selectedTicketSuspension.revocation_reason ||
                           "The account suspension was lifted early."}
                       </p>
@@ -1324,7 +1324,7 @@ export function ModerationDashboard() {
             </section>
 
             <Link
-              className="inline-flex min-h-10 w-fit items-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 sm:w-fit"
               href={`/moderation/review/${selectedTicket.id}`}
             >
               Open full review and evidence
