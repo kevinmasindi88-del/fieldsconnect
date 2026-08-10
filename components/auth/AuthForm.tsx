@@ -149,7 +149,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         </p>
 
         <Link
-          className="w-fit rounded-lg border px-4 py-2 text-sm font-medium"
+          className="w-full rounded-lg border px-4 py-2 text-center text-sm font-medium sm:w-fit"
           href="/login"
         >
           Go to login
