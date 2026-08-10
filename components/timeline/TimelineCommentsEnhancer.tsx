@@ -162,7 +162,7 @@ function applyCommentVisibility(
       viewAllButton.type = "button";
       viewAllButton.dataset.commentsViewAll = "true";
       viewAllButton.className =
-        "w-fit rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50";
+        "w-full rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50 sm:w-fit";
       viewAllButton.textContent = `View all ${commentItems.length} comments`;
       commentsSection.insertBefore(viewAllButton, form);
     } else {
