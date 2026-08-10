@@ -106,7 +106,7 @@ export function AdminTicketUnassignment({
 
   return (
     <form
-      className="grid gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5"
+      className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:gap-4 sm:p-5"
       onSubmit={unassignTicket}
     >
       <div>
@@ -114,7 +114,7 @@ export function AdminTicketUnassignment({
           Unassign ticket
         </h3>
 
-        <p className="mt-1 text-sm leading-6 text-amber-900">
+        <p className="mt-1 text-sm leading-snug text-amber-900 sm:leading-6">
           Return this unresolved ticket to the unassigned
           queue so it can be reassigned or released before an
           FC Team member leaves.
