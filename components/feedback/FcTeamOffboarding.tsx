@@ -540,7 +540,7 @@ This action will immediately revoke FC Team privileges and return the account to
 
   if (isLoading) {
     return (
-      <section className="rounded-2xl border bg-white p-5">
+      <section className="rounded-2xl border bg-white p-4 sm:p-5">
         <p className="text-sm text-gray-600">
           Loading membership controls...
         </p>
@@ -553,7 +553,7 @@ This action will immediately revoke FC Team privileges and return the account to
   }
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-4 sm:gap-6">
       {message && (
         <p
           aria-live="polite"
@@ -564,13 +564,13 @@ This action will immediately revoke FC Team privileges and return the account to
       )}
 
       {!isAdmin && isActiveMember && (
-        <section className="grid gap-4 rounded-2xl border bg-white p-5 sm:p-6">
+        <section className="grid gap-3 rounded-2xl border bg-white p-4 sm:gap-4 sm:p-6">
           <div>
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-lg font-semibold sm:text-xl">
               FC Team membership
             </h2>
 
-            <p className="mt-1 text-sm leading-6 text-gray-600">
+            <p className="mt-1 text-sm leading-snug text-gray-600 sm:leading-6">
               You may request to leave the FC Team. Your
               membership remains active until the administrator
               approves the request.
@@ -578,7 +578,7 @@ This action will immediately revoke FC Team privileges and return the account to
           </div>
 
           {hasPendingOwnRequest ? (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:p-4">
               Your leave request is awaiting administrative
               review.
             </p>
@@ -626,7 +626,7 @@ This action will immediately revoke FC Team privileges and return the account to
 
               {myRequests.map((request) => (
                 <article
-                  className="rounded-xl bg-gray-50 p-4 text-sm"
+                  className="rounded-xl bg-gray-50 p-3 text-sm sm:p-4"
                   key={request.id}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -662,7 +662,7 @@ This action will immediately revoke FC Team privileges and return the account to
         <>
           <section className="grid gap-4">
             <div>
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg font-semibold sm:text-xl">
                 Pending leave requests
               </h2>
 
@@ -685,7 +685,7 @@ This action will immediately revoke FC Team privileges and return the account to
 
                 return (
                   <article
-                    className="grid gap-4 rounded-2xl border bg-white p-5"
+                    className="grid gap-3 rounded-2xl border bg-white p-4 sm:gap-4 sm:p-5"
                     key={request.id}
                   >
                     <div>
@@ -700,7 +700,7 @@ This action will immediately revoke FC Team privileges and return the account to
                         </p>
                       )}
 
-                      <p className="mt-3 text-sm leading-6 text-gray-700">
+                      <p className="mt-3 text-sm leading-snug text-gray-700 sm:leading-6">
                         <strong>Reason:</strong>{" "}
                         {request.reason}
                       </p>
@@ -733,9 +733,9 @@ This action will immediately revoke FC Team privileges and return the account to
                       />
                     </label>
 
-                    <div className="flex flex-wrap gap-3">
+                    <div className="grid gap-2 sm:flex sm:flex-wrap sm:gap-3">
                       <button
-                        className="rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        className="w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                         disabled={workingKey !== null}
                         onClick={() =>
                           void reviewLeaveRequest(
@@ -751,7 +751,7 @@ This action will immediately revoke FC Team privileges and return the account to
                       </button>
 
                       <button
-                        className="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                        className="w-full rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50 sm:w-auto"
                         disabled={workingKey !== null}
                         onClick={() =>
                           void reviewLeaveRequest(
@@ -772,11 +772,11 @@ This action will immediately revoke FC Team privileges and return the account to
 
           <section className="grid gap-4">
             <div>
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg font-semibold sm:text-xl">
                 Remove FC Team member
               </h2>
 
-              <p className="mt-1 text-sm leading-6 text-gray-600">
+              <p className="mt-1 text-sm leading-snug text-gray-600 sm:leading-6">
                 Removing a member immediately returns them to
                 standard-member access. A justification is
                 mandatory.
@@ -799,7 +799,7 @@ This action will immediately revoke FC Team privileges and return the account to
 
                   return (
                     <article
-                      className="grid gap-4 rounded-2xl border bg-white p-5"
+                      className="grid gap-3 rounded-2xl border bg-white p-4 sm:gap-4 sm:p-5"
                       key={member.user_id}
                     >
                       <div>
