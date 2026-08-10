@@ -821,7 +821,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
   if (isLoading) {
     return (
-      <p className="mx-auto max-w-5xl p-8 text-sm text-gray-600">
+      <p className="mx-auto max-w-5xl px-4 py-6 text-sm text-gray-600 sm:p-8">
         Loading moderation review...
       </p>
     );
@@ -829,8 +829,8 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
   if (!["moderator", "senior_moderator", "admin"].includes(role)) {
     return (
-      <section className="mx-auto max-w-3xl p-8">
-        <h1 className="text-3xl font-semibold">Moderation review</h1>
+      <section className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
+        <h1 className="text-xl font-semibold leading-snug sm:text-3xl">Moderation review</h1>
 
         <p className="mt-4 rounded-xl border p-4 text-sm text-gray-700">
           This review is available only to active FieldsConnect moderators and
@@ -842,7 +842,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
 
   if (!ticket) {
     return (
-      <section className="mx-auto max-w-3xl p-8">
+      <section className="mx-auto max-w-3xl px-4 py-6 sm:p-8">
         <Link
           className="text-sm font-medium text-blue-700 underline"
           href="/moderation/dashboard"
@@ -858,7 +858,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-8">
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:p-8">
       <div>
         <Link
           className="text-sm font-medium text-blue-700 underline"
@@ -871,9 +871,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           {ticket.ticket_number ?? "Legacy report"}
         </p>
 
-        <h1 className="mt-1 text-3xl font-semibold">Moderation review</h1>
+        <h1 className="mt-1 text-xl font-semibold leading-snug sm:text-3xl">Moderation review</h1>
 
-        <div className="mt-4 grid gap-3 rounded-xl border p-4 text-sm md:grid-cols-2">
+        <div className="mt-4 grid gap-3 rounded-xl border p-3 text-sm sm:p-4 md:grid-cols-2">
           <div>
             <span className="font-medium">Report reason:</span>{" "}
             {ticket.reason}
@@ -902,9 +902,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
         </div>
 
         {ticket.details && (
-          <div className="mt-4 rounded-xl bg-gray-50 p-4">
+          <div className="mt-4 rounded-xl bg-gray-50 p-3 sm:p-4">
             <h2 className="font-medium">Reporter details</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:leading-6">
               {ticket.details}
             </p>
           </div>
@@ -912,7 +912,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       </div>
 
       <div className="border-t pt-6">
-        <h2 className="mb-4 text-xl font-semibold">Reported content</h2>
+        <h2 className="mb-3 text-lg font-semibold sm:mb-4 sm:text-xl">Reported content</h2>
 
         {ticket.target_type === "post" ? (
           <PostDetailWorkflow
@@ -925,7 +925,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               Loading reported comment...
             </p>
           ) : reportedComment ? (
-            <article className="rounded-xl border bg-white p-4">
+            <article className="rounded-xl border bg-white p-3 sm:p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{reportedComment.author_name}</p>
@@ -950,7 +950,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                   This comment was removed by FCModerators.
                 </p>
               ) : (
-                <p className="mt-4 whitespace-pre-wrap text-sm text-gray-800">
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-snug text-gray-800 sm:leading-6">
                   {reportedComment.body}
                 </p>
               )}
@@ -966,10 +966,10 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               Loading reported library resource...
             </p>
           ) : reportedLibraryDocument ? (
-            <article className="rounded-xl border bg-white p-4">
+            <article className="rounded-xl border bg-white p-3 sm:p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold">
+                  <h3 className="text-base font-semibold sm:text-lg">
                     {reportedLibraryDocument.title}
                   </h3>
                   <p className="mt-1 text-sm text-gray-600">
@@ -997,7 +997,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               ) : (
                 <>
                   {reportedLibraryDocument.description && (
-                    <p className="mt-4 whitespace-pre-wrap text-sm text-gray-700">
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:leading-6">
                       {reportedLibraryDocument.description}
                     </p>
                   )}
@@ -1152,7 +1152,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
           )
         ) : ticket.target_type === "message" ? (
           <div className="space-y-4">
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 sm:p-4">
               <h3 className="font-semibold text-amber-950">
                 Confidential message evidence
               </h3>
@@ -1178,7 +1178,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                 No message evidence is available for this ticket.
               </p>
             ) : (
-              <div className="rounded-xl border bg-gray-50 p-4">
+              <div className="rounded-xl border bg-gray-50 p-3 sm:p-4">
                 <p className="mb-4 text-sm text-gray-600">
                   Showing {messageContext.length - 1} prior{" "}
                   {messageContext.length - 1 === 1 ? "message" : "messages"} and
@@ -1190,8 +1190,8 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                     <li
                       className={
                         contextMessage.is_reported_message
-                          ? "rounded-xl border-2 border-red-600 bg-red-50 p-4"
-                          : "rounded-xl border bg-white p-4"
+                          ? "rounded-xl border-2 border-red-600 bg-red-50 p-3 sm:p-4"
+                          : "rounded-xl border bg-white p-3 sm:p-4"
                       }
                       key={contextMessage.message_id}
                     >
@@ -1221,7 +1221,7 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
                         </time>
                       </div>
 
-                      <p className="mt-3 whitespace-pre-wrap text-sm text-gray-800">
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-snug text-gray-800 sm:leading-6">
                         {contextMessage.body}
                       </p>
                     </li>
