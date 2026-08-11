@@ -701,22 +701,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       Profile
                     </Link>
 
-                    <Link
-                      className={[
-                        "block rounded-lg px-3 py-2 text-sm",
-                        pathname.startsWith("/moderation")
-                          ? "bg-gray-100 font-medium text-gray-950"
-                          : "text-gray-700 hover:bg-gray-50",
-                      ].join(" ")}
-                      href="/moderation"
-                      onClick={(event) => {
-                        event.currentTarget
-                          .closest("details")
-                          ?.removeAttribute("open");
-                      }}
-                    >
-                      Moderation
-                    </Link>
+                    <RoleAwareAccountLinks pathname={pathname} />
 
                     <button
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
