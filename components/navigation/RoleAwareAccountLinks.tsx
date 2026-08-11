@@ -213,7 +213,9 @@ export function RoleAwareAccountLinks({
     platformRole === "admin" || isFcTeamMember;
 
   const canAccessFcTeam =
-    platformRole === "admin" || isFcTeamMember;
+    platformRole === "senior_moderator" ||
+    platformRole === "admin" ||
+    isFcTeamMember;
 
   if (isLoading) {
     return null;

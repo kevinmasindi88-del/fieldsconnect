@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { FcNewsWorkflow } from "@/components/feedback/FcNewsWorkflow";
 import { FcTeamOffboarding } from "@/components/feedback/FcTeamOffboarding";
 import {
   getSupabaseBrowserClient,
@@ -954,6 +955,16 @@ export function FcTeamWorkflow() {
           There are no FC Team invitations requiring your
           response.
         </p>
+      )}
+
+      {(isAdmin ||
+        currentRole === "senior_moderator" ||
+        isActiveFcTeamMember) && (
+        <FcNewsWorkflow
+          currentRole={currentRole}
+          currentUserId={currentUserId}
+          isActiveFcTeamMember={isActiveFcTeamMember}
+        />
       )}
 
       {(isAdmin || isActiveFcTeamMember) && (
