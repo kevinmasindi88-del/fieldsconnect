@@ -157,12 +157,12 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         Back to timeline
       </Link>
 
-      <article className="flex flex-col gap-4 rounded-xl border p-4">
-        <div className="flex items-center justify-between gap-3">
+      <article className="flex flex-col gap-4 rounded-xl border p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {fcNewsPublication ? (
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold">FC News</p>
                 <p className="text-sm text-gray-600">
                   Official FieldsConnect update
@@ -187,7 +187,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
         <div>
           {fcNewsPublication && (
-            <h1 className="mb-2 text-lg font-semibold leading-snug text-gray-950 sm:text-xl">
+            <h1 className="mb-2 break-words text-lg font-semibold leading-snug text-gray-950 sm:text-xl">
               {fcNewsPublication.title}
             </h1>
           )}

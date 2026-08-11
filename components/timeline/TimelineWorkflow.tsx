@@ -797,13 +797,13 @@ export function TimelineWorkflow() {
           const isEditing = editingPostId === post.id;
 
           return (
-            <article key={post.id} className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-4">
+            <article key={post.id} className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-3 sm:p-4">
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                   {isFcNews ? (
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
-                      <div>
+                      <div className="min-w-0">
                         <h2 className="text-sm font-semibold leading-snug sm:text-base">
                           FC News
                         </h2>
@@ -894,7 +894,7 @@ export function TimelineWorkflow() {
                 ) : (
                   <>
                     {fcNewsPublication && (
-                      <h3 className="mt-4 text-base font-semibold leading-snug text-gray-950 sm:text-lg">
+                      <h3 className="mt-4 break-words text-base font-semibold leading-snug text-gray-950 sm:text-lg">
                         {fcNewsPublication.title}
                       </h3>
                     )}

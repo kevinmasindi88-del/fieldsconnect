@@ -453,7 +453,7 @@ export function NotificationsWorkflow() {
             return (
               <article
                 key={notification.id}
-                className={`flex min-w-0 gap-3 rounded-xl border p-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
+                className={`flex min-w-0 gap-2.5 rounded-xl border p-3 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
               >
                 <ProfileAvatar
                   avatarPath={actor?.avatar_url}
@@ -464,7 +464,7 @@ export function NotificationsWorkflow() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
                     <div className="flex min-w-0 items-start justify-between gap-2">
-                      <h2 className="min-w-0 text-sm font-semibold leading-snug sm:text-base">
+                      <h2 className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">
                         {getNotificationTitle(notification)}
                       </h2>
                       {isUnread && (

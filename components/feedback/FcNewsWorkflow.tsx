@@ -499,7 +499,7 @@ export function FcNewsWorkflow({
   }
 
   return (
-    <section className="grid gap-4 rounded-2xl border bg-white p-4 sm:gap-6 sm:p-6">
+    <section className="grid gap-4 rounded-2xl border bg-white p-3 sm:gap-6 sm:p-6">
       <div>
         <p className="text-sm font-semibold text-blue-700">
           Official FieldsConnect updates
@@ -527,7 +527,7 @@ export function FcNewsWorkflow({
 
       {isActiveFcTeamMember && (
         <form
-          className="grid gap-3 rounded-xl border p-4"
+          className="grid gap-3 rounded-xl border p-3 sm:p-4"
           onSubmit={
             editingId
               ? saveEdit
@@ -535,7 +535,7 @@ export function FcNewsWorkflow({
           }
         >
           <div>
-            <h3 className="font-semibold">
+            <h3 className="break-words font-semibold">
               {editingId
                 ? "Edit FC News"
                 : "Create FC News"}
@@ -581,7 +581,7 @@ export function FcNewsWorkflow({
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
-              className="min-h-11 rounded-xl bg-gray-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              className="min-h-11 w-full rounded-xl bg-gray-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
               disabled={isWorking}
               type="submit"
             >
@@ -607,7 +607,7 @@ export function FcNewsWorkflow({
       {isActiveFcTeamMember && (
         <section className="grid gap-3">
           <div>
-            <h3 className="font-semibold">
+            <h3 className="break-words font-semibold">
               My FC News
             </h3>
 
@@ -628,12 +628,12 @@ export function FcNewsWorkflow({
           ) : (
             authoredItems.map((item) => (
               <article
-                className="grid gap-3 rounded-xl border p-4"
+                className="grid gap-3 rounded-xl border p-3 sm:p-4"
                 key={item.id}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="font-semibold">
+                    <h4 className="break-words font-semibold">
                       {item.title}
                     </h4>
 
@@ -658,7 +658,7 @@ export function FcNewsWorkflow({
 
                 {item.reviewer_comments && (
                   <div className="rounded-xl bg-amber-50 p-3 text-sm text-gray-800">
-                    <p className="font-semibold">
+                    <p className="break-words font-semibold">
                       Reviewer comments
                     </p>
 
@@ -687,7 +687,7 @@ export function FcNewsWorkflow({
                   ) && (
                     <>
                       <button
-                        className="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                        className="min-h-11 w-full rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50 sm:w-auto"
                         disabled={isWorking}
                         onClick={() =>
                           beginEditing(item)
@@ -698,7 +698,7 @@ export function FcNewsWorkflow({
                       </button>
 
                       <button
-                        className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        className="min-h-11 w-full rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                         disabled={isWorking}
                         onClick={() =>
                           void submitForReview(
@@ -715,7 +715,7 @@ export function FcNewsWorkflow({
                   {item.status ===
                     "approved" && (
                     <button
-                      className="rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      className="min-h-11 w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                       disabled={isWorking}
                       onClick={() =>
                         void publishNews(
@@ -739,7 +739,7 @@ export function FcNewsWorkflow({
                     "published" &&
                     item.published_post_id && (
                       <button
-                        className="rounded-xl border px-4 py-2 text-sm font-semibold"
+                        className="min-h-11 w-full rounded-xl border px-4 py-2 text-sm font-semibold sm:w-auto"
                         onClick={() =>
                           router.push(
                             `/post/${item.published_post_id}`
@@ -760,7 +760,7 @@ export function FcNewsWorkflow({
       {canReview && (
         <section className="grid gap-3">
           <div>
-            <h3 className="font-semibold">
+            <h3 className="break-words font-semibold">
               FC News review queue
             </h3>
 
@@ -786,11 +786,11 @@ export function FcNewsWorkflow({
 
               return (
                 <article
-                  className="grid gap-3 rounded-xl border p-4"
+                  className="grid gap-3 rounded-xl border p-3 sm:p-4"
                   key={item.id}
                 >
                   <div>
-                    <h4 className="font-semibold">
+                    <h4 className="break-words font-semibold">
                       {item.title}
                     </h4>
 
@@ -855,7 +855,7 @@ export function FcNewsWorkflow({
 
                       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                         <button
-                          className="rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          className="min-h-11 w-full rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50 sm:w-auto"
                           disabled={isWorking}
                           onClick={() =>
                             void reviewNews(
@@ -869,7 +869,7 @@ export function FcNewsWorkflow({
                         </button>
 
                         <button
-                          className="rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                          className="min-h-11 w-full rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
                           disabled={isWorking}
                           onClick={() =>
                             void reviewNews(
