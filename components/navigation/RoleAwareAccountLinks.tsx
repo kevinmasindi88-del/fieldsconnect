@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -47,6 +47,8 @@ export function RoleAwareAccountLinks({
     useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
+
+  const realtimeInstanceId = useId();
 
   useEffect(() => {
     let isMounted = true;
@@ -120,7 +122,7 @@ export function RoleAwareAccountLinks({
 
     const channel = supabase
       .channel(
-        `account-fc-team-access-${currentUserId}`
+        `account-fc-team-access-${currentUserId}-${realtimeInstanceId}`
       )
       .on(
         "postgres_changes",
@@ -164,7 +166,7 @@ export function RoleAwareAccountLinks({
 
     const channel = supabase
       .channel(
-        `account-fc-team-notifications-${currentUserId}`
+        `account-fc-team-notifications-${currentUserId}-${realtimeInstanceId}`
       )
       .on(
         "postgres_changes",
