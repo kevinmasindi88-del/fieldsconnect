@@ -22,6 +22,13 @@ type Post = {
   edited_at: string | null;
 };
 
+type FcNewsPublication = {
+  post_id: string;
+  fc_news_id: string;
+  title: string;
+  published_at: string;
+};
+
 type Comment = {
   id: string;
   post_id: string;
@@ -32,6 +39,8 @@ type Comment = {
 
 export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [post, setPost] = useState<Post | null>(null);
+  const [fcNewsPublication, setFcNewsPublication] =
+    useState<FcNewsPublication | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -87,6 +96,20 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         if (commentError) throw commentError;
         if (profileError) throw profileError;
 
+        const publicationResult = await supabase
+          .from("fc_news_publications")
+          .select("post_id, fc_news_id, title, published_at")
+          .eq("post_id", postId)
+          .maybeSingle();
+
+        if (publicationResult.error) {
+          throw publicationResult.error;
+        }
+
+        setFcNewsPublication(
+          (publicationResult.data as FcNewsPublication | null) ?? null
+        );
+
         setPost((postData as Post | null) ?? null);
         setComments((commentData ?? []) as Comment[]);
         setProfiles((profileData ?? []) as Profile[]);
@@ -136,23 +159,40 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
       <article className="flex flex-col gap-4 rounded-xl border p-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <ProfileAvatar avatarPath={author?.avatar_url ?? null} displayName={author?.display_name ?? null} size={40} />
-            <div>
-              <p className="font-semibold">{author?.display_name ?? "Unknown profile"}</p>
-              <p className="text-sm text-gray-600">
-                {author ? [author.role_type, author.field].filter(Boolean).join(" - ") || "Profile" : "Profile"}
-              </p>
+          {fcNewsPublication ? (
+            <div className="flex items-center gap-3">
+              <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
+              <div>
+                <p className="font-semibold">FC News</p>
+                <p className="text-sm text-gray-600">
+                  Official FieldsConnect update
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <ProfileAvatar avatarPath={author?.avatar_url ?? null} displayName={author?.display_name ?? null} size={40} />
+              <div>
+                <p className="font-semibold">{author?.display_name ?? "Unknown profile"}</p>
+                <p className="text-sm text-gray-600">
+                  {author ? [author.role_type, author.field].filter(Boolean).join(" - ") || "Profile" : "Profile"}
+                </p>
+              </div>
+            </div>
+          )}
           <span className="rounded-full border px-3 py-1 text-xs">
             {post.visibility === "public" ? "Public" : "Connections"}
           </span>
         </div>
 
         <div>
-          <p className="whitespace-pre-wrap text-sm text-gray-800">{post.body}</p>
-          {post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
+          {fcNewsPublication && (
+            <h1 className="mb-2 text-lg font-semibold leading-snug text-gray-950 sm:text-xl">
+              {fcNewsPublication.title}
+            </h1>
+          )}
+          <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{post.body}</p>
+          {!fcNewsPublication && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
         </div>
 
         <div className="flex flex-col gap-3 border-t pt-4">

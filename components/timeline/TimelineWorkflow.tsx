@@ -27,6 +27,13 @@ type Post = {
   edited_at: string | null;
 };
 
+type FcNewsPublication = {
+  post_id: string;
+  fc_news_id: string;
+  title: string;
+  published_at: string;
+};
+
 type Comment = {
   id: string;
   post_id: string;
@@ -68,6 +75,8 @@ export function TimelineWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [fcNewsPublications, setFcNewsPublications] =
+    useState<FcNewsPublication[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
@@ -87,23 +96,66 @@ export function TimelineWorkflow() {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
 
+  const fcNewsPublicationByPostId = useMemo(() => {
+    return new Map(
+      fcNewsPublications.map((publication) => [
+        publication.post_id,
+        publication,
+      ])
+    );
+  }, [fcNewsPublications]);
+
   async function loadPosts() {
     if (!isSupabaseConfigured()) return;
 
     const supabase = getSupabaseBrowserClient();
 
-    const { data, error } = await supabase
-      .from("posts")
-      .select("id, author_id, body, visibility, created_at, edited_at")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+    const [postResult, publicationResult] =
+      await Promise.all([
+        supabase
+          .from("posts")
+          .select("id, author_id, body, visibility, created_at, edited_at")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("fc_news_publications")
+          .select("post_id, fc_news_id, title, published_at"),
+      ]);
 
-    if (error) {
-      console.error("Unable to refresh timeline posts:", error);
+    if (postResult.error) {
+      console.error("Unable to refresh timeline posts:", postResult.error);
       return;
     }
 
-    setPosts((data ?? []) as Post[]);
+    if (publicationResult.error) {
+      console.error("Unable to refresh FC News publications:", publicationResult.error);
+      return;
+    }
+
+    setFcNewsPublications(
+      (publicationResult.data ?? []) as FcNewsPublication[]
+    );
+
+    setPosts((postResult.data ?? []) as Post[]);
+  }
+
+  async function loadFcNewsPublications() {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("fc_news_publications")
+      .select("post_id, fc_news_id, title, published_at");
+
+    if (error) {
+      console.error("Unable to refresh FC News publications:", error);
+      return;
+    }
+
+    setFcNewsPublications(
+      (data ?? []) as FcNewsPublication[]
+    );
   }
 
   async function loadComments() {
@@ -188,6 +240,7 @@ export function TimelineWorkflow() {
         { data: commentData, error: commentError },
         { data: reactionData, error: reactionError },
         { data: commentReactionData, error: commentReactionError },
+        { data: publicationData, error: publicationError },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -205,6 +258,9 @@ export function TimelineWorkflow() {
           .order("created_at", { ascending: true }),
         supabase.from("reactions").select("id, post_id, profile_id, reaction_type"),
         supabase.from("comment_reactions").select("id, comment_id, profile_id, reaction_type"),
+        supabase
+          .from("fc_news_publications")
+          .select("post_id, fc_news_id, title, published_at"),
       ]);
 
       if (profileError) throw profileError;
@@ -212,8 +268,12 @@ export function TimelineWorkflow() {
       if (commentError) throw commentError;
       if (reactionError) throw reactionError;
       if (commentReactionError) throw commentReactionError;
+      if (publicationError) throw publicationError;
 
       setProfiles((profileData ?? []) as Profile[]);
+      setFcNewsPublications(
+        (publicationData ?? []) as FcNewsPublication[]
+      );
       setPosts((postData ?? []) as Post[]);
       setComments((commentData ?? []) as Comment[]);
       setReactions((reactionData ?? []) as Reaction[]);
@@ -278,6 +338,17 @@ export function TimelineWorkflow() {
         },
         () => {
           void loadCommentReactions();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "fc_news_publications",
+        },
+        () => {
+          void loadFcNewsPublications();
         }
       )
       .subscribe();
@@ -717,6 +788,9 @@ export function TimelineWorkflow() {
       ) : (
         posts.map((post) => {
           const author = profileById.get(post.author_id);
+          const fcNewsPublication =
+            fcNewsPublicationByPostId.get(post.id);
+          const isFcNews = Boolean(fcNewsPublication);
           const postComments = getPostComments(post.id);
           const liked = hasLiked(post.id);
           const isOwnPost = post.author_id === currentUserId;
@@ -726,7 +800,19 @@ export function TimelineWorkflow() {
             <article key={post.id} className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-4">
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                  {author ? (
+                  {isFcNews ? (
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
+                      <div>
+                        <h2 className="text-sm font-semibold leading-snug sm:text-base">
+                          FC News
+                        </h2>
+                        <p className="text-xs leading-snug text-gray-600 sm:text-sm">
+                          Official FieldsConnect update
+                        </p>
+                      </div>
+                    </div>
+                  ) : author ? (
                     <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${author.id}`}>
                       <ProfileAvatar avatarPath={author.avatar_url} displayName={author.display_name} size={40} />
                       <div>
@@ -756,7 +842,7 @@ export function TimelineWorkflow() {
                     <span className="w-fit rounded-full border px-2.5 py-0.5 text-[11px] sm:px-3 sm:py-1 sm:text-xs">
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
-                    {isOwnPost && !isEditing ? (
+                    {isOwnPost && !isEditing && !isFcNews ? (
                       <button
                         className="rounded-lg border px-3 py-1 text-xs font-medium"
                         disabled={isWorking}
@@ -807,8 +893,13 @@ export function TimelineWorkflow() {
                   </div>
                 ) : (
                   <>
-                    <p className="mt-4 whitespace-pre-wrap text-sm leading-snug text-gray-800">{post.body}</p>
-                    {post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
+                    {fcNewsPublication && (
+                      <h3 className="mt-4 text-base font-semibold leading-snug text-gray-950 sm:text-lg">
+                        {fcNewsPublication.title}
+                      </h3>
+                    )}
+                    <p className={`${fcNewsPublication ? "mt-2" : "mt-4"} whitespace-pre-wrap text-sm leading-snug text-gray-800`}>{post.body}</p>
+                    {!isFcNews && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
                   </>
                 )}
               </div>

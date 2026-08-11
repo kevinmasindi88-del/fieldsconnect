@@ -34,7 +34,11 @@ type Notification = {
   | "fc_team_leave_requested"
   | "fc_feedback_unassigned"
     | "suspension_revoked"
-    | "mentorship_completion_feedback";
+    | "mentorship_completion_feedback"
+    | "fc_news_review_requested"
+    | "fc_news_changes_requested"
+    | "fc_news_approved"
+    | "fc_news_published";
   entity_type:
     | "connection"
     | "conversation"
@@ -42,7 +46,8 @@ type Notification = {
     | "post"
     | "comment"
     | "moderation_ticket"
-    | "mentorship";
+    | "mentorship"
+    | "fc_news";
   entity_id: string | null;
   title: string;
   body: string | null;
@@ -239,6 +244,14 @@ export function NotificationsWorkflow() {
         return `${actorName} accepted your connection request`;
       case "new_message":
         return `${actorName} sent you a message`;
+      case "fc_news_published":
+        return "FC News";
+      case "fc_news_review_requested":
+        return "FC News review requested";
+      case "fc_news_changes_requested":
+        return "FC News changes requested";
+      case "fc_news_approved":
+        return "FC News approved";
       case "moderation_escalation":
         return "Moderation ticket escalated";
       case "account_suspension":
@@ -298,6 +311,59 @@ export function NotificationsWorkflow() {
         </>
       );
     }
+    if (
+      notification.notification_type === "fc_news_published" &&
+      postId
+    ) {
+      return (
+        <>
+          New FC News{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/post/${postId}`
+              )
+            }
+            type="button"
+          >
+            post
+          </button>
+        </>
+      );
+    }
+
+    if (
+      notification.entity_type === "fc_news" &&
+      notification.entity_id &&
+      [
+        "fc_news_review_requested",
+        "fc_news_changes_requested",
+        "fc_news_approved",
+      ].includes(notification.notification_type)
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                "/feedback/team"
+              )
+            }
+            type="button"
+          >
+            Open FC News
+          </button>
+        </>
+      );
+    }
+
     if (!postId) {
       return notification.body;
     }
