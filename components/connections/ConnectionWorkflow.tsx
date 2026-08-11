@@ -1604,14 +1604,19 @@ export function ConnectionWorkflow() {
                                 aria-hidden="true"
                                 className="h-5 w-5"
                                 fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth="2"
+                                viewBox="0 0 512 512"
                               >
                                 <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M8.5 8.5 6.75 6.75a4 4 0 1 0-5.66 5.66l2.5 2.5a4 4 0 0 0 5.66 0l1.25-1.25m5-5 1.25-1.25a4 4 0 1 1 5.66 5.66l-2.5 2.5a4 4 0 0 1-5.66 0L12.5 14M4 4l16 16"
+                                  d="M104 300c-22 22-34 52-34 83 0 31 12 61 34 83 22 22 52 34 83 34h63v-52h-63c-17 0-33-7-45-19s-19-28-19-45 7-33 19-45l98-98-37-37-99 96Z"
+                                  fill="currentColor"
+                                />
+                                <path
+                                  d="M262 67h63c31 0 61 12 83 34 22 22 34 52 34 83 0 31-12 61-34 83l-98 98 37 37 99-96c22-22 34-52 34-83 0-31-12-61-34-83-22-22-52-34-83-34h-63v52Z"
+                                  fill="currentColor"
+                                />
+                                <path
+                                  d="M135 114 398 377c6 6 6 15 0 21l-14 14c-6 6-15 6-21 0L100 149c-6-6-6-15 0-21l14-14c6-6 15-6 21 0Z"
+                                  fill="currentColor"
                                 />
                               </svg>
                             </button>
