@@ -865,10 +865,12 @@ export function ConnectionWorkflow() {
                 {mentorship.mentorship_field}
               </p>
 
-              <p className="mt-1 text-xs font-medium text-gray-500">
-                You are the{" "}
-                {isMentor ? "mentor" : "mentee"}
-              </p>
+              {!isHistorical && (
+                <p className="mt-1 text-xs font-medium text-gray-500">
+                  You are the{" "}
+                  {isMentor ? "mentor" : "mentee"}
+                </p>
+              )}
             </div>
           </div>
 
@@ -887,34 +889,36 @@ export function ConnectionWorkflow() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap">
-          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
-            {formatMentorshipDuration(
-              mentorship.agreed_duration
-            )}
-          </span>
+        {!isHistorical && (
+          <div className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap">
+            <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
+              {formatMentorshipDuration(
+                mentorship.agreed_duration
+              )}
+            </span>
 
-          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
-            {formatMentorshipFrequency(
-              mentorship.agreed_frequency
-            )}
-          </span>
+            <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
+              {formatMentorshipFrequency(
+                mentorship.agreed_frequency
+              )}
+            </span>
 
-          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
-            Started{" "}
-            {formatMentorshipDate(
-              mentorship.start_date
-            )}
-          </span>
+            <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
+              Started{" "}
+              {formatMentorshipDate(
+                mentorship.start_date
+              )}
+            </span>
 
-          <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
-            {mentorship.expected_end_date
-              ? `Expected end ${formatMentorshipDate(
-                  mentorship.expected_end_date
-                )}`
-              : "Ongoing"}
-          </span>
-        </div>
+            <span className="min-w-0 rounded-lg border px-2.5 py-2 text-center sm:rounded-full sm:px-3 sm:py-1">
+              {mentorship.expected_end_date
+                ? `Expected end ${formatMentorshipDate(
+                    mentorship.expected_end_date
+                  )}`
+                : "Ongoing"}
+            </span>
+          </div>
+        )}
 
         <Link
           className="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 sm:w-fit"
@@ -1561,24 +1565,56 @@ export function ConnectionWorkflow() {
                           profile={profile}
                           skills={profileSkills}
                           showBio={false}
+                          showMentorAvailability={false}
                         >
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
                             <Link
-                              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                              aria-label={`Message ${profile?.display_name ?? "connection"}`}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                               href={`/messages?connection=${encodeURIComponent(connection.id)}`}
+                              title="Message"
                             >
-                              Message
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M8 10h8M8 14h5m-7 6 3.5-3H18a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h.5L6 20Z"
+                                />
+                              </svg>
                             </Link>
-                          <button
-                            className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
-                            disabled={isWorking}
-                            onClick={() =>
-                              disconnectConnection(connection.id)
-                            }
-                            type="button"
-                          >
-                            Disconnect
-                          </button>
+
+                            <button
+                              aria-label={`Disconnect from ${profile?.display_name ?? "connection"}`}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                              disabled={isWorking}
+                              onClick={() =>
+                                disconnectConnection(connection.id)
+                              }
+                              title="Disconnect"
+                              type="button"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M8.5 8.5 6.75 6.75a4 4 0 1 0-5.66 5.66l2.5 2.5a4 4 0 0 0 5.66 0l1.25-1.25m5-5 1.25-1.25a4 4 0 1 1 5.66 5.66l-2.5 2.5a4 4 0 0 1-5.66 0L12.5 14M4 4l16 16"
+                                />
+                              </svg>
+                            </button>
                           </div>
                         </ConnectionCard>
                       );
@@ -1765,11 +1801,13 @@ function ConnectionCard({
   profile,
   skills = [],
   showBio = true,
+  showMentorAvailability = true,
   children,
 }: {
   profile?: Profile;
   skills?: string[];
   showBio?: boolean;
+  showMentorAvailability?: boolean;
   children: React.ReactNode;
 }) {
   const identity = (
@@ -1794,7 +1832,7 @@ function ConnectionCard({
           </p>
         )}
 
-        {profile?.mentor_available && (
+        {showMentorAvailability && profile?.mentor_available && (
           <p className="mt-2 text-xs font-medium sm:text-sm">
             Available as mentor
           </p>
