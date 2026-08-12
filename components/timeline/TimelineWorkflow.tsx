@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
 import {
   getActionErrorMessage,
@@ -365,6 +366,8 @@ export function TimelineWorkflow() {
       void Promise.all([
         loadPosts(),
         loadComments(),
+        loadReactions(),
+        loadCommentReactions(),
       ]);
     }, 3000);
 
@@ -802,7 +805,7 @@ export function TimelineWorkflow() {
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                   {isFcNews ? (
                     <div className="flex min-w-0 items-center gap-3">
-                      <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
+                      <FcLogoAvatar size={40} />
                       <div className="min-w-0">
                         <h2 className="text-sm font-semibold leading-snug sm:text-base">
                           FC News
@@ -858,6 +861,7 @@ export function TimelineWorkflow() {
                           targetId={post.id}
                           reportedUserId={post.author_id}
                           label="post"
+                          menuAlign="left"
                           disabled={isWorking}
                         />
                       )

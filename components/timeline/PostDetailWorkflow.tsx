@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 
 type Profile = {
   id: string;
@@ -161,7 +162,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {fcNewsPublication ? (
             <div className="flex min-w-0 items-center gap-3">
-              <ProfileAvatar avatarPath={null} displayName="FC News" size={40} />
+              <FcLogoAvatar size={40} />
               <div className="min-w-0">
                 <p className="font-semibold">FC News</p>
                 <p className="text-sm text-gray-600">

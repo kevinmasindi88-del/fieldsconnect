@@ -151,7 +151,12 @@ export function FcNewsWorkflow({
     [items]
   );
 
-  async function loadNews() {
+  async function loadNews(options?: {
+    background?: boolean;
+  }) {
+    const background =
+      options?.background ?? false;
+
     if (
       !isSupabaseConfigured() ||
       !currentUserId
@@ -162,7 +167,9 @@ export function FcNewsWorkflow({
       return;
     }
 
-    setIsLoading(true);
+    if (!background) {
+      setIsLoading(true);
+    }
 
     try {
       const supabase =
@@ -221,12 +228,61 @@ export function FcNewsWorkflow({
         )
       );
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     void loadNews();
+  }, [
+    currentUserId,
+    currentRole,
+    isActiveFcTeamMember,
+  ]);
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured()
+    ) {
+      return;
+    }
+
+    const supabase =
+      getSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(
+        `fc-news-editorial-live:${currentUserId}`
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "fc_news",
+        },
+        () => {
+          void loadNews({
+            background: true,
+          });
+        }
+      )
+      .subscribe();
+
+    const intervalId =
+      window.setInterval(() => {
+        void loadNews({
+          background: true,
+        });
+      }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      void supabase.removeChannel(channel);
+    };
   }, [
     currentUserId,
     currentRole,

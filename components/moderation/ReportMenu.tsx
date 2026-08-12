@@ -17,6 +17,7 @@ type ReportMenuProps = {
   targetId: string;
   reportedUserId: string;
   label: string;
+  menuAlign?: "left" | "right";
   disabled?: boolean;
 };
 
@@ -48,6 +49,7 @@ export function ReportMenu({
   targetId,
   reportedUserId,
   label,
+  menuAlign = "right",
   disabled = false,
 }: ReportMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,7 +121,7 @@ export function ReportMenu({
       </button>
 
       {menuOpen && (
-        <div className="absolute right-0 top-10 z-20 min-w-44 rounded-xl border bg-white p-2 shadow-lg">
+        <div className={`absolute top-10 z-20 min-w-44 max-w-[calc(100vw-2rem)] rounded-xl border bg-white p-2 shadow-lg ${menuAlign === "left" ? "left-0 sm:left-auto sm:right-0" : "right-0"}`}>
           <button
             className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50"
             onClick={openDialog}

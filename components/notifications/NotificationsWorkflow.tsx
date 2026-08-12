@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 
 type Notification = {
   id: string;
@@ -455,11 +456,19 @@ export function NotificationsWorkflow() {
                 key={notification.id}
                 className={`flex min-w-0 gap-2.5 rounded-xl border p-3 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
               >
-                <ProfileAvatar
-                  avatarPath={actor?.avatar_url}
-                  displayName={actor?.display_name ?? notification.title}
-                  size={40}
-                />
+                {notification.notification_type ===
+                "fc_news_published" ? (
+                  <FcLogoAvatar size={40} />
+                ) : (
+                  <ProfileAvatar
+                    avatarPath={actor?.avatar_url}
+                    displayName={
+                      actor?.display_name ??
+                      notification.title
+                    }
+                    size={40}
+                  />
+                )}
 
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
