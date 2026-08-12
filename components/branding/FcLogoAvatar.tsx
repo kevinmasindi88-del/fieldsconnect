@@ -15,7 +15,7 @@ export function FcLogoAvatar({
         alt=""
         aria-hidden="true"
         className="h-full w-full object-contain"
-        src="/icons/fc-logo.png"
+        src="/icons/fc-logo-transparent.png"
       />
     </div>
   );
