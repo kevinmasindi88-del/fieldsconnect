@@ -223,6 +223,16 @@ export function RoleAwareAccountLinks({
 
   return (
     <>
+      <Link
+        className={accountLinkClass(
+          pathname === "/feedback"
+        )}
+        href="/feedback"
+        onClick={closeAccountDropdown}
+      >
+        Feedback
+      </Link>
+
       {canAccessFeedbackReview && (
         <Link
           className={accountLinkClass(
