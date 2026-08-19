@@ -39,7 +39,9 @@ type Notification = {
     | "fc_news_review_requested"
     | "fc_news_changes_requested"
     | "fc_news_approved"
-    | "fc_news_published";
+    | "fc_news_published"
+    | "skill_published"
+    | "skill_updated";
   entity_type:
     | "connection"
     | "conversation"
@@ -48,7 +50,8 @@ type Notification = {
     | "comment"
     | "moderation_ticket"
     | "mentorship"
-    | "fc_news";
+    | "fc_news"
+    | "skill";
   entity_id: string | null;
   title: string;
   body: string | null;
@@ -245,6 +248,10 @@ export function NotificationsWorkflow() {
         return `${actorName} accepted your connection request`;
       case "new_message":
         return `${actorName} sent you a message`;
+      case "skill_published":
+        return `${actorName} published a skill`;
+      case "skill_updated":
+        return `${actorName} updated a skill`;
       case "fc_news_published":
         return "FC News";
       case "fc_news_review_requested":
@@ -360,6 +367,31 @@ export function NotificationsWorkflow() {
             type="button"
           >
             Open FC News
+          </button>
+        </>
+      );
+    }
+
+    if (
+      (notification.notification_type === "skill_published" ||
+        notification.notification_type === "skill_updated") &&
+      notification.actor_id
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/profile/${notification.actor_id}`
+              )
+            }
+            type="button"
+          >
+            View profile
           </button>
         </>
       );
