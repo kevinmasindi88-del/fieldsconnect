@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
@@ -70,6 +70,8 @@ export function MessagingWorkflow() {
     useState(false);
   const [mobileThreadOffset, setMobileThreadOffset] =
     useState(0);
+  const [currentLocalDate, setCurrentLocalDate] =
+    useState(() => new Date());
   const onlineUserIds =
     useOnlinePresence();
   const messageScrollRef =
@@ -456,6 +458,23 @@ export function MessagingWorkflow() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const nextDate = new Date();
+
+      setCurrentLocalDate((currentDate) =>
+        getLocalDateKey(currentDate) ===
+        getLocalDateKey(nextDate)
+          ? currentDate
+          : nextDate
+      );
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -1123,7 +1142,7 @@ export function MessagingWorkflow() {
               )}
 
               {activeMessages.map(
-                (item) => {
+                (item, index) => {
                   const isOwn =
                     item.sender_id ===
                     currentUserId;
@@ -1133,9 +1152,44 @@ export function MessagingWorkflow() {
                       item.sender_id
                     );
 
+                  const previousMessage =
+                    index > 0
+                      ? activeMessages[index - 1]
+                      : null;
+
+                  const showDateSeparator =
+                    !previousMessage ||
+                    getLocalDateKey(
+                      new Date(
+                        previousMessage.created_at
+                      )
+                    ) !==
+                      getLocalDateKey(
+                        new Date(item.created_at)
+                      );
+
+                  const dateLabel =
+                    formatMessageDateLabel(
+                      item.created_at,
+                      currentLocalDate
+                    );
+
                   return (
+                    <Fragment key={item.id}>
+                      {showDateSeparator && (
+                        <div className="flex w-full items-center gap-3 py-1">
+                          <span className="h-px flex-1 bg-gray-200" />
+
+                          <span className="shrink-0 text-[11px] font-medium text-gray-500">
+                            {dateLabel}
+                          </span>
+
+                          <span className="h-px flex-1 bg-gray-200" />
+                        </div>
+                      )}
+
                     <article
-                      key={item.id}
+
                       className={`flex max-w-[88%] gap-2 rounded-xl border p-3 text-sm sm:max-w-2xl sm:gap-3 ${
                         isOwn
                           ? "self-end bg-gray-100"
@@ -1202,8 +1256,21 @@ export function MessagingWorkflow() {
                         <p className="mt-1 whitespace-pre-wrap leading-snug text-gray-800">
                           {item.body}
                         </p>
+
+                        <p
+                          className={`mt-1 text-[10px] text-gray-500 ${
+                            isOwn
+                              ? "text-right"
+                              : "text-left"
+                          }`}
+                        >
+                          {formatMessageTime(
+                            item.created_at
+                          )}
+                        </p>
                       </div>
                     </article>
+                    </Fragment>
                   );
                 }
               )}
@@ -1244,5 +1311,68 @@ export function MessagingWorkflow() {
         </form>
       </main>
     </section>
+  );
+}
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatMessageDateLabel(
+  createdAt: string,
+  currentDate: Date
+) {
+  const messageDate = new Date(createdAt);
+
+  const todayKey =
+    getLocalDateKey(currentDate);
+
+  const yesterday = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate() - 1
+  );
+
+  const yesterdayKey =
+    getLocalDateKey(yesterday);
+
+  const messageKey =
+    getLocalDateKey(messageDate);
+
+  if (messageKey === todayKey) {
+    return "Today";
+  }
+
+  if (messageKey === yesterdayKey) {
+    return "Yesterday";
+  }
+
+  return messageDate.toLocaleDateString(
+    "en-ZA",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }
+  );
+}
+
+function formatMessageTime(createdAt: string) {
+  return new Date(
+    createdAt
+  ).toLocaleTimeString(
+    "en-ZA",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }
   );
 }
