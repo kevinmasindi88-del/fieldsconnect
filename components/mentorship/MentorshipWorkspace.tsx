@@ -1674,7 +1674,7 @@ export function MentorshipWorkspace({
         }
       />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
         <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
           <h2 className="text-xl font-semibold">
             Shared updates
