@@ -1452,7 +1452,7 @@ export function MentorshipWorkspace({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
+    <section className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-6 sm:gap-8 sm:px-6 sm:py-8">
       <div>
         <Link
           className="text-sm font-medium text-blue-700 underline"
@@ -1473,7 +1473,7 @@ export function MentorshipWorkspace({
 
             <p className="mt-2 text-sm text-gray-600">
               You are participating as the{" "}
-              <span className="font-semibold">
+              <span className="break-words font-semibold">
                 {currentUserRole}
               </span>
               .
@@ -1504,7 +1504,7 @@ export function MentorshipWorkspace({
         />
       </div>
 
-      <section className="rounded-2xl border bg-white p-5">
+      <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
         <h2 className="text-xl font-semibold">
           Mentorship agreement
         </h2>
@@ -1589,7 +1589,7 @@ export function MentorshipWorkspace({
 
       {isWorkspaceReadOnly && (
         <div className="rounded-2xl border bg-gray-50 p-5">
-          <h2 className="font-semibold">
+          <h2 className="break-words font-semibold">
             Read-only mentorship record
           </h2>
 
@@ -1674,8 +1674,8 @@ export function MentorshipWorkspace({
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
-        <section className="rounded-2xl border bg-white p-5">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
+        <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
           <h2 className="text-xl font-semibold">
             Shared updates
           </h2>
@@ -1694,7 +1694,7 @@ export function MentorshipWorkspace({
               Update type
 
               <select
-                className="rounded-xl border px-4 py-3 font-normal"
+                className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal"
                 disabled={isSubmittingUpdate}
                 onChange={(event) =>
                   setUpdateType(
@@ -1723,7 +1723,7 @@ export function MentorshipWorkspace({
               Update
 
               <textarea
-                className="min-h-32 resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="min-h-32 min-w-0 w-full resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 disabled={isSubmittingUpdate}
                 maxLength={5000}
                 minLength={2}
@@ -1763,7 +1763,7 @@ export function MentorshipWorkspace({
 
                 return (
                   <article
-                    className="rounded-xl border p-4"
+                    className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4"
                     key={update.id}
                   >
                     <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
@@ -1779,7 +1779,7 @@ export function MentorshipWorkspace({
                         />
 
                         <div>
-                          <p className="font-semibold">
+                          <p className="break-words font-semibold">
                             {author?.display_name ??
                               "Unknown participant"}
                           </p>
@@ -1812,9 +1812,9 @@ export function MentorshipWorkspace({
           </div>
         </section>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {canManageMilestones && (
-            <section className="rounded-2xl border bg-white p-5">
+            <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
             <h2 className="text-xl font-semibold">
               Add milestone
             </h2>
@@ -1832,7 +1832,7 @@ export function MentorshipWorkspace({
                 Title
 
                 <input
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingMilestone}
                   maxLength={160}
                   minLength={2}
@@ -1851,7 +1851,7 @@ export function MentorshipWorkspace({
                 Description
 
                 <textarea
-                  className="min-h-24 resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingMilestone}
                   maxLength={3000}
                   onChange={(event) =>
@@ -1868,7 +1868,7 @@ export function MentorshipWorkspace({
                 Target date
 
                 <input
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingMilestone}
                   onChange={(event) =>
                     setMilestoneTargetDate(
@@ -1898,7 +1898,7 @@ export function MentorshipWorkspace({
 
 
           {!isWorkspaceReadOnly && (
-          <section className="rounded-2xl border bg-white p-5">
+          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
             <h2 className="text-xl font-semibold">
               Add action item
             </h2>
@@ -1915,7 +1915,7 @@ export function MentorshipWorkspace({
                 Title
 
                 <input
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
                   maxLength={200}
                   minLength={2}
@@ -1934,7 +1934,7 @@ export function MentorshipWorkspace({
                 Description
 
                 <textarea
-                  className="min-h-24 resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
                   maxLength={3000}
                   onChange={(event) =>
@@ -1951,7 +1951,7 @@ export function MentorshipWorkspace({
                 Assign to
 
                 <select
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
                   onChange={(event) =>
                     setActionItemAssignee(
@@ -1986,7 +1986,7 @@ export function MentorshipWorkspace({
                 Linked milestone
 
                 <select
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
                   onChange={(event) =>
                     setActionItemMilestoneId(
@@ -2014,7 +2014,7 @@ export function MentorshipWorkspace({
                 Due date
 
                 <input
-                  className="rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
                   onChange={(event) =>
                     setActionItemDueDate(
@@ -2089,7 +2089,7 @@ function ParticipantCard({
   profile?: Profile;
 }) {
   return (
-    <article className="rounded-2xl border bg-white p-5">
+    <article className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
         {label}
       </p>
@@ -2110,7 +2110,7 @@ function ParticipantCard({
               {profile.display_name}
             </Link>
           ) : (
-            <p className="font-semibold">
+            <p className="break-words font-semibold">
               Unknown participant
             </p>
           )}
@@ -2175,7 +2175,7 @@ function CompletionFeedbackPanel({
 
   return (
     <div className="mt-5 rounded-xl border p-4">
-      <h3 className="font-semibold">
+      <h3 className="break-words font-semibold">
         Completion feedback
       </h3>
 
@@ -2400,7 +2400,7 @@ function LifecyclePanel({
     currentUserId;
 
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h2 className="text-xl font-semibold">
@@ -2472,7 +2472,7 @@ function LifecyclePanel({
             ) : (
               <div className="mt-4 grid gap-3">
                 <textarea
-                  className="min-h-24 resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   maxLength={1000}
                   onChange={(event) =>
                     setExtensionResponseNote(
@@ -2527,7 +2527,7 @@ function LifecyclePanel({
 
       {mentorship.status === "paused" && (
         <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-700">
-          <p className="font-semibold">
+          <p className="break-words font-semibold">
             Mentorship paused
           </p>
 
@@ -2602,7 +2602,7 @@ function LifecyclePanel({
           ) : (
             <div className="mt-4 grid gap-3">
               <textarea
-                className="min-h-24 resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 maxLength={2000}
                 onChange={(event) =>
                   setCompletionResponseNote(
@@ -2657,8 +2657,8 @@ function LifecyclePanel({
           "completion_requested" && (
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             {canManagePauseResume ? (
-              <div className="rounded-xl border p-4">
-                <h3 className="font-semibold">
+              <div className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4">
+                <h3 className="break-words font-semibold">
                   Pause mentorship
                 </h3>
 
@@ -2692,7 +2692,7 @@ function LifecyclePanel({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed p-4">
-                <h3 className="font-semibold">
+                <h3 className="break-words font-semibold">
                   Pause mentorship
                 </h3>
 
@@ -2702,8 +2702,8 @@ function LifecyclePanel({
               </div>
             )}
 
-            <div className="rounded-xl border p-4">
-              <h3 className="font-semibold">
+            <div className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4">
+              <h3 className="break-words font-semibold">
                 Request completion
               </h3>
 
@@ -2721,7 +2721,7 @@ function LifecyclePanel({
 
               {hasUnfinishedWork && (
                 <div className="mt-3 rounded-xl border border-dashed p-3 text-sm text-gray-700">
-                  <p className="font-semibold">
+                  <p className="break-words font-semibold">
                     Completion is not yet available
                   </p>
 
@@ -2817,7 +2817,7 @@ function LifecyclePanel({
         mentorship.status !==
           "extension_pending" && (
           <div className="mt-5 rounded-xl border p-4">
-            <h3 className="font-semibold">
+            <h3 className="break-words font-semibold">
               Request extension
             </h3>
 
@@ -2827,7 +2827,7 @@ function LifecyclePanel({
               </p>
             ) : !canRequestExtension ? (
               <div className="mt-3 rounded-xl border border-dashed p-3 text-sm text-gray-700">
-                <p className="font-semibold">
+                <p className="break-words font-semibold">
                   Extension is not yet available
                 </p>
 
@@ -2848,7 +2848,7 @@ function LifecyclePanel({
                   Requested term
 
                   <select
-                    className="min-h-11 rounded-xl border bg-white px-4 py-2 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                    className="min-h-11 min-w-0 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                     onChange={(event) =>
                       setExtensionDuration(
                         event.target.value as MentorshipExtensionRequest["requested_duration"]
@@ -2875,7 +2875,7 @@ function LifecyclePanel({
                 </label>
 
                 <textarea
-                  className="min-h-24 resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                  className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   maxLength={1000}
                   onChange={(event) =>
                     setExtensionReason(
@@ -3001,7 +3001,7 @@ function MentorshipWorkboard({
     ).length;
 
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h2 className="text-xl font-semibold">
@@ -3072,7 +3072,7 @@ function MentorshipWorkboard({
 
             return (
               <details
-                className="group rounded-2xl border bg-gray-50 p-3"
+                className="group min-w-0 max-w-full overflow-hidden rounded-2xl border bg-gray-50 p-3"
 
                 key={milestone.id}
               >
@@ -3153,7 +3153,7 @@ function MentorshipWorkboard({
         )}
 
         <details
-          className="group rounded-2xl border bg-gray-50 p-3"
+          className="group min-w-0 max-w-full overflow-hidden rounded-2xl border bg-gray-50 p-3"
 
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl p-2">
@@ -3165,7 +3165,7 @@ function MentorshipWorkboard({
                 ▶
               </span>
 
-              <h3 className="font-semibold">
+              <h3 className="break-words font-semibold">
                 Unlinked action items
               </h3>
             </div>
@@ -3242,7 +3242,7 @@ function MilestoneList({
   updatingMilestoneId: string | null;
 }) {
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <h2 className="text-xl font-semibold">
         Milestones
       </h2>
@@ -3293,12 +3293,12 @@ function MilestoneList({
 
             return (
               <article
-                className="rounded-xl border p-4"
+                className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4"
                 key={milestone.id}
               >
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                   <div>
-                    <h3 className="font-semibold">
+                    <h3 className="break-words font-semibold">
                       {milestone.title}
                     </h3>
 
@@ -3604,7 +3604,7 @@ function ActionItemList({
   }
 
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <h2 className="text-xl font-semibold">
         Action items
       </h2>
@@ -3641,7 +3641,7 @@ function ActionItemList({
 
             return (
               <article
-                className="rounded-xl border p-4"
+                className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4"
                 key={item.id}
               >
                 <button
@@ -3656,7 +3656,7 @@ function ActionItemList({
                   type="button"
                 >
                   <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                    <h3 className="font-semibold">
+                    <h3 className="break-words font-semibold">
                       {item.title}
                     </h3>
 
@@ -3796,7 +3796,7 @@ function ActionItemList({
                             Completion summary
 
                             <textarea
-                              className="min-h-32 resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                              className="min-h-32 min-w-0 w-full resize-y rounded-xl border px-4 py-3 font-normal leading-6 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                               disabled={isUpdating}
                               maxLength={5000}
                               minLength={10}
@@ -3848,7 +3848,7 @@ function ActionItemList({
                             Completion rating
 
                             <select
-                              className="rounded-xl border px-4 py-3 font-normal"
+                              className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal"
                               disabled={isUpdating}
                               onChange={(event) =>
                                 setReviewRating(
@@ -3887,7 +3887,7 @@ function ActionItemList({
                             Review comments
 
                             <textarea
-                              className="min-h-24 resize-y rounded-xl border px-4 py-3 font-normal leading-6"
+                              className="min-h-24 min-w-0 w-full resize-y rounded-xl border px-4 py-3 font-normal leading-6"
                               disabled={isUpdating}
                               maxLength={3000}
                               onChange={(event) =>
@@ -3980,7 +3980,7 @@ function WorkspaceList({
   emptyText: string;
 }) {
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
       <h2 className="text-xl font-semibold">
         {title}
       </h2>
@@ -3991,11 +3991,11 @@ function WorkspaceList({
         ) : (
           items.map((item) => (
             <article
-              className="rounded-xl border p-4"
+              className="min-w-0 max-w-full overflow-hidden rounded-xl border p-4"
               key={item.id}
             >
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                <h3 className="font-semibold">
+                <h3 className="break-words font-semibold">
                   {item.title}
                 </h3>
 

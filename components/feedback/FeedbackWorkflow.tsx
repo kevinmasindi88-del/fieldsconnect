@@ -96,7 +96,7 @@ export function FeedbackWorkflow() {
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-6 sm:py-10">
+    <section className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-4 overflow-x-hidden px-3 py-4 sm:gap-6 sm:px-6 sm:py-10">
       <header>
 <h1 className="mt-1 text-xl font-semibold tracking-tight text-gray-950 sm:text-3xl">
           Share feedback
@@ -110,7 +110,7 @@ export function FeedbackWorkflow() {
       </header>
 
       <form
-        className="grid gap-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:gap-5 sm:p-7"
+        className="grid min-w-0 max-w-full gap-4 overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:gap-5 sm:p-7"
         onSubmit={submitFeedback}
       >
         <label className="grid gap-2 text-sm font-medium text-gray-900">
@@ -118,7 +118,7 @@ export function FeedbackWorkflow() {
 
           <input
             autoFocus
-            className="min-h-11 rounded-xl border border-gray-300 px-4 py-3 text-sm font-normal outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            className="min-h-11 min-w-0 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-normal outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             disabled={isSubmitting}
             maxLength={160}
             minLength={3}
@@ -142,7 +142,7 @@ export function FeedbackWorkflow() {
           Description
 
           <textarea
-            className="min-h-48 resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm font-normal leading-6 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            className="min-h-48 min-w-0 w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-sm font-normal leading-6 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             disabled={isSubmitting}
             maxLength={5000}
             minLength={10}
