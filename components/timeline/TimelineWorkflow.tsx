@@ -92,6 +92,8 @@ export function TimelineWorkflow() {
   const [isWorking, setIsWorking] = useState(false);
   const [reactingPostId, setReactingPostId] = useState<string | null>(null);
   const [reactingCommentId, setReactingCommentId] = useState<string | null>(null);
+  const [relativeTimeNow, setRelativeTimeNow] =
+    useState(() => Date.now());
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -288,6 +290,16 @@ export function TimelineWorkflow() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setRelativeTimeNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -811,7 +823,11 @@ export function TimelineWorkflow() {
                           FC News
                         </h2>
                         <p className="text-xs leading-snug text-gray-600 sm:text-sm">
-                          Official FieldsConnect update
+                          Official FieldsConnect update ·{" "}
+                          {formatPostAge(
+                            post.created_at,
+                            relativeTimeNow
+                          )}
                         </p>
                       </div>
                     </div>
@@ -823,7 +839,17 @@ export function TimelineWorkflow() {
                           {author.display_name}
                         </h2>
                         <p className="text-xs leading-snug text-gray-600 sm:text-sm">
-                          {[author.role_type, author.field].filter(Boolean).join(" - ") || "Profile"}
+                          {[author.role_type, author.field]
+                            .filter(Boolean)
+                            .join(" - ") || "Profile"}{" "}
+                          ·{" "}
+                          {formatPostAge(
+                            post.created_at,
+                            relativeTimeNow
+                          )}
+                          {post.edited_at
+                            ? " · Edited"
+                            : ""}
                         </p>
                       </div>
                     </Link>
@@ -835,7 +861,14 @@ export function TimelineWorkflow() {
                           Unknown profile
                         </h2>
                         <p className="text-xs leading-snug text-gray-600 sm:text-sm">
-                          Profile
+                          Profile ·{" "}
+                          {formatPostAge(
+                            post.created_at,
+                            relativeTimeNow
+                          )}
+                          {post.edited_at
+                            ? " · Edited"
+                            : ""}
                         </p>
                       </div>
                     </div>
@@ -903,7 +936,7 @@ export function TimelineWorkflow() {
                       </h3>
                     )}
                     <p className={`${fcNewsPublication ? "mt-2" : "mt-4"} whitespace-pre-wrap text-sm leading-snug text-gray-800`}>{post.body}</p>
-                    {!isFcNews && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
+
                   </>
                 )}
               </div>
@@ -1044,4 +1077,56 @@ export function TimelineWorkflow() {
       )}
     </section>
   );
+}
+function formatPostAge(
+  createdAt: string,
+  nowMs: number
+) {
+  const createdMs =
+    new Date(createdAt).getTime();
+
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor(
+      (nowMs - createdMs) / 1000
+    )
+  );
+
+  if (elapsedSeconds < 60) {
+    return `${elapsedSeconds}s`;
+  }
+
+  const minutes = Math.floor(
+    elapsedSeconds / 60
+  );
+
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(
+    minutes / 60
+  );
+
+  if (hours < 24) {
+    return `${hours}h`;
+  }
+
+  const days = Math.floor(
+    hours / 24
+  );
+
+  if (days < 7) {
+    return `${days}d`;
+  }
+
+  if (days < 30) {
+    return `${Math.floor(days / 7)}w`;
+  }
+
+  if (days < 365) {
+    return `${Math.floor(days / 30)}mo`;
+  }
+
+  return `${Math.floor(days / 365)}y`;
 }
