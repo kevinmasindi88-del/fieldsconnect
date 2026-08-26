@@ -995,11 +995,33 @@ export function TimelineWorkflow() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             {commenter ? (
-                              <Link className="text-xs font-medium hover:underline sm:text-sm" href={`/profile/${commenter.id}`}>
-                                {commenter.display_name}
-                              </Link>
+                              <div className="flex flex-wrap items-center gap-1 text-xs sm:text-sm">
+                                <Link
+                                  className="font-medium hover:underline"
+                                  href={`/profile/${commenter.id}`}
+                                >
+                                  {commenter.display_name}
+                                </Link>
+
+                                <span className="text-gray-500">
+                                  ·{" "}
+                                  {formatPostAge(
+                                    comment.created_at,
+                                    relativeTimeNow
+                                  )}
+                                </span>
+                              </div>
                             ) : (
-                              <p className="text-xs font-medium sm:text-sm">Unknown profile</p>
+                              <p className="text-xs font-medium sm:text-sm">
+                                Unknown profile{" "}
+                                <span className="font-normal text-gray-500">
+                                  ·{" "}
+                                  {formatPostAge(
+                                    comment.created_at,
+                                    relativeTimeNow
+                                  )}
+                                </span>
+                              </p>
                             )}
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">{comment.body}</p>
                           </div>
