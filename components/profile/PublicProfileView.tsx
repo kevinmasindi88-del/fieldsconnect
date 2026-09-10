@@ -48,6 +48,7 @@ type MentorProfile = {
 
 type MentorshipRequestForm = {
   mentorshipField: string;
+  mentorshipLevel: string;
   objective: string;
   motivation: string;
   requestedDuration: MentorshipDuration;
@@ -89,6 +90,7 @@ type PublicProfileViewProps = {
 
 const initialMentorshipRequestForm: MentorshipRequestForm = {
   mentorshipField: "",
+  mentorshipLevel: "",
   objective: "",
   motivation: "",
   requestedDuration: "3_months",
@@ -235,6 +237,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             ...current,
             mentorshipField:
               mentorData.mentoring_fields?.[0] ?? "",
+            mentorshipLevel:
+              mentorData.mentoring_levels?.[0] ?? "",
             requestedDuration:
               firstAcceptedDuration ??
               current.requestedDuration,
@@ -475,6 +479,21 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       return;
     }
 
+    const availableMentorshipLevels =
+      mentorProfile.mentoring_levels ?? [];
+
+    if (
+      !requestForm.mentorshipLevel ||
+      !availableMentorshipLevels.includes(
+        requestForm.mentorshipLevel
+      )
+    ) {
+      setMessage(
+        "Select a mentorship level offered by this mentor."
+      );
+      return;
+    }
+
     const acceptedDurationValues =
       getAcceptedDurations().map(
         (duration) => duration.value
@@ -515,6 +534,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             requestForm.requestedDuration,
           requested_contact_frequency:
             requestForm.requestedFrequency,
+          requested_mentorship_level:
+            requestForm.mentorshipLevel,
         }
       );
 
@@ -738,6 +759,46 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                   Explain what you hope to achieve and why this
                   mentor is a suitable match.
                 </p>
+              </div>
+
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <p className="text-sm font-semibold">
+                  Choose your mentorship level
+                </p>
+
+                <p className="mt-1 text-sm text-gray-600">
+                  This mentor currently offers mentorship at the
+                  following level(s). Select the level that best fits
+                  this mentorship cycle. Your main FieldsConnect
+                  profile will not be changed.
+                </p>
+
+                <label className="mt-3 flex flex-col gap-2 text-sm font-medium">
+                  Mentorship level
+
+                  <select
+                    className="rounded-lg border bg-white px-3 py-2"
+                    value={requestForm.mentorshipLevel}
+                    onChange={(event) =>
+                      updateRequestField(
+                        "mentorshipLevel",
+                        event.target.value
+                      )
+                    }
+                  >
+                    <option value="">
+                      Select a mentorship level
+                    </option>
+
+                    {mentorProfile.mentoring_levels.map(
+                      (level) => (
+                        <option key={level} value={level}>
+                          {formatMentorshipLevel(level)}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
               </div>
 
               <label className="flex flex-col gap-2 text-sm font-medium">
@@ -975,6 +1036,14 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       </section>
     </section>
   );
+}
+
+function formatMentorshipLevel(level: string) {
+  return level
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) =>
+      character.toUpperCase()
+    );
 }
 
 function formatBytes(bytes: number) {
