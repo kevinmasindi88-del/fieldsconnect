@@ -524,6 +524,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     const supabase = getSupabaseBrowserClient();
 
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "serviceWorker" in navigator &&
+        "PushManager" in window
+      ) {
+        const registration =
+          await navigator.serviceWorker.getRegistration();
+
+        const subscription =
+          registration
+            ? await registration.pushManager.getSubscription()
+            : null;
+
+        if (subscription) {
+          const endpoint = subscription.endpoint;
+
+          const { error } = await supabase.rpc(
+            "unregister_push_subscription",
+            {
+              subscription_endpoint: endpoint,
+            }
+          );
+
+          if (error) {
+            console.warn(
+              "Unable to unregister push subscription during logout:",
+              error
+            );
+          }
+
+          await subscription.unsubscribe();
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Unable to clean up push subscription during logout:",
+        error
+      );
+    }
+
     await supabase.auth.signOut();
     window.location.href = "/login";
   }
