@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { InstallFieldsConnect } from "@/components/navigation/InstallFieldsConnect";
 import { useEffect, useId, useState } from "react";
 import {
   getSupabaseBrowserClient,
@@ -223,6 +224,8 @@ export function RoleAwareAccountLinks({
 
   return (
     <>
+      <InstallFieldsConnect />
+
       <Link
         className={accountLinkClass(
           pathname === "/feedback"
