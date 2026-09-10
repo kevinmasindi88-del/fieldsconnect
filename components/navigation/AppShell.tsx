@@ -832,22 +832,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       >
                         Profile
                       </Link>
-                      <Link
-                        className={[
-                          "block rounded-lg px-3 py-2 text-sm",
-                          pathname === "/feedback"
-                            ? "bg-gray-100 font-medium text-gray-950"
-                            : "text-gray-700 hover:bg-gray-50",
-                        ].join(" ")}
-                        href="/feedback"
-                        onClick={(event) => {
-                          event.currentTarget
-                            .closest("details")
-                            ?.removeAttribute("open");
-                        }}
-                      >
-                        Feedback
-                      </Link>
                       <RoleAwareAccountLinks pathname={pathname} />
                     </div>
                   </details>
