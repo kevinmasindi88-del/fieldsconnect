@@ -56,6 +56,22 @@ export function AcceptanceForm() {
         return;
       }
 
+      const { data: profileData, error: profileError } =
+        await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", userId)
+          .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (!profileData?.display_name?.trim()) {
+        setMessage(
+          "Please complete your profile name before finishing onboarding."
+        );
+        return;
+      }
+
       const now = new Date().toISOString();
 
       const { error } = await supabase
