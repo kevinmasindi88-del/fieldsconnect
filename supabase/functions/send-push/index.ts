@@ -136,12 +136,23 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  const authoritativeUnreadCount =
+    unreadCountError ? undefined : unreadCount ?? 0;
+
   const message = JSON.stringify({
+    web_push: 8030,
     notificationId: notification.id,
-    unreadCount: unreadCountError ? null : unreadCount ?? 0,
-    title: notification.title || "FieldsConnect",
-    body: notification.body || "You have a new notification.",
-    url: "/notifications",
+    unreadCount: authoritativeUnreadCount,
+    app_badge: authoritativeUnreadCount,
+    notification: {
+      title: notification.title || "FieldsConnect",
+      body:
+        notification.body ||
+        "You have a new notification.",
+      navigate:
+        "https://fieldsconnect.app/notifications",
+      tag: `fc-${notification.id}`,
+    },
   });
 
   let sent = 0;
@@ -156,7 +167,12 @@ Deno.serve(async (req: Request) => {
             auth: subscription.auth,
           },
         },
-        message
+        message,
+        {
+          headers: {
+            "Content-Type": "application/notification+json",
+          },
+        }
       );
 
       sent += 1;

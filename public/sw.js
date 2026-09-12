@@ -10,9 +10,17 @@
     };
   }
 
+  const notificationPayload =
+    payload &&
+    typeof payload.notification === "object" &&
+    payload.notification !== null
+      ? payload.notification
+      : payload;
+
   const title =
-    typeof payload.title === "string" && payload.title.trim()
-      ? payload.title
+    typeof notificationPayload.title === "string" &&
+    notificationPayload.title.trim()
+      ? notificationPayload.title
       : "FieldsConnect";
 
   const notificationId =
@@ -23,8 +31,8 @@
 
   const options = {
     body:
-      typeof payload.body === "string"
-        ? payload.body
+      typeof notificationPayload.body === "string"
+        ? notificationPayload.body
         : "You have a new FieldsConnect notification.",
     icon: "/icon.svg",
     badge: "/icon.svg",
@@ -34,16 +42,17 @@
     renotify: false,
     data: {
       url:
-        typeof payload.url === "string" && payload.url.startsWith("/")
-          ? payload.url
+        typeof notificationPayload.navigate === "string" &&
+        notificationPayload.navigate.startsWith("/")
+          ? notificationPayload.navigate
           : "/notifications",
     },
   };
 
   const unreadCount =
-    typeof payload.unreadCount === "number" &&
-    Number.isFinite(payload.unreadCount)
-      ? Math.max(0, Math.floor(payload.unreadCount))
+    typeof (payload.app_badge ?? payload.unreadCount) === "number" &&
+    Number.isFinite(payload.app_badge ?? payload.unreadCount)
+      ? Math.max(0, Math.floor(payload.app_badge ?? payload.unreadCount))
       : null;
 
   const tasks = [

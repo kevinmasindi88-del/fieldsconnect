@@ -2,6 +2,7 @@
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "FieldsConnect",
     short_name: "FieldsConnect",
     description: "Mentorship and professional connection platform.",
