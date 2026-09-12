@@ -118,6 +118,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const message = JSON.stringify({
+    notificationId: notification.id,
     title: notification.title || "FieldsConnect",
     body: notification.body || "You have a new notification.",
     url: "/notifications",

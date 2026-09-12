@@ -15,6 +15,12 @@
       ? payload.title
       : "FieldsConnect";
 
+  const notificationId =
+    typeof payload.notificationId === "string" &&
+    payload.notificationId.trim()
+      ? payload.notificationId.trim()
+      : null;
+
   const options = {
     body:
       typeof payload.body === "string"
@@ -22,6 +28,10 @@
         : "You have a new FieldsConnect notification.",
     icon: "/icon.svg",
     badge: "/icon.svg",
+    tag: notificationId
+      ? `fc-${notificationId}`
+      : undefined,
+    renotify: false,
     data: {
       url:
         typeof payload.url === "string" && payload.url.startsWith("/")
