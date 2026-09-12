@@ -117,8 +117,28 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const {
+    count: unreadCount,
+    error: unreadCountError,
+  } = await supabase
+    .from("notifications")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("recipient_id", notification.recipient_id)
+    .is("read_at", null);
+
+  if (unreadCountError) {
+    console.error(
+      "Unable to load unread notification count:",
+      unreadCountError
+    );
+  }
+
   const message = JSON.stringify({
     notificationId: notification.id,
+    unreadCount: unreadCountError ? null : unreadCount ?? 0,
     title: notification.title || "FieldsConnect",
     body: notification.body || "You have a new notification.",
     url: "/notifications",

@@ -519,7 +519,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [user, pathname]);
 
+  useEffect(() => {
+    async function syncAppBadge() {
+      if (typeof navigator === "undefined") return;
+
+      try {
+        if (
+          unreadNotificationCount > 0 &&
+          "setAppBadge" in navigator
+        ) {
+          await navigator.setAppBadge(
+            unreadNotificationCount
+          );
+          return;
+        }
+
+        if (
+          unreadNotificationCount === 0 &&
+          "clearAppBadge" in navigator
+        ) {
+          await navigator.clearAppBadge();
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to update app badge:",
+          error
+        );
+      }
+    }
+
+    void syncAppBadge();
+  }, [unreadNotificationCount]);
+
   async function handleLogout() {
+    if (
+      typeof navigator !== "undefined" &&
+      "clearAppBadge" in navigator
+    ) {
+      try {
+        await navigator.clearAppBadge();
+      } catch {
+        // Badge clearing is best-effort only.
+      }
+    }
+
     if (!isSupabaseConfigured()) return;
 
     const supabase = getSupabaseBrowserClient();

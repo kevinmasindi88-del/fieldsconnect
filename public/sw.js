@@ -40,8 +40,40 @@
     },
   };
 
+  const unreadCount =
+    typeof payload.unreadCount === "number" &&
+    Number.isFinite(payload.unreadCount)
+      ? Math.max(0, Math.floor(payload.unreadCount))
+      : null;
+
+  const tasks = [
+    self.registration.showNotification(
+      title,
+      options
+    ),
+  ];
+
+  if (
+    unreadCount !== null &&
+    "setAppBadge" in self.navigator
+  ) {
+    if (unreadCount > 0) {
+      tasks.push(
+        self.navigator.setAppBadge(
+          unreadCount
+        )
+      );
+    } else if (
+      "clearAppBadge" in self.navigator
+    ) {
+      tasks.push(
+        self.navigator.clearAppBadge()
+      );
+    }
+  }
+
   event.waitUntil(
-    self.registration.showNotification(title, options)
+    Promise.all(tasks)
   );
 });
 
