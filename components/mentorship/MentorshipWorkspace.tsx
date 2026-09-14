@@ -341,6 +341,23 @@ export function MentorshipWorkspace({
     setUpdatingActionItemId,
   ] = useState<string | null>(null);
 
+  const [isPeopleOpen, setIsPeopleOpen] =
+    useState(true);
+
+  const [isAgreementOpen, setIsAgreementOpen] =
+    useState(false);
+
+  const [isCycleOpen, setIsCycleOpen] =
+    useState(false);
+
+  const [isWorkboardOpen, setIsWorkboardOpen] =
+    useState(true);
+
+  const [
+    isAddActionItemOpen,
+    setIsAddActionItemOpen,
+  ] = useState(false);
+
   const profileById = useMemo(
     () =>
       new Map(
@@ -1492,23 +1509,43 @@ export function MentorshipWorkspace({
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ParticipantCard
-          label="Mentor"
-          profile={mentor}
-        />
+      <MobileWorkspaceSection
+        isOpen={isPeopleOpen}
+        onToggle={() =>
+          setIsPeopleOpen((current) => !current)
+        }
+        summary={`${mentor?.display_name ?? "Mentor"} · ${
+          mentee?.display_name ?? "Mentee"
+        }`}
+        title="Participants"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <ParticipantCard
+            label="Mentor"
+            profile={mentor}
+          />
 
-        <ParticipantCard
-          label="Mentee"
-          profile={mentee}
-        />
-      </div>
+          <ParticipantCard
+            label="Mentee"
+            profile={mentee}
+          />
+        </div>
+      </MobileWorkspaceSection>
 
-      <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
-        <h2 className="text-xl font-semibold">
-          Mentorship agreement
-        </h2>
-
+      <MobileWorkspaceSection
+        isOpen={isAgreementOpen}
+        onToggle={() =>
+          setIsAgreementOpen(
+            (current) => !current
+          )
+        }
+        summary={`${formatDuration(
+          mentorship.agreed_duration
+        )} · ${formatFrequency(
+          mentorship.agreed_frequency
+        )}`}
+        title="Mentorship agreement"
+      >
         <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <SummaryItem
             label="Duration"
@@ -1585,8 +1622,7 @@ export function MentorshipWorkspace({
             {mentorship.objective}
           </p>
         </div>
-      </section>
-
+      </MobileWorkspaceSection>
       {isWorkspaceReadOnly && (
         <div className="rounded-2xl border bg-gray-50 p-5">
           <h2 className="break-words font-semibold">
@@ -1603,78 +1639,23 @@ export function MentorshipWorkspace({
         </div>
       )}
 
-      <LifecyclePanel
-        completionRequestNote={
-          completionRequestNote
-        }
-        completionResponseNote={
-          completionResponseNote
-        }
-        currentUserId={currentUserId}
-        extensionAction={extensionAction}
-        extensionDuration={extensionDuration}
-        extensionReason={extensionReason}
-        extensionRequest={extensionRequest}
-        extensionResponseNote={
-          extensionResponseNote
-        }
-        earlyEndingReason={
-          earlyEndingReason
-        }
-        lifecycleAction={lifecycleAction}
-        mentorship={mentorship}
-        pauseReason={pauseReason}
-        respondToExtension={
-          respondToExtension
-        }
-        runLifecycleAction={
-          runLifecycleAction
-        }
-        setCompletionRequestNote={
-          setCompletionRequestNote
-        }
-        setCompletionResponseNote={
-          setCompletionResponseNote
-        }
-        setExtensionDuration={
-          setExtensionDuration
-        }
-        setExtensionReason={
-          setExtensionReason
-        }
-        setExtensionResponseNote={
-          setExtensionResponseNote
-        }
-        setEarlyEndingReason={
-          setEarlyEndingReason
-        }
-        setPauseReason={setPauseReason}
-        completionFeedback={completionFeedback}
-        completionFeedbackText={
-          completionFeedbackText
-        }
-        profileById={profileById}
-        setCompletionFeedbackText={
-          setCompletionFeedbackText
-        }
-        submitCompletionFeedback={
-          submitCompletionFeedback
-        }
-        submittingCompletionFeedback={
-          submittingCompletionFeedback
-        }
-        unfinishedActionItemCount={
-          unfinishedActionItemCount
-        }
-        submitExtensionRequest={
-          submitExtensionRequest
-        }
-        unfinishedMilestoneCount={
-          unfinishedMilestoneCount
-        }
-      />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,35fr)_minmax(0,65fr)]">
+      <MobileWorkspaceSection
+        isOpen={isWorkboardOpen}
+        onToggle={() =>
+          setIsWorkboardOpen(
+            (current) => !current
+          )
+        }
+        summary={`${unfinishedMilestoneCount} open milestone${
+          unfinishedMilestoneCount === 1 ? "" : "s"
+        } · ${unfinishedActionItemCount} open action${
+          unfinishedActionItemCount === 1 ? "" : "s"
+        }`}
+        title="Mentorship workboard"
+        contentClassName="max-h-[72vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+      >
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,35fr)_minmax(0,65fr)]">
         <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
           <h2 className="text-xl font-semibold">
             Shared updates
@@ -1897,12 +1878,142 @@ export function MentorshipWorkspace({
           )}
 
 
-          {!isWorkspaceReadOnly && (
-          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
-            <h2 className="text-xl font-semibold">
-              Add action item
-            </h2>
+          <MentorshipWorkboard
+            actionItems={actionItems}
+            canManageMilestones={
+              canManageMilestones
+            }
+            currentUserId={
+              isWorkspaceReadOnly
+                ? null
+                : currentUserId
+            }
+            isReadOnly={isWorkspaceReadOnly}
+            milestones={milestones}
+            profileById={profileById}
+            selectedActionItem={
+              selectedActionItem
+            }
+            setSelectedActionItemId={
+              setSelectedActionItemId
+            }
+            updateActionItemWorkflow={
+              updateActionItemWorkflow
+            }
+            updateMilestoneStatus={
+              updateMilestoneStatus
+            }
+            updatingActionItemId={
+              updatingActionItemId
+            }
+            updatingMilestoneId={
+              updatingMilestoneId
+            }
+          />
+        </div>
+      </div>
+      </MobileWorkspaceSection>
+      <MobileWorkspaceSection
+        isOpen={isCycleOpen}
+        onToggle={() =>
+          setIsCycleOpen((current) => !current)
+        }
+        summary={`${formatStatus(
+          mentorship.status
+        )} · ${unfinishedMilestoneCount + unfinishedActionItemCount} open item${
+          unfinishedMilestoneCount + unfinishedActionItemCount === 1
+            ? ""
+            : "s"
+        }`}
+        title="Mentorship cycle"
+        contentClassName="max-h-[68vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+      >
+        <LifecyclePanel
+          embedded
+          completionRequestNote={
+          completionRequestNote
+        }
+        completionResponseNote={
+          completionResponseNote
+        }
+        currentUserId={currentUserId}
+        extensionAction={extensionAction}
+        extensionDuration={extensionDuration}
+        extensionReason={extensionReason}
+        extensionRequest={extensionRequest}
+        extensionResponseNote={
+          extensionResponseNote
+        }
+        earlyEndingReason={
+          earlyEndingReason
+        }
+        lifecycleAction={lifecycleAction}
+        mentorship={mentorship}
+        pauseReason={pauseReason}
+        respondToExtension={
+          respondToExtension
+        }
+        runLifecycleAction={
+          runLifecycleAction
+        }
+        setCompletionRequestNote={
+          setCompletionRequestNote
+        }
+        setCompletionResponseNote={
+          setCompletionResponseNote
+        }
+        setExtensionDuration={
+          setExtensionDuration
+        }
+        setExtensionReason={
+          setExtensionReason
+        }
+        setExtensionResponseNote={
+          setExtensionResponseNote
+        }
+        setEarlyEndingReason={
+          setEarlyEndingReason
+        }
+        setPauseReason={setPauseReason}
+        completionFeedback={completionFeedback}
+        completionFeedbackText={
+          completionFeedbackText
+        }
+        profileById={profileById}
+        setCompletionFeedbackText={
+          setCompletionFeedbackText
+        }
+        submitCompletionFeedback={
+          submitCompletionFeedback
+        }
+        submittingCompletionFeedback={
+          submittingCompletionFeedback
+        }
+        unfinishedActionItemCount={
+          unfinishedActionItemCount
+        }
+        submitExtensionRequest={
+          submitExtensionRequest
+        }
+        unfinishedMilestoneCount={
+          unfinishedMilestoneCount
+        }
+      />
 
+      </MobileWorkspaceSection>
+
+      {!isWorkspaceReadOnly && (
+        <MobileWorkspaceSection
+          isOpen={isAddActionItemOpen}
+          onToggle={() =>
+            setIsAddActionItemOpen(
+              (current) => !current
+            )
+          }
+          summary="Assign a task to either participant"
+          title="Add action item"
+          contentClassName="max-h-[68vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+        >
             <p className="mt-1 text-sm text-gray-600">
               Assign a clear task to either participant.
             </p>
@@ -2040,47 +2151,88 @@ export function MentorshipWorkspace({
                   : "Add action item"}
               </button>
             </form>
-          </section>
-          )}
 
-          <MentorshipWorkboard
-            actionItems={actionItems}
-            canManageMilestones={
-              canManageMilestones
-            }
-            currentUserId={
-              isWorkspaceReadOnly
-                ? null
-                : currentUserId
-            }
-            isReadOnly={isWorkspaceReadOnly}
-            milestones={milestones}
-            profileById={profileById}
-            selectedActionItem={
-              selectedActionItem
-            }
-            setSelectedActionItemId={
-              setSelectedActionItemId
-            }
-            updateActionItemWorkflow={
-              updateActionItemWorkflow
-            }
-            updateMilestoneStatus={
-              updateMilestoneStatus
-            }
-            updatingActionItemId={
-              updatingActionItemId
-            }
-            updatingMilestoneId={
-              updatingMilestoneId
-            }
-          />
-        </div>
-      </div>
+        </MobileWorkspaceSection>
+      )}
     </section>
   );
 }
 
+function MobileWorkspaceSection({
+  title,
+  summary,
+  isOpen,
+  onToggle,
+  contentClassName = "",
+  children,
+}: {
+  title: string;
+  summary?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  contentClassName?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-2xl border bg-white">
+      <button
+        aria-expanded={isOpen}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left sm:hidden"
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="min-w-0">
+          <span className="block font-semibold">
+            {title}
+          </span>
+
+          {summary && (
+            <span className="mt-0.5 block truncate text-xs text-gray-500">
+              {summary}
+            </span>
+          )}
+        </span>
+
+        <svg
+          aria-hidden="true"
+          className={`h-5 w-5 shrink-0 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="m6 9 6 6 6-6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      <div className="hidden border-b px-5 py-4 sm:block">
+        <h2 className="text-xl font-semibold">
+          {title}
+        </h2>
+
+        {summary && (
+          <p className="mt-1 text-sm text-gray-500">
+            {summary}
+          </p>
+        )}
+      </div>
+
+      <div
+        className={`p-3 sm:block sm:p-5 ${
+          isOpen ? "block" : "hidden"
+        } ${contentClassName}`}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
 function ParticipantCard({
   label,
   profile,
@@ -2255,6 +2407,7 @@ function CompletionFeedbackPanel({
 }
 
 function LifecyclePanel({
+  embedded = false,
   completionFeedback,
   completionFeedbackText,
   completionRequestNote,
@@ -2286,6 +2439,7 @@ function LifecyclePanel({
   unfinishedActionItemCount,
   unfinishedMilestoneCount,
 }: {
+  embedded?: boolean;
   completionFeedback: MentorshipCompletionFeedback[];
   completionFeedbackText: string;
   completionRequestNote: string;
@@ -2400,22 +2554,30 @@ function LifecyclePanel({
     currentUserId;
 
   return (
-    <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
-          <h2 className="text-xl font-semibold">
-            Mentorship lifecycle
-          </h2>
+    <section
+      className={
+        embedded
+          ? "min-w-0 max-w-full"
+          : "min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5"
+      }
+    >
+      {!embedded && (
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div>
+            <h2 className="text-xl font-semibold">
+              Mentorship lifecycle
+            </h2>
 
-          <p className="mt-1 text-sm text-gray-600">
-            Pause, resume, complete or formally end this mentorship.
-          </p>
+            <p className="mt-1 text-sm text-gray-600">
+              Pause, resume, complete or formally end this mentorship.
+            </p>
+          </div>
+
+          <span className="h-fit rounded-full border px-3 py-1 text-xs capitalize">
+            {formatStatus(mentorship.status)}
+          </span>
         </div>
-
-        <span className="h-fit rounded-full border px-3 py-1 text-xs capitalize">
-          {formatStatus(mentorship.status)}
-        </span>
-      </div>
+      )}
 
       {mentorship.status ===
         "extension_pending" &&

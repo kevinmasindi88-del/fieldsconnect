@@ -157,6 +157,11 @@ export function ConnectionWorkflow() {
   const [counterproposalMessage, setCounterproposalMessage] =
     useState("");
 
+  const [
+    isMentorshipHistoryOpen,
+    setIsMentorshipHistoryOpen,
+  ] = useState(false);
+
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
@@ -1123,17 +1128,6 @@ export function ConnectionWorkflow() {
             )}
           </ConnectionSection>
 
-          <ConnectionSection
-            title={`Mentorship history · ${historicalMentorships.length}`}
-          >
-            {historicalMentorships.length === 0 ? (
-              <EmptyState text="No completed or closed mentorships yet." />
-            ) : (
-              historicalMentorships.map(
-                renderMentorshipCard
-              )
-            )}
-          </ConnectionSection>
           <ConnectionSection title="Mentorship requests">
             {incomingMentorshipRequests.length === 0 ? (
               <EmptyState text="No incoming mentorship requests yet." />
@@ -1472,6 +1466,54 @@ export function ConnectionWorkflow() {
               })
             )}
           </ConnectionSection>
+
+          <section className="flex flex-col gap-3">
+            <button
+              aria-expanded={isMentorshipHistoryOpen}
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3 text-left transition hover:bg-gray-50"
+              onClick={() =>
+                setIsMentorshipHistoryOpen(
+                  (current) => !current
+                )
+              }
+              type="button"
+            >
+              <span className="text-lg font-semibold sm:text-xl">
+                Mentorship history · {historicalMentorships.length}
+              </span>
+
+              <svg
+                aria-hidden="true"
+                className={`h-5 w-5 shrink-0 transition-transform ${
+                  isMentorshipHistoryOpen
+                    ? "rotate-180"
+                    : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="m6 9 6 6 6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            {isMentorshipHistoryOpen && (
+              <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+                {historicalMentorships.length === 0 ? (
+                  <EmptyState text="No completed or closed mentorships yet." />
+                ) : (
+                  historicalMentorships.map(
+                    renderMentorshipCard
+                  )
+                )}
+              </div>
+            )}
+          </section>
 
           <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
