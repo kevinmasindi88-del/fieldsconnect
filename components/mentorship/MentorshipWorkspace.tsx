@@ -1656,7 +1656,7 @@ export function MentorshipWorkspace({
         contentClassName="max-h-[72vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
       >
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,35fr)_minmax(0,65fr)]">
-        <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
+        <section className="order-2 min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 lg:order-1">
           <h2 className="text-xl font-semibold">
             Shared updates
           </h2>
@@ -1793,7 +1793,7 @@ export function MentorshipWorkspace({
           </div>
         </section>
 
-        <div className="min-w-0 space-y-6">
+        <div className="order-1 min-w-0 space-y-6 lg:order-2">
           {canManageMilestones && (
             <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
             <h2 className="text-xl font-semibold">
@@ -3180,7 +3180,7 @@ function MentorshipWorkboard({
         </span>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-2 gap-3">
         <WorkSummaryCard
           label="Milestones"
           value={milestones.length}
