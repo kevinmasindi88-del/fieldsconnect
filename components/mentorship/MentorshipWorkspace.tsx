@@ -3374,7 +3374,7 @@ function WorkSummaryCard({
 }) {
   return (
     <div className="rounded-xl border bg-gray-50 p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+      <p className="flex min-h-8 items-center text-[13px] font-medium uppercase leading-4 text-gray-500">
         {label}
       </p>
 
