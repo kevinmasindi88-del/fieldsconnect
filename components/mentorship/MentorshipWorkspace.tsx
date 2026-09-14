@@ -1653,7 +1653,7 @@ export function MentorshipWorkspace({
           unfinishedActionItemCount === 1 ? "" : "s"
         }`}
         title="Mentorship workboard"
-        contentClassName="max-h-[72vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+        contentClassName="max-h-[72vh] overflow-y-auto pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
       >
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,35fr)_minmax(0,65fr)]">
         <section className="order-2 min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 lg:order-1">
@@ -1926,7 +1926,7 @@ export function MentorshipWorkspace({
             : "s"
         }`}
         title="Mentorship cycle"
-        contentClassName="max-h-[68vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+        contentClassName="max-h-[68vh] overflow-y-auto pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
       >
         <LifecyclePanel
           embedded
@@ -2012,7 +2012,7 @@ export function MentorshipWorkspace({
           }
           summary="Assign a task to either participant"
           title="Add action item"
-          contentClassName="max-h-[68vh] overflow-y-auto overscroll-contain pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+          contentClassName="max-h-[68vh] overflow-y-auto pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
         >
             <p className="mt-1 text-sm text-gray-600">
               Assign a clear task to either participant.
