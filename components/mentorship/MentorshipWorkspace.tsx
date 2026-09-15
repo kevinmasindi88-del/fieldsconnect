@@ -1913,95 +1913,6 @@ export function MentorshipWorkspace({
         </div>
       </div>
       </MobileWorkspaceSection>
-      <MobileWorkspaceSection
-        isOpen={isCycleOpen}
-        onToggle={() =>
-          setIsCycleOpen((current) => !current)
-        }
-        summary={`${formatStatus(
-          mentorship.status
-        )} · ${unfinishedMilestoneCount + unfinishedActionItemCount} open item${
-          unfinishedMilestoneCount + unfinishedActionItemCount === 1
-            ? ""
-            : "s"
-        }`}
-        title="Mentorship cycle"
-        contentClassName="max-h-[68vh] overflow-y-auto pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
-      >
-        <LifecyclePanel
-          embedded
-          completionRequestNote={
-          completionRequestNote
-        }
-        completionResponseNote={
-          completionResponseNote
-        }
-        currentUserId={currentUserId}
-        extensionAction={extensionAction}
-        extensionDuration={extensionDuration}
-        extensionReason={extensionReason}
-        extensionRequest={extensionRequest}
-        extensionResponseNote={
-          extensionResponseNote
-        }
-        earlyEndingReason={
-          earlyEndingReason
-        }
-        lifecycleAction={lifecycleAction}
-        mentorship={mentorship}
-        pauseReason={pauseReason}
-        respondToExtension={
-          respondToExtension
-        }
-        runLifecycleAction={
-          runLifecycleAction
-        }
-        setCompletionRequestNote={
-          setCompletionRequestNote
-        }
-        setCompletionResponseNote={
-          setCompletionResponseNote
-        }
-        setExtensionDuration={
-          setExtensionDuration
-        }
-        setExtensionReason={
-          setExtensionReason
-        }
-        setExtensionResponseNote={
-          setExtensionResponseNote
-        }
-        setEarlyEndingReason={
-          setEarlyEndingReason
-        }
-        setPauseReason={setPauseReason}
-        completionFeedback={completionFeedback}
-        completionFeedbackText={
-          completionFeedbackText
-        }
-        profileById={profileById}
-        setCompletionFeedbackText={
-          setCompletionFeedbackText
-        }
-        submitCompletionFeedback={
-          submitCompletionFeedback
-        }
-        submittingCompletionFeedback={
-          submittingCompletionFeedback
-        }
-        unfinishedActionItemCount={
-          unfinishedActionItemCount
-        }
-        submitExtensionRequest={
-          submitExtensionRequest
-        }
-        unfinishedMilestoneCount={
-          unfinishedMilestoneCount
-        }
-      />
-
-      </MobileWorkspaceSection>
-
       {!isWorkspaceReadOnly && (
         <MobileWorkspaceSection
           isOpen={isAddActionItemOpen}
@@ -2154,6 +2065,95 @@ export function MentorshipWorkspace({
 
         </MobileWorkspaceSection>
       )}
+
+      <MobileWorkspaceSection
+        isOpen={isCycleOpen}
+        onToggle={() =>
+          setIsCycleOpen((current) => !current)
+        }
+        summary={`${formatStatus(
+          mentorship.status
+        )} · ${unfinishedMilestoneCount + unfinishedActionItemCount} open item${
+          unfinishedMilestoneCount + unfinishedActionItemCount === 1
+            ? ""
+            : "s"
+        }`}
+        title="Mentorship cycle"
+        contentClassName="max-h-[68vh] overflow-y-auto pr-2 sm:max-h-none sm:overflow-visible sm:pr-0"
+      >
+        <LifecyclePanel
+          embedded
+          completionRequestNote={
+          completionRequestNote
+        }
+        completionResponseNote={
+          completionResponseNote
+        }
+        currentUserId={currentUserId}
+        extensionAction={extensionAction}
+        extensionDuration={extensionDuration}
+        extensionReason={extensionReason}
+        extensionRequest={extensionRequest}
+        extensionResponseNote={
+          extensionResponseNote
+        }
+        earlyEndingReason={
+          earlyEndingReason
+        }
+        lifecycleAction={lifecycleAction}
+        mentorship={mentorship}
+        pauseReason={pauseReason}
+        respondToExtension={
+          respondToExtension
+        }
+        runLifecycleAction={
+          runLifecycleAction
+        }
+        setCompletionRequestNote={
+          setCompletionRequestNote
+        }
+        setCompletionResponseNote={
+          setCompletionResponseNote
+        }
+        setExtensionDuration={
+          setExtensionDuration
+        }
+        setExtensionReason={
+          setExtensionReason
+        }
+        setExtensionResponseNote={
+          setExtensionResponseNote
+        }
+        setEarlyEndingReason={
+          setEarlyEndingReason
+        }
+        setPauseReason={setPauseReason}
+        completionFeedback={completionFeedback}
+        completionFeedbackText={
+          completionFeedbackText
+        }
+        profileById={profileById}
+        setCompletionFeedbackText={
+          setCompletionFeedbackText
+        }
+        submitCompletionFeedback={
+          submitCompletionFeedback
+        }
+        submittingCompletionFeedback={
+          submittingCompletionFeedback
+        }
+        unfinishedActionItemCount={
+          unfinishedActionItemCount
+        }
+        submitExtensionRequest={
+          submitExtensionRequest
+        }
+        unfinishedMilestoneCount={
+          unfinishedMilestoneCount
+        }
+      />
+
+      </MobileWorkspaceSection>
     </section>
   );
 }
