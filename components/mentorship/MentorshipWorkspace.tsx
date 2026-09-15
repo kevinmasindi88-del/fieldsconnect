@@ -3444,9 +3444,16 @@ function MilestoneList({
               milestone.id;
 
             const canComplete =
-              milestone.status ===
-                "in_progress" &&
-              unfinishedActionCount === 0;
+              unfinishedActionCount === 0 &&
+              (
+                milestone.status ===
+                  "in_progress" ||
+                (
+                  milestone.status ===
+                    "planned" &&
+                  linkedActionItems.length > 0
+                )
+              );
 
             const canCancel =
               milestone.status !==
@@ -3515,7 +3522,8 @@ function MilestoneList({
                 {canManageMilestones && (
                   <div className="mt-4 flex flex-wrap gap-3">
                     {milestone.status ===
-                    "planned" && (
+                    "planned" &&
+                    !canComplete && (
                     <button
                       className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={isUpdating}
@@ -3533,8 +3541,12 @@ function MilestoneList({
                     </button>
                   )}
 
-                  {milestone.status ===
-                    "in_progress" && (
+                  {(
+                    milestone.status ===
+                      "in_progress" ||
+                    milestone.status ===
+                      "planned"
+                  ) && (
                     <button
                       className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={
