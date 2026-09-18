@@ -821,6 +821,28 @@ export function MentorshipWorkspace({
       return;
     }
 
+    if (
+      milestoneTargetDate &&
+      mentorship.start_date &&
+      milestoneTargetDate < mentorship.start_date
+    ) {
+      setMessage(
+        "The milestone target date cannot fall before the mentorship start date."
+      );
+      return;
+    }
+
+    if (
+      milestoneTargetDate &&
+      mentorship.expected_end_date &&
+      milestoneTargetDate > mentorship.expected_end_date
+    ) {
+      setMessage(
+        "The milestone target date cannot fall after the mentorship end date."
+      );
+      return;
+    }
+
     setIsSubmittingMilestone(true);
     setMessage(null);
 
@@ -958,6 +980,58 @@ export function MentorshipWorkspace({
         "Select the participant responsible for this action item."
       );
       return;
+    }
+
+    if (!actionItemDueDate) {
+      setMessage(
+        "Select a due date within the mentorship cycle."
+      );
+      return;
+    }
+
+    if (
+      actionItemDueDate &&
+      mentorship.start_date &&
+      actionItemDueDate < mentorship.start_date
+    ) {
+      setMessage(
+        "The action-item due date cannot fall before the mentorship start date."
+      );
+      return;
+    }
+
+    if (
+      actionItemDueDate &&
+      mentorship.expected_end_date &&
+      actionItemDueDate > mentorship.expected_end_date
+    ) {
+      setMessage(
+        "The action-item due date cannot fall after the mentorship end date."
+      );
+      return;
+    }
+
+    if (
+      actionItemMilestoneId &&
+      actionItemDueDate
+    ) {
+      const linkedMilestone =
+        milestones.find(
+          (milestone) =>
+            milestone.id ===
+            actionItemMilestoneId
+        );
+
+      if (
+        linkedMilestone?.target_date &&
+        actionItemDueDate >
+          linkedMilestone.target_date
+      ) {
+        setMessage(
+          "The action-item due date cannot fall after the linked milestone target date."
+        );
+        return;
+      }
     }
 
     setIsSubmittingActionItem(true);
@@ -1851,6 +1925,14 @@ export function MentorshipWorkspace({
                 <input
                   className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingMilestone}
+                  max={
+                    mentorship.expected_end_date ??
+                    undefined
+                  }
+                  min={
+                    mentorship.start_date ??
+                    undefined
+                  }
                   onChange={(event) =>
                     setMilestoneTargetDate(
                       event.target.value
@@ -2038,11 +2120,45 @@ export function MentorshipWorkspace({
                 <input
                   className="min-w-0 w-full rounded-xl border px-4 py-3 font-normal outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                   disabled={isSubmittingActionItem}
+                  max={
+                    (() => {
+                      const milestoneTarget =
+                        milestones.find(
+                          (milestone) =>
+                            milestone.id ===
+                            actionItemMilestoneId
+                        )?.target_date;
+
+                      const mentorshipEnd =
+                        mentorship.expected_end_date;
+
+                      if (
+                        milestoneTarget &&
+                        mentorshipEnd
+                      ) {
+                        return milestoneTarget <
+                          mentorshipEnd
+                          ? milestoneTarget
+                          : mentorshipEnd;
+                      }
+
+                      return (
+                        milestoneTarget ??
+                        mentorshipEnd ??
+                        undefined
+                      );
+                    })()
+                  }
+                  min={
+                    mentorship.start_date ??
+                    undefined
+                  }
                   onChange={(event) =>
                     setActionItemDueDate(
                       event.target.value
                     )
                   }
+                  required
                   type="date"
                   value={actionItemDueDate}
                 />
@@ -2053,7 +2169,8 @@ export function MentorshipWorkspace({
                 disabled={
                   isSubmittingActionItem ||
                   actionItemTitle.trim().length < 2 ||
-                  !actionItemAssignee
+                  !actionItemAssignee ||
+                  !actionItemDueDate
                 }
                 type="submit"
               >
