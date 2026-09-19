@@ -44,7 +44,19 @@ export function TimelinePostDeleteEnhancer() {
         if (!editButton) continue;
 
         const actionContainer = editButton.parentElement;
-        if (!actionContainer || actionContainer.querySelector("[data-delete-post-button='true']")) continue;
+        if (!actionContainer) continue;
+
+        const existingDeleteButton =
+          actionContainer.querySelector<HTMLButtonElement>(
+            "[data-delete-post-button='true']"
+          );
+
+        if (existingDeleteButton) {
+          if (editButton.nextElementSibling !== existingDeleteButton) {
+            editButton.insertAdjacentElement("afterend", existingDeleteButton);
+          }
+          continue;
+        }
 
         const postId = article.dataset.postId;
 
@@ -64,7 +76,7 @@ export function TimelinePostDeleteEnhancer() {
         deleteButton.className =
           "rounded-lg border px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50";
         deleteButton.textContent = "Delete";
-        actionContainer.appendChild(deleteButton);
+        editButton.insertAdjacentElement("afterend", deleteButton);
       }
     }
 
