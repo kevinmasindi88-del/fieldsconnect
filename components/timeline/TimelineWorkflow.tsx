@@ -1169,14 +1169,24 @@ export function TimelineWorkflow() {
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
                     {isOwnPost && !isEditing && !isFcNews ? (
-                      <button
-                        className="rounded-lg border px-3 py-1 text-xs font-medium"
-                        disabled={isWorking}
-                        onClick={() => startEditingPost(post)}
-                        type="button"
-                      >
-                        Edit
-                      </button>
+                      <>
+                        <button
+                          className="rounded-lg border px-3 py-1 text-xs font-medium"
+                          disabled={isWorking}
+                          onClick={() => startEditingPost(post)}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="rounded-lg border px-3 py-1 text-xs font-medium text-red-700 disabled:opacity-50"
+                          data-delete-post-button="true"
+                          data-post-id={post.id}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </>
                     ) : (
                       currentUserId && (
                         <ReportMenu
