@@ -811,6 +811,42 @@ export function TimelineWorkflow() {
     }
   }
 
+  async function deletePost(postId: string) {
+    if (!currentUserId || !isSupabaseConfigured()) return;
+
+    const confirmed = window.confirm(
+      "Delete this post? This cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { data, error } = await supabase.rpc(
+        "soft_delete_own_post",
+        {
+          target_post_id: postId,
+        }
+      );
+
+      if (error) throw error;
+
+      if (!data) {
+        throw new Error("Unable to delete this post.");
+      }
+
+      await loadData();
+    } catch (error) {
+      setMessage(getActionErrorMessage(error, "delete post"));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   function getPostComments(postId: string) {
     return comments.filter((comment) => comment.post_id === postId);
   }
@@ -1165,14 +1201,25 @@ export function TimelineWorkflow() {
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
                     {isOwnPost && !isEditing && !isFcNews ? (
-                      <button
-                        className="rounded-lg border px-3 py-1 text-xs font-medium"
-                        disabled={isWorking}
-                        onClick={() => startEditingPost(post)}
-                        type="button"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="rounded-lg border px-3 py-1 text-xs font-medium"
+                          disabled={isWorking}
+                          onClick={() => startEditingPost(post)}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() => deletePost(post.id)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     ) : (
                       currentUserId && (
                         <ReportMenu
