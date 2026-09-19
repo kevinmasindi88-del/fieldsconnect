@@ -65,6 +65,11 @@ type MentionCandidate = {
   avatar_url: string | null;
 };
 
+type PostMention = {
+  post_id: string;
+  mentioned_profile_id: string;
+};
+
 const postEmojis = [
   "😀",
   "😂",
@@ -89,6 +94,7 @@ export function TimelineWorkflow() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
+  const [postMentions, setPostMentions] = useState<PostMention[]>([]);
   const [postBody, setPostBody] = useState("");
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isMentionPickerOpen, setIsMentionPickerOpen] = useState(false);
@@ -126,7 +132,7 @@ export function TimelineWorkflow() {
 
     const supabase = getSupabaseBrowserClient();
 
-    const [postResult, publicationResult] =
+    const [postResult, publicationResult, mentionResult] =
       await Promise.all([
         supabase
           .from("posts")
@@ -136,6 +142,9 @@ export function TimelineWorkflow() {
         supabase
           .from("fc_news_publications")
           .select("post_id, fc_news_id, title, published_at"),
+        supabase
+          .from("post_mentions")
+          .select("post_id, mentioned_profile_id"),
       ]);
 
     if (postResult.error) {
@@ -147,6 +156,15 @@ export function TimelineWorkflow() {
       console.error("Unable to refresh FC News publications:", publicationResult.error);
       return;
     }
+
+    if (mentionResult.error) {
+      console.error("Unable to refresh post mentions:", mentionResult.error);
+      return;
+    }
+
+    setPostMentions(
+      (mentionResult.data ?? []) as PostMention[]
+    );
 
     setFcNewsPublications(
       (publicationResult.data ?? []) as FcNewsPublication[]
@@ -257,6 +275,7 @@ export function TimelineWorkflow() {
         { data: reactionData, error: reactionError },
         { data: commentReactionData, error: commentReactionError },
         { data: publicationData, error: publicationError },
+        { data: postMentionData, error: postMentionError },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -277,6 +296,9 @@ export function TimelineWorkflow() {
         supabase
           .from("fc_news_publications")
           .select("post_id, fc_news_id, title, published_at"),
+        supabase
+          .from("post_mentions")
+          .select("post_id, mentioned_profile_id"),
       ]);
 
       if (profileError) throw profileError;
@@ -285,8 +307,12 @@ export function TimelineWorkflow() {
       if (reactionError) throw reactionError;
       if (commentReactionError) throw commentReactionError;
       if (publicationError) throw publicationError;
+      if (postMentionError) throw postMentionError;
 
       setProfiles((profileData ?? []) as Profile[]);
+      setPostMentions(
+        (postMentionData ?? []) as PostMention[]
+      );
       setFcNewsPublications(
         (publicationData ?? []) as FcNewsPublication[]
       );
@@ -789,6 +815,15 @@ export function TimelineWorkflow() {
     return comments.filter((comment) => comment.post_id === postId);
   }
 
+  function getPostMentions(postId: string) {
+    return postMentions
+      .filter((mention) => mention.post_id === postId)
+      .map((mention) =>
+        profileById.get(mention.mentioned_profile_id)
+      )
+      .filter((profile): profile is Profile => Boolean(profile));
+  }
+
   function getPostLikeCount(postId: string) {
     return reactions.filter((reaction) => reaction.post_id === postId).length;
   }
@@ -1057,6 +1092,7 @@ export function TimelineWorkflow() {
             fcNewsPublicationByPostId.get(post.id);
           const isFcNews = Boolean(fcNewsPublication);
           const postComments = getPostComments(post.id);
+          const mentionedProfiles = getPostMentions(post.id);
           const liked = hasLiked(post.id);
           const isOwnPost = post.author_id === currentUserId;
           const isEditing = editingPostId === post.id;
@@ -1185,7 +1221,25 @@ export function TimelineWorkflow() {
                         {fcNewsPublication.title}
                       </h3>
                     )}
-                    <p className={`${fcNewsPublication ? "mt-2" : "mt-4"} whitespace-pre-wrap text-sm leading-snug text-gray-800`}>{post.body}</p>
+                    <p className={`${fcNewsPublication ? "mt-2" : "mt-4"} whitespace-pre-wrap text-sm leading-snug text-gray-800`}>
+                      {post.body}
+                      {mentionedProfiles.length > 0 && (
+                        <>
+                          {" "}
+                          {mentionedProfiles.map((profile, index) => (
+                            <span key={profile.id}>
+                              {index > 0 && " "}
+                              <Link
+                                className="font-medium text-blue-700 hover:underline"
+                                href={`/profile/${profile.id}`}
+                              >
+                                @{profile.display_name}
+                              </Link>
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </p>
 
                   </>
                 )}

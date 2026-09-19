@@ -38,12 +38,18 @@ type Comment = {
   created_at: string;
 };
 
+type PostMention = {
+  post_id: string;
+  mentioned_profile_id: string;
+};
+
 export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [post, setPost] = useState<Post | null>(null);
   const [fcNewsPublication, setFcNewsPublication] =
     useState<FcNewsPublication | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [postMentions, setPostMentions] = useState<PostMention[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -74,6 +80,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
           { data: postData, error: postError },
           { data: commentData, error: commentError },
           { data: profileData, error: profileError },
+          { data: postMentionData, error: postMentionError },
         ] = await Promise.all([
           supabase
             .from("posts")
@@ -91,11 +98,16 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
             .from("profiles")
             .select("id, display_name, role_type, field, avatar_url")
             .is("deleted_at", null),
+          supabase
+            .from("post_mentions")
+            .select("post_id, mentioned_profile_id")
+            .eq("post_id", postId),
         ]);
 
         if (postError) throw postError;
         if (commentError) throw commentError;
         if (profileError) throw profileError;
+        if (postMentionError) throw postMentionError;
 
         const publicationResult = await supabase
           .from("fc_news_publications")
@@ -114,6 +126,9 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         setPost((postData as Post | null) ?? null);
         setComments((commentData ?? []) as Comment[]);
         setProfiles((profileData ?? []) as Profile[]);
+        setPostMentions(
+          (postMentionData ?? []) as PostMention[]
+        );
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Unable to load this post.");
       } finally {
@@ -151,6 +166,12 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   }
 
   const author = profileById.get(post.author_id);
+
+  const mentionedProfiles = postMentions
+    .map((mention) =>
+      profileById.get(mention.mentioned_profile_id)
+    )
+    .filter((profile): profile is Profile => Boolean(profile));
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:p-8">
@@ -192,7 +213,25 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
               {fcNewsPublication.title}
             </h1>
           )}
-          <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{post.body}</p>
+          <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">
+            {post.body}
+            {mentionedProfiles.length > 0 && (
+              <>
+                {" "}
+                {mentionedProfiles.map((profile, index) => (
+                  <span key={profile.id}>
+                    {index > 0 && " "}
+                    <Link
+                      className="font-medium text-blue-700 hover:underline"
+                      href={`/profile/${profile.id}`}
+                    >
+                      @{profile.display_name}
+                    </Link>
+                  </span>
+                ))}
+              </>
+            )}
+          </p>
           {!fcNewsPublication && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
         </div>
 
