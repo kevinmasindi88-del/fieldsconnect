@@ -16,6 +16,7 @@ type Notification = {
     | "new_message"
     | "post_liked"
     | "post_commented"
+    | "post_mentioned"
     | "comment_liked"
     | "moderation_warning"
     | "moderation_action"
@@ -240,6 +241,8 @@ export function NotificationsWorkflow() {
         return `${actorName} liked your post`;
       case "post_commented":
         return `${actorName} commented on your post`;
+      case "post_mentioned":
+        return `${actorName} mentioned you in a post`;
       case "comment_liked":
         return `${actorName} liked your comment`;
       case "connection_request":
@@ -399,6 +402,28 @@ export function NotificationsWorkflow() {
 
     if (!postId) {
       return notification.body;
+    }
+
+    if (notification.notification_type === "post_mentioned") {
+      return (
+        <>
+          {actorName} mentioned you in a{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/post/${postId}`
+              )
+            }
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
     }
 
     if (notification.notification_type === "post_liked") {

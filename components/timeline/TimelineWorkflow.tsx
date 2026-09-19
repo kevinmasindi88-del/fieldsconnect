@@ -57,6 +57,14 @@ type CommentReaction = {
   reaction_type: string;
 };
 
+type MentionCandidate = {
+  profile_id: string;
+  display_name: string;
+  username: string | null;
+  field: string | null;
+  avatar_url: string | null;
+};
+
 const postEmojis = [
   "😀",
   "😂",
@@ -83,6 +91,11 @@ export function TimelineWorkflow() {
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [postBody, setPostBody] = useState("");
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isMentionPickerOpen, setIsMentionPickerOpen] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState("");
+  const [mentionResults, setMentionResults] = useState<MentionCandidate[]>([]);
+  const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
+  const [isMentionSearching, setIsMentionSearching] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "connections">("public");
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -303,6 +316,63 @@ export function TimelineWorkflow() {
   }, []);
 
   useEffect(() => {
+    if (
+      !currentUserId ||
+      !isMentionPickerOpen ||
+      !isSupabaseConfigured()
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const timeoutId = window.setTimeout(async () => {
+      setIsMentionSearching(true);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data, error } = await supabase.rpc(
+          "search_mentionable_connections",
+          {
+            search_term: mentionSearch,
+            result_limit: 20,
+            result_offset: 0,
+          }
+        );
+
+        if (error) throw error;
+
+        if (!cancelled) {
+          setMentionResults(
+            (data ?? []) as MentionCandidate[]
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Unable to search mentionable connections:",
+            error
+          );
+          setMentionResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsMentionSearching(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    currentUserId,
+    isMentionPickerOpen,
+    mentionSearch,
+  ]);
+
+  useEffect(() => {
     if (!currentUserId || !isSupabaseConfigured()) return;
 
     const supabase = getSupabaseBrowserClient();
@@ -388,6 +458,30 @@ export function TimelineWorkflow() {
     };
   }, [currentUserId]);
 
+  function addMention(candidate: MentionCandidate) {
+    setSelectedMentions((current) => {
+      if (
+        current.length >= 10 ||
+        current.some(
+          (mention) =>
+            mention.profile_id === candidate.profile_id
+        )
+      ) {
+        return current;
+      }
+
+      return [...current, candidate];
+    });
+  }
+
+  function removeMention(profileId: string) {
+    setSelectedMentions((current) =>
+      current.filter(
+        (mention) => mention.profile_id !== profileId
+      )
+    );
+  }
+
   async function createPost(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!currentUserId || !postBody.trim() || !isSupabaseConfigured()) return;
@@ -397,15 +491,28 @@ export function TimelineWorkflow() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.from("posts").insert({
-        author_id: currentUserId,
-        body: postBody.trim(),
-        visibility,
-      });
+
+      const { error } = await supabase.rpc(
+        "create_post_with_mentions",
+        {
+          post_body: postBody.trim(),
+          post_visibility: visibility,
+          mentioned_profile_ids: selectedMentions.map(
+            (mention) => mention.profile_id
+          ),
+        }
+      );
+
       if (error) throw error;
 
       setPostBody("");
       setVisibility("public");
+      setSelectedMentions([]);
+      setMentionSearch("");
+      setMentionResults([]);
+      setIsMentionPickerOpen(false);
+      setIsEmojiPickerOpen(false);
+
       await loadData();
     } catch (error) {
       setMessage(getActionErrorMessage(error, "create post"));
@@ -727,6 +834,31 @@ export function TimelineWorkflow() {
           </select>
         </label>
 
+        {selectedMentions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedMentions.map((mention) => (
+              <span
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-900"
+                key={mention.profile_id}
+              >
+                <span className="truncate">
+                  @{mention.display_name}
+                </span>
+                <button
+                  aria-label={`Remove ${mention.display_name}`}
+                  className="font-semibold text-blue-700 hover:text-blue-950"
+                  onClick={() =>
+                    removeMention(mention.profile_id)
+                  }
+                  type="button"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-end justify-between gap-3">
           <div className="relative flex items-center gap-2">
             <button
@@ -738,7 +870,10 @@ export function TimelineWorkflow() {
                   ? "border-gray-950 bg-gray-950 text-white"
                   : "border-gray-300 bg-white text-gray-950 hover:border-gray-500 hover:bg-gray-50",
               ].join(" ")}
-              onClick={() => setIsEmojiPickerOpen((current) => !current)}
+              onClick={() => {
+                setIsEmojiPickerOpen((current) => !current);
+                setIsMentionPickerOpen(false);
+              }}
               title="Add emoji"
               type="button"
             >
@@ -767,7 +902,7 @@ export function TimelineWorkflow() {
             </button>
 
             {isEmojiPickerOpen && (
-              <div className="absolute left-0 top-full z-10 mt-2 grid w-max grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg sm:left-full sm:top-1/2 sm:ml-2 sm:mt-0 sm:-translate-y-1/2">
+              <div className="absolute left-0 top-full z-20 mt-2 grid w-max grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg sm:left-full sm:top-1/2 sm:ml-2 sm:mt-0 sm:-translate-y-1/2">
                 {postEmojis.map((emoji) => (
                   <button
                     aria-label={`Add ${emoji}`}
@@ -782,6 +917,121 @@ export function TimelineWorkflow() {
                     {emoji}
                   </button>
                 ))}
+              </div>
+            )}
+
+            <button
+              aria-expanded={isMentionPickerOpen}
+              aria-label="Mention a connection"
+              className={[
+                "inline-flex h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                isMentionPickerOpen
+                  ? "border-gray-950 bg-gray-950 text-white"
+                  : "border-gray-300 bg-white text-gray-950 hover:border-gray-500 hover:bg-gray-50",
+              ].join(" ")}
+              onClick={() => {
+                setIsMentionPickerOpen((current) => !current);
+                setIsEmojiPickerOpen(false);
+              }}
+              title="Mention a connection"
+              type="button"
+            >
+              @
+            </button>
+
+            {isMentionPickerOpen && (
+              <div className="absolute left-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-950">
+                    Mention connections
+                  </p>
+                  <span className="text-xs text-gray-500">
+                    {selectedMentions.length}/10
+                  </span>
+                </div>
+
+                <input
+                  autoFocus
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  onChange={(event) =>
+                    setMentionSearch(event.target.value)
+                  }
+                  placeholder="Search name, username or field..."
+                  type="search"
+                  value={mentionSearch}
+                />
+
+                <div className="mt-2 max-h-72 overflow-y-auto">
+                  {isMentionSearching ? (
+                    <p className="px-2 py-3 text-sm text-gray-500">
+                      Searching...
+                    </p>
+                  ) : mentionResults.filter(
+                      (candidate) =>
+                        !selectedMentions.some(
+                          (selected) =>
+                            selected.profile_id ===
+                            candidate.profile_id
+                        )
+                    ).length === 0 ? (
+                    <p className="px-2 py-3 text-sm text-gray-500">
+                      No additional matching connections.
+                    </p>
+                  ) : (
+                    mentionResults
+                      .filter(
+                        (candidate) =>
+                          !selectedMentions.some(
+                            (selected) =>
+                              selected.profile_id ===
+                              candidate.profile_id
+                          )
+                      )
+                      .map((candidate) => (
+                        <button
+                          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-gray-50 disabled:opacity-50"
+                          disabled={
+                            selectedMentions.length >= 10
+                          }
+                          key={candidate.profile_id}
+                          onClick={() =>
+                            addMention(candidate)
+                          }
+                          type="button"
+                        >
+                          <ProfileAvatar
+                            avatarPath={candidate.avatar_url}
+                            displayName={candidate.display_name}
+                            size={36}
+                          />
+
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-gray-950">
+                              {candidate.display_name}
+                            </span>
+
+                            <span className="block truncate text-xs text-gray-500">
+                              {[
+                                candidate.username
+                                  ? `@${candidate.username}`
+                                  : null,
+                                candidate.field,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ") ||
+                                "Connection"}
+                            </span>
+                          </span>
+                        </button>
+                      ))
+                  )}
+                </div>
+
+                {selectedMentions.length >= 10 && (
+                  <p className="mt-2 border-t pt-2 text-xs text-gray-500">
+                    Maximum of 10 mentions reached.
+                  </p>
+                )}
               </div>
             )}
           </div>
