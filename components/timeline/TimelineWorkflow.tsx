@@ -1098,7 +1098,11 @@ export function TimelineWorkflow() {
           const isEditing = editingPostId === post.id;
 
           return (
-            <article key={post.id} className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-3 sm:p-4">
+            <article
+              key={post.id}
+              data-post-id={post.id}
+              className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-3 sm:p-4"
+            >
               <div>
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
                   {isFcNews ? (

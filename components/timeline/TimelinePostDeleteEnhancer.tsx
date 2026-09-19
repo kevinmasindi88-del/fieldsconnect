@@ -46,13 +46,12 @@ export function TimelinePostDeleteEnhancer() {
         const actionContainer = editButton.parentElement;
         if (!actionContainer || actionContainer.querySelector("[data-delete-post-button='true']")) continue;
 
-        const bodyElement = Array.from(article.querySelectorAll<HTMLParagraphElement>("p")).find((paragraph) =>
-          paragraph.className.includes("whitespace-pre-wrap") && paragraph.className.includes("text-gray-800")
-        );
-        const body = bodyElement?.textContent ?? "";
+        const postId = article.dataset.postId;
+
+        if (!postId) continue;
 
         const matchedPost = ownPosts.find(
-          (post) => !usedPostIds.has(post.id) && post.body === body
+          (post) => !usedPostIds.has(post.id) && post.id === postId
         );
 
         if (!matchedPost) continue;
