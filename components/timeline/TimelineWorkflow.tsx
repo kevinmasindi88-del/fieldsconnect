@@ -1341,7 +1341,6 @@ export function TimelineWorkflow() {
                                 </span>
                               </p>
                             )}
-                            <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">{comment.body}</p>
                           </div>
                           {!isOwnComment && currentUserId && (
                             <ReportMenu
@@ -1353,6 +1352,7 @@ export function TimelineWorkflow() {
                             />
                           )}
                         </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">{comment.body}</p>
                         <button
                           aria-label={
                             commentLiked
