@@ -975,86 +975,19 @@ export function ConnectionWorkflow() {
       const supabase =
         getSupabaseBrowserClient();
 
-      let query = supabase
-        .from("profiles")
-        .select(
-          "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
-        )
-        .is("deleted_at", null)
-        .order("display_name", {
-          ascending: true,
-        })
-        .order("id", {
-          ascending: true,
-        });
-
-      const safeSearchTerm =
-        criteria.term
-          .replace(/[,%()]/g, " ")
-          .trim();
-
-      if (safeSearchTerm) {
-        query = query.or(
-          `display_name.ilike.%${safeSearchTerm}%,username.ilike.%${safeSearchTerm}%,field.ilike.%${safeSearchTerm}%`
-        );
-      }
-
-      if (criteria.role !== "all") {
-        query = query.eq(
-          "role_type",
-          criteria.role
-        );
-      }
-
-      if (criteria.mentor === "mentors") {
-        query = query.eq(
-          "mentor_available",
-          true
-        );
-      } else if (
-        criteria.mentor === "non-mentors"
-      ) {
-        query = query.eq(
-          "mentor_available",
-          false
-        );
-      }
-
-      const excludedProfileIds =
-        new Set<string>([currentUserId]);
-
-      connections.forEach((connection) => {
-        if (
-          connection.status !== "pending" &&
-          connection.status !== "accepted"
-        ) {
-          return;
-        }
-
-        const otherProfileId =
-          connection.requester_id === currentUserId
-            ? connection.recipient_id
-            : connection.requester_id;
-
-        excludedProfileIds.add(
-          otherProfileId
-        );
-      });
-
-      query = query.not(
-        "id",
-        "in",
-        `(${Array.from(
-          excludedProfileIds
-        ).join(",")})`
-      );
-
       const {
         data,
         error,
-      } = await query.range(
-        offset,
-        offset + PEOPLE_SEARCH_PAGE_SIZE
+      } = await supabase.rpc(
+        "search_people",
+        {
+          search_term: criteria.term,
+          role_filter: criteria.role,
+          mentor_filter: criteria.mentor,
+          result_limit:
+            PEOPLE_SEARCH_PAGE_SIZE + 1,
+          result_offset: offset,
+        }
       );
 
       if (error) {
@@ -1689,7 +1622,7 @@ export function ConnectionWorkflow() {
                         event.target.value
                       )
                     }
-                    placeholder="Search by name or field..."
+                    placeholder="Search by name, field, or skill..."
                     type="search"
                     value={searchTerm}
                   />
@@ -1762,7 +1695,7 @@ export function ConnectionWorkflow() {
                         ? "result"
                         : "results"
                     } loaded`
-                  : "Search FieldsConnect by name, field, role type, or mentor availability."}
+                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
               </p>
 
               {peopleSearchError && (
