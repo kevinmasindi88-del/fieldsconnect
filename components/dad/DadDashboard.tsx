@@ -128,9 +128,7 @@ export function DadDashboard() {
       return;
     }
 
-    const { data: access, error: accessError } = await supabase.rpc("has_dad_access", {
-      candidate: user.id,
-    });
+    const { data: access, error: accessError } = await supabase.rpc("has_dad_access");
 
     if (accessError || !access) {
       setHasAccess(false);
