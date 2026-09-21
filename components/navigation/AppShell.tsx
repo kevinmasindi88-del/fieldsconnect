@@ -65,9 +65,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
 
     async function loadDadAccess() {
-      const { data, error } = await supabase.rpc("has_dad_access", {
-        candidate: user.id,
-      });
+      const { data, error } = await supabase.rpc("has_dad_access");
 
       if (!error) {
         setHasDadAccess(Boolean(data));
