@@ -26,6 +26,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [hasDadAccess, setHasDadAccess] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -49,6 +51,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setIsProfileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      setHasDadAccess(false);
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+
+    async function loadDadAccess() {
+      const { data, error } = await supabase.rpc("has_dad_access");
+
+      if (!error) {
+        setHasDadAccess(Boolean(data));
+      }
+    }
+
+    void loadDadAccess();
+  }, [user]);
 
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
@@ -134,9 +159,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </Link>
 
-                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/profile">
-                    Profile
-                  </Link>
+                  <div className="relative">
+                    <button
+                      aria-expanded={isProfileMenuOpen}
+                      aria-haspopup="menu"
+                      className="rounded-lg border px-3 py-2 text-sm font-medium"
+                      onClick={() => setIsProfileMenuOpen((open) => !open)}
+                      type="button"
+                    >
+                      Profile
+                      <span aria-hidden="true" className="ml-2 text-xs">
+                        ▾
+                      </span>
+                    </button>
+
+                    {isProfileMenuOpen && (
+                      <div
+                        className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-xl border bg-white p-1 shadow-lg"
+                        role="menu"
+                      >
+                        <Link
+                          className="block rounded-lg px-3 py-2 text-sm hover:bg-gray-50"
+                          href="/profile"
+                          role="menuitem"
+                        >
+                          View profile
+                        </Link>
+
+                        {hasDadAccess && (
+                          <Link
+                            className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50"
+                            href="/dad"
+                            role="menuitem"
+                          >
+                            Data Analytics Dashboard
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
