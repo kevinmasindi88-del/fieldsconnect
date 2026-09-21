@@ -226,6 +226,22 @@ export function LibraryWorkflow() {
       if (error) throw error;
 
       if (data?.signedUrl) {
+        if (currentUserId) {
+          void supabase.from("analytics_events").insert({
+            user_id: currentUserId,
+            event_name: "library_document_opened",
+            feature: "library",
+            library_document_id: document.id,
+            source: "library",
+            context: {
+              owner_id: document.owner_id,
+              visibility: document.visibility,
+              is_published: document.is_published,
+              mime_type: document.mime_type,
+            },
+          });
+        }
+
         window.open(data.signedUrl, "_blank", "noopener,noreferrer");
       }
     } catch (error) {
