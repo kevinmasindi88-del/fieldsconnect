@@ -10,9 +10,24 @@ type MetricRow = {
   calculated_at: string;
 };
 
-const metricLabels: Record<string, string> = {
+type MetricGovernanceRow = {
+  metric_key: string;
+  display_name: string;
+  definition: string;
+  calculation_definition: string;
+  measurement_type: "snapshot" | "daily_flow";
+  time_basis: string;
+  time_rule: string;
+  calculation_cadence: string;
+  review_cadence: string;
+  baseline_status: string;
+  benchmark_status: string;
+  threshold_status: string;
+};
+
+const fallbackMetricLabels: Record<string, string> = {
   users_total: "Total users",
-  users_new: "New users today",
+  users_new: "New users",
   connections_total: "Connection requests",
   connections_accepted: "Accepted connections",
   mentorship_requests_total: "Mentorship requests",
@@ -27,7 +42,7 @@ const metricLabels: Record<string, string> = {
   comments_total: "Comments",
   post_reactions_total: "Post reactions",
   messages_total: "Messages",
-  analytics_events_today: "Tracked events today",
+  analytics_events_today: "Tracked events",
 };
 
 const overviewKeys = [
@@ -69,10 +84,12 @@ function MetricBars({
   title,
   keys,
   metrics,
+  labels,
 }: {
   title: string;
   keys: string[];
   metrics: Map<string, number>;
+  labels: Map<string, string>;
 }) {
   const max = Math.max(1, ...keys.map((key) => metrics.get(key) ?? 0));
 
@@ -87,7 +104,7 @@ function MetricBars({
           return (
             <div key={key}>
               <div className="mb-1 flex items-center justify-between gap-4 text-sm">
-                <span className="text-gray-700">{metricLabels[key] ?? key}</span>
+                <span className="text-gray-700">{labels.get(key) ?? fallbackMetricLabels[key] ?? key}</span>
                 <span className="font-semibold">{value.toLocaleString()}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-gray-100">
@@ -106,6 +123,7 @@ function MetricBars({
 
 export function DadDashboard() {
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
+  const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -138,22 +156,40 @@ export function DadDashboard() {
 
     setHasAccess(true);
 
-    const { data, error } = await supabase
-      .from("dad_daily_metrics")
-      .select("metric_date, metric_key, metric_value, calculated_at")
-      .eq("dimension_type", "global")
-      .eq("dimension_value", "all")
-      .order("metric_date", { ascending: false })
-      .limit(100);
+    const [metricsResult, governanceResult] = await Promise.all([
+      supabase
+        .from("dad_daily_metrics")
+        .select("metric_date, metric_key, metric_value, calculated_at")
+        .eq("dimension_type", "global")
+        .eq("dimension_value", "all")
+        .order("metric_date", { ascending: false })
+        .limit(100),
+      supabase
+        .from("dad_metric_governance")
+        .select(
+          "metric_key, display_name, definition, calculation_definition, measurement_type, time_basis, time_rule, calculation_cadence, review_cadence, baseline_status, benchmark_status, threshold_status"
+        )
+        .eq("is_active", true)
+        .order("metric_key", { ascending: true }),
+    ]);
 
-    if (error) {
-      setMessage(error.message);
+    if (metricsResult.error) {
+      setMessage(metricsResult.error.message);
       setIsLoading(false);
       return;
     }
 
-    const newestDate = data?.[0]?.metric_date;
-    setMetrics((data ?? []).filter((row) => row.metric_date === newestDate));
+    if (governanceResult.error) {
+      setGovernance([]);
+      setMessage("Metrics loaded, but governance metadata is unavailable.");
+    } else {
+      setGovernance((governanceResult.data ?? []) as MetricGovernanceRow[]);
+    }
+
+    const newestDate = metricsResult.data?.[0]?.metric_date;
+    setMetrics(
+      (metricsResult.data ?? []).filter((row) => row.metric_date === newestDate)
+    );
     setIsLoading(false);
   }, []);
 
@@ -164,6 +200,10 @@ export function DadDashboard() {
   const metricMap = useMemo(() => {
     return new Map(metrics.map((row) => [row.metric_key, Number(row.metric_value)]));
   }, [metrics]);
+
+  const metricLabelMap = useMemo(() => {
+    return new Map(governance.map((row) => [row.metric_key, row.display_name]));
+  }, [governance]);
 
   const lastCalculatedAt = metrics
     .map((row) => row.calculated_at)
@@ -252,16 +292,31 @@ export function DadDashboard() {
         {overviewKeys.map((key) => (
           <MetricCard
             key={key}
-            label={metricLabels[key] ?? key}
+            label={metricLabelMap.get(key) ?? fallbackMetricLabels[key] ?? key}
             value={metricMap.get(key) ?? 0}
           />
         ))}
       </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <MetricBars title="Mentorship" keys={mentorshipKeys} metrics={metricMap} />
-        <MetricBars title="Engagement" keys={engagementKeys} metrics={metricMap} />
-        <MetricBars title="Library" keys={libraryKeys} metrics={metricMap} />
+        <MetricBars
+          title="Mentorship"
+          keys={mentorshipKeys}
+          metrics={metricMap}
+          labels={metricLabelMap}
+        />
+        <MetricBars
+          title="Engagement"
+          keys={engagementKeys}
+          metrics={metricMap}
+          labels={metricLabelMap}
+        />
+        <MetricBars
+          title="Library"
+          keys={libraryKeys}
+          metrics={metricMap}
+          labels={metricLabelMap}
+        />
 
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Analyst workflow</h2>
