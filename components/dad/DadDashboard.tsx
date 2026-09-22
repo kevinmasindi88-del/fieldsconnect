@@ -25,6 +25,12 @@ type MetricGovernanceRow = {
   threshold_status: string;
 };
 
+type SignupTrendRow = {
+  month_start: string;
+  signup_count: number | string;
+  is_current_month: boolean;
+};
+
 const fallbackMetricLabels: Record<string, string> = {
   users_total: "Total users",
   users_new: "New users",
@@ -123,9 +129,195 @@ function MetricBars({
   );
 }
 
+function SignupTrend({
+  rows,
+  error,
+}: {
+  rows: SignupTrendRow[];
+  error: string | null;
+}) {
+  const monthLabels = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const normalizedRows = rows.map((row, index) => ({
+    ...row,
+    signup_count: Number(row.signup_count),
+    index,
+  }));
+
+  const max = Math.max(
+    1,
+    ...normalizedRows.map((row) => row.signup_count)
+  );
+
+  const yearGroups: Array<{
+    year: string;
+    rows: (typeof normalizedRows)[number][];
+  }> = [];
+
+  for (const row of normalizedRows) {
+    const year = row.month_start.slice(0, 4);
+    const currentGroup = yearGroups.at(-1);
+
+    if (currentGroup?.year === year) {
+      currentGroup.rows.push(row);
+    } else {
+      yearGroups.push({
+        year,
+        rows: [row],
+      });
+    }
+  }
+
+  return (
+    <div className="mt-6 border-t pt-6">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="font-semibold">12-month signup trend</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Gross profile signups by UTC calendar month. The current month is provisional.
+          </p>
+        </div>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+          Rolling 12 months
+        </p>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          {error}
+        </div>
+      ) : normalizedRows.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          No signup trend data is available.
+        </div>
+      ) : (
+        <div className="mt-4 overflow-x-auto pb-2">
+          <div className="flex min-w-[900px] gap-3">
+            {yearGroups.map((group) => (
+              <div
+                key={group.year}
+                className="rounded-xl border bg-gray-50/50 p-3"
+                style={{ flex: `${group.rows.length} 1 0%` }}
+              >
+                <div className="border-b pb-2 text-center text-xs font-semibold uppercase tracking-[0.16em] text-gray-600">
+                  {group.year}
+                </div>
+
+                <div
+                  className="mt-3 grid gap-2"
+                  style={{
+                    gridTemplateColumns: `repeat(${group.rows.length}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {group.rows.map((row) => {
+                    const previous =
+                      row.index > 0
+                        ? normalizedRows[row.index - 1].signup_count
+                        : null;
+
+                    const delta =
+                      previous === null
+                        ? null
+                        : row.signup_count - previous;
+
+                    const percentChange =
+                      previous !== null && previous > 0 && delta !== null
+                        ? Math.round((delta / previous) * 100)
+                        : null;
+
+                    const monthNumber = Number(
+                      row.month_start.slice(5, 7)
+                    );
+
+                    const monthLabel =
+                      monthLabels[monthNumber - 1] ??
+                      row.month_start.slice(5, 7);
+
+                    const barHeight =
+                      row.signup_count === 0
+                        ? 0
+                        : Math.max(
+                            10,
+                            (row.signup_count / max) * 100
+                          );
+
+                    const movementLabel =
+                      delta === null
+                        ? "12m start"
+                        : `${delta > 0 ? "+" : ""}${delta.toLocaleString()} MoM${
+                            percentChange !== null
+                              ? ` (${percentChange > 0 ? "+" : ""}${percentChange}%)`
+                              : ""
+                          }`;
+
+                    return (
+                      <div
+                        key={row.month_start}
+                        className={`rounded-lg border bg-white p-2 ${
+                          row.is_current_month
+                            ? "ring-1 ring-black"
+                            : ""
+                        }`}
+                      >
+                        <p className="text-center text-xs font-semibold text-gray-700">
+                          {monthLabel}
+                        </p>
+
+                        <p className="mt-1 text-center text-xl font-semibold">
+                          {row.signup_count.toLocaleString()}
+                        </p>
+
+                        <div className="mt-2 flex h-28 items-end justify-center rounded-md bg-gray-100 px-2">
+                          {row.signup_count > 0 && (
+                            <div
+                              className="w-full max-w-8 rounded-t bg-black transition-all"
+                              style={{
+                                height: `${barHeight}%`,
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-center text-[10px] font-medium text-gray-500">
+                          {movementLabel}
+                        </p>
+
+                        {row.is_current_month && (
+                          <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                            Provisional
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DadDashboard() {
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
   const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
+  const [signupTrend, setSignupTrend] = useState<SignupTrendRow[]>([]);
+  const [signupTrendError, setSignupTrendError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -158,7 +350,7 @@ export function DadDashboard() {
 
     setHasAccess(true);
 
-    const [metricsResult, governanceResult] = await Promise.all([
+    const [metricsResult, governanceResult, signupTrendResult] = await Promise.all([
       supabase
         .from("dad_daily_metrics")
         .select("metric_date, metric_key, metric_value, calculated_at")
@@ -173,6 +365,9 @@ export function DadDashboard() {
         )
         .eq("is_active", true)
         .order("metric_key", { ascending: true }),
+      supabase.rpc("get_dad_signup_monthly_12m", {
+        p_as_of: new Date().toISOString().slice(0, 10),
+      }),
     ]);
 
     if (metricsResult.error) {
@@ -186,6 +381,16 @@ export function DadDashboard() {
       setMessage("Metrics loaded, but governance metadata is unavailable.");
     } else {
       setGovernance((governanceResult.data ?? []) as MetricGovernanceRow[]);
+    }
+
+    if (signupTrendResult.error) {
+      setSignupTrend([]);
+      setSignupTrendError("The 12-month signup trend is unavailable.");
+    } else {
+      setSignupTrend(
+        (signupTrendResult.data ?? []) as SignupTrendRow[]
+      );
+      setSignupTrendError(null);
     }
 
     const newestDate = metricsResult.data?.[0]?.metric_date;
@@ -304,8 +509,8 @@ export function DadDashboard() {
         ))}
       </section>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="text-lg font-semibold">Growth &amp; Activation</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {growthActivationKeys.map((key) => {
@@ -332,6 +537,11 @@ export function DadDashboard() {
               );
             })}
           </div>
+
+          <SignupTrend
+            rows={signupTrend}
+            error={signupTrendError}
+          />
         </section>
 
         <MetricBars
