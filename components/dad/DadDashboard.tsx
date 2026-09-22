@@ -163,7 +163,7 @@ function MetricBars({
           <div className="min-w-0">
             <h2 className="text-sm font-semibold">{title}</h2>
             <p className="mt-0.5 text-[11px] text-gray-500">
-              {keys.length} metrics / tap to expand
+              {keys.length} metrics
             </p>
           </div>
 
@@ -398,7 +398,7 @@ function AnalystWorkflow() {
           <div className="min-w-0">
             <h2 className="text-sm font-semibold">Analyst workflow</h2>
             <p className="mt-0.5 text-[11px] text-gray-500">
-              Review workspace / tap to expand
+              Review workspace
             </p>
           </div>
 
