@@ -88,6 +88,63 @@ function MetricCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+function MetricBarsContent({
+  keys,
+  metrics,
+  labels,
+  compact = false,
+}: {
+  keys: string[];
+  metrics: Map<string, number>;
+  labels: Map<string, string>;
+  compact?: boolean;
+}) {
+  const max = Math.max(
+    1,
+    ...keys.map((key) => metrics.get(key) ?? 0)
+  );
+
+  return (
+    <div className={compact ? "space-y-3" : "space-y-4"}>
+      {keys.map((key) => {
+        const value = metrics.get(key) ?? 0;
+        const width = Math.max(
+          value === 0 ? 0 : 4,
+          (value / max) * 100
+        );
+
+        return (
+          <div key={key}>
+            <div
+              className={`mb-1 flex items-center justify-between gap-3 ${
+                compact ? "text-xs" : "text-sm"
+              }`}
+            >
+              <span className="min-w-0 break-words text-gray-700">
+                {labels.get(key) ?? fallbackMetricLabels[key] ?? key}
+              </span>
+              <span className="shrink-0 font-semibold">
+                {value.toLocaleString()}
+              </span>
+            </div>
+
+            <div
+              className={`overflow-hidden rounded-full bg-gray-100 ${
+                compact ? "h-1.5" : "h-2"
+              }`}
+            >
+              <div
+                className="h-full rounded-full bg-black transition-all"
+                style={{ width: `${width}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MetricBars({
   title,
   keys,
@@ -99,36 +156,56 @@ function MetricBars({
   metrics: Map<string, number>;
   labels: Map<string, string>;
 }) {
-  const max = Math.max(1, ...keys.map((key) => metrics.get(key) ?? 0));
-
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="mt-5 space-y-4">
-        {keys.map((key) => {
-          const value = metrics.get(key) ?? 0;
-          const width = Math.max(value === 0 ? 0 : 4, (value / max) * 100);
+    <>
+      <details className="group min-w-0 rounded-xl border bg-white shadow-sm sm:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              {keys.length} metrics / tap to expand
+            </p>
+          </div>
 
-          return (
-            <div key={key}>
-              <div className="mb-1 flex items-center justify-between gap-4 text-sm">
-                <span className="text-gray-700">{labels.get(key) ?? fallbackMetricLabels[key] ?? key}</span>
-                <span className="font-semibold">{value.toLocaleString()}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-black transition-all"
-                  style={{ width: `${width}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
+            <path
+              d="m5 7.5 5 5 5-5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </summary>
+
+        <div className="border-t px-4 py-4">
+          <MetricBarsContent
+            keys={keys}
+            metrics={metrics}
+            labels={labels}
+            compact
+          />
+        </div>
+      </details>
+
+      <section className="hidden rounded-2xl border bg-white p-6 shadow-sm sm:block">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <div className="mt-5">
+          <MetricBarsContent
+            keys={keys}
+            metrics={metrics}
+            labels={labels}
+          />
+        </div>
+      </section>
+    </>
   );
 }
-
 function SignupTrend({
   rows,
   error,
@@ -313,6 +390,57 @@ function SignupTrend({
   );
 }
 
+function AnalystWorkflow() {
+  return (
+    <>
+      <details className="group min-w-0 rounded-xl border bg-white shadow-sm sm:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Analyst workflow</h2>
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              Review workspace / tap to expand
+            </p>
+          </div>
+
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
+            <path
+              d="m5 7.5 5 5 5-5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </summary>
+
+        <div className="border-t px-4 py-4">
+          <p className="text-xs text-gray-600">
+            Observation → evidence → interpretation → recommendation → action → outcome.
+          </p>
+
+          <div className="mt-4 rounded-xl border border-dashed p-3 text-xs text-gray-500">
+            Analyst review workspace is connected at database level and will be surfaced here next.
+          </div>
+        </div>
+      </details>
+
+      <section className="hidden rounded-2xl border bg-white p-6 shadow-sm sm:block">
+        <h2 className="text-lg font-semibold">Analyst workflow</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Observation → evidence → interpretation → recommendation → action → outcome.
+        </p>
+        <div className="mt-5 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          Analyst review workspace is connected at database level and will be surfaced here next.
+        </div>
+      </section>
+    </>
+  );
+}
 export function DadDashboard() {
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
   const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
@@ -563,15 +691,7 @@ export function DadDashboard() {
           labels={metricLabelMap}
         />
 
-        <section className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Analyst workflow</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Observation → evidence → interpretation → recommendation → action → outcome.
-          </p>
-          <div className="mt-5 rounded-xl border border-dashed p-4 text-sm text-gray-500">
-            Analyst review workspace is connected at database level and will be surfaced here next.
-          </div>
-        </section>
+        <AnalystWorkflow />
       </div>
     </main>
   );
