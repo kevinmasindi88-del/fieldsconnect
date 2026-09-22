@@ -52,6 +52,8 @@ const overviewKeys = [
   "library_documents_published",
 ];
 
+const growthActivationKeys = ["users_total", "users_new"];
+
 const mentorshipKeys = [
   "mentorship_requests_total",
   "mentorship_requests_accepted",
@@ -205,6 +207,10 @@ export function DadDashboard() {
     return new Map(governance.map((row) => [row.metric_key, row.display_name]));
   }, [governance]);
 
+  const metricGovernanceMap = useMemo(() => {
+    return new Map(governance.map((row) => [row.metric_key, row]));
+  }, [governance]);
+
   const lastCalculatedAt = metrics
     .map((row) => row.calculated_at)
     .sort()
@@ -299,6 +305,35 @@ export function DadDashboard() {
       </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold">Growth &amp; Activation</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {growthActivationKeys.map((key) => {
+              const governanceRow = metricGovernanceMap.get(key);
+
+              return (
+                <div key={key} className="rounded-xl border bg-gray-50 p-4">
+                  <p className="text-sm font-medium text-gray-500">
+                    {metricLabelMap.get(key) ?? fallbackMetricLabels[key] ?? key}
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight">
+                    {(metricMap.get(key) ?? 0).toLocaleString()}
+                  </p>
+                  {governanceRow && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      {governanceRow.measurement_type === "daily_flow"
+                        ? "Daily flow"
+                        : "Snapshot"}
+                      {" · "}
+                      {governanceRow.time_basis}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         <MetricBars
           title="Mentorship"
           keys={mentorshipKeys}
