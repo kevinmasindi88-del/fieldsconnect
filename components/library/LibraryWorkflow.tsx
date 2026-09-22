@@ -705,22 +705,31 @@ export function LibraryWorkflow() {
       const analyticsClient =
         getSupabaseBrowserClient();
 
-      void analyticsClient
-        .from("analytics_events")
-        .insert({
-          user_id: currentUserId,
-          event_name: "library_document_opened",
-          feature: "library",
-          library_document_id: document.id,
-          source: "library",
-          context: {
-            owner_id: document.owner_id,
-            visibility: document.visibility,
-            is_published: document.is_published,
-            mime_type: document.mime_type,
-            resource_type: document.resource_type,
-          },
-        });
+      void (async () => {
+        const { error } = await analyticsClient
+          .from("analytics_events")
+          .insert({
+            user_id: currentUserId,
+            event_name: "library_document_opened",
+            feature: "library",
+            library_document_id: document.id,
+            source: "library",
+            context: {
+              owner_id: document.owner_id,
+              visibility: document.visibility,
+              is_published: document.is_published,
+              mime_type: document.mime_type,
+              resource_type: document.resource_type,
+            },
+          });
+
+        if (error) {
+          console.warn(
+            "Unable to track Library open:",
+            error
+          );
+        }
+      })();
     }
 
     try {
