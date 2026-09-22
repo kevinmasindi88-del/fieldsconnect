@@ -81,9 +81,9 @@ const libraryKeys = ["library_documents_total", "library_documents_published"];
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight">{value.toLocaleString()}</p>
+    <div className="rounded-xl border bg-white p-4 shadow-sm sm:rounded-2xl sm:p-5">
+      <p className="text-xs font-medium text-gray-500 sm:text-sm">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -182,7 +182,7 @@ function SignupTrend({
   }
 
   return (
-    <div className="mt-6 border-t pt-6">
+    <div className="mt-5 min-w-0 border-t pt-5 sm:mt-6 sm:pt-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="font-semibold">12-month signup trend</h3>
@@ -204,7 +204,7 @@ function SignupTrend({
           No signup trend data is available.
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto pb-2">
+        <div className="mt-4 min-w-0 overflow-x-auto overscroll-x-contain pb-2">
           <div className="flex min-w-[900px] gap-3">
             {yearGroups.map((group) => (
               <div
@@ -446,7 +446,7 @@ export function DadDashboard() {
 
   if (isLoading || hasAccess === null) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <p className="text-sm text-gray-500">Loading DAD…</p>
       </main>
     );
@@ -454,7 +454,7 @@ export function DadDashboard() {
 
   if (!hasAccess) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="rounded-2xl border p-6">
           <h1 className="text-2xl font-semibold">Data Analytics Dashboard</h1>
           <p className="mt-2 text-gray-600">You do not currently have access to DAD.</p>
@@ -464,14 +464,14 @@ export function DadDashboard() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 sm:text-sm sm:tracking-[0.18em]">
             FieldsConnect intelligence
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Data Analytics Dashboard</h1>
-          <p className="mt-2 max-w-2xl text-gray-600">
+          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Data Analytics Dashboard</h1>
+          <p className="mt-2 max-w-2xl text-sm text-gray-600 sm:text-base">
             Daily operational view across growth, mentorship, engagement and Library activity.
           </p>
         </div>
@@ -499,7 +499,7 @@ export function DadDashboard() {
         </div>
       )}
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 lg:grid-cols-4">
         {overviewKeys.map((key) => (
           <MetricCard
             key={key}
@@ -510,22 +510,22 @@ export function DadDashboard() {
       </section>
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl border bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="text-lg font-semibold">Growth &amp; Activation</h2>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <section className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm sm:p-6 lg:col-span-2">
+          <h2 className="text-base font-semibold sm:text-lg">Growth &amp; Activation</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5 sm:gap-4">
             {growthActivationKeys.map((key) => {
               const governanceRow = metricGovernanceMap.get(key);
 
               return (
-                <div key={key} className="rounded-xl border bg-gray-50 p-4">
-                  <p className="text-sm font-medium text-gray-500">
+                <div key={key} className="min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4">
+                  <p className="text-xs font-medium text-gray-500 sm:text-sm">
                     {metricLabelMap.get(key) ?? fallbackMetricLabels[key] ?? key}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight">
+                  <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                     {(metricMap.get(key) ?? 0).toLocaleString()}
                   </p>
                   {governanceRow && (
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-[11px] text-gray-500 sm:text-xs">
                       {governanceRow.measurement_type === "daily_flow"
                         ? "Daily flow"
                         : "Snapshot"}
