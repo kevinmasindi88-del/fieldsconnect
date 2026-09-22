@@ -47,6 +47,9 @@ export function RoleAwareAccountLinks({
   const [isFcTeamMember, setIsFcTeamMember] =
     useState(false);
 
+  const [hasDadAccess, setHasDadAccess] =
+    useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const realtimeInstanceId = useId();
@@ -78,14 +81,22 @@ export function RoleAwareAccountLinks({
           );
         }
 
-        const [roleResult, teamResult] =
+        const [roleResult, teamResult, dadResult] =
           await Promise.all([
             supabase.rpc("current_platform_role"),
             supabase.rpc("is_fc_team_member"),
+            supabase.rpc("has_dad_access"),
           ]);
 
         if (roleResult.error) throw roleResult.error;
         if (teamResult.error) throw teamResult.error;
+
+        if (dadResult.error) {
+          console.warn(
+            "Unable to load DAD access:",
+            dadResult.error
+          );
+        }
 
         if (!isMounted) return;
 
@@ -94,6 +105,10 @@ export function RoleAwareAccountLinks({
         );
 
         setIsFcTeamMember(Boolean(teamResult.data));
+
+        setHasDadAccess(
+          !dadResult.error && Boolean(dadResult.data)
+        );
       } catch (error) {
         console.error(
           "Unable to load account workspace access:",
@@ -225,6 +240,18 @@ export function RoleAwareAccountLinks({
   return (
     <>
       <InstallFieldsConnect />
+
+      {hasDadAccess && (
+        <Link
+          className={accountLinkClass(
+            pathname.startsWith("/dad")
+          )}
+          href="/dad"
+          onClick={closeAccountDropdown}
+        >
+          Data Analytics Dashboard
+        </Link>
+      )}
 
       <Link
         className={accountLinkClass(

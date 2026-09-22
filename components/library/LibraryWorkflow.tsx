@@ -694,6 +694,35 @@ export function LibraryWorkflow() {
     setIsWorking(true);
     setMessage(null);
 
+    function trackLibraryOpen() {
+      if (
+        !currentUserId ||
+        !isSupabaseConfigured()
+      ) {
+        return;
+      }
+
+      const analyticsClient =
+        getSupabaseBrowserClient();
+
+      void analyticsClient
+        .from("analytics_events")
+        .insert({
+          user_id: currentUserId,
+          event_name: "library_document_opened",
+          feature: "library",
+          library_document_id: document.id,
+          source: "library",
+          context: {
+            owner_id: document.owner_id,
+            visibility: document.visibility,
+            is_published: document.is_published,
+            mime_type: document.mime_type,
+            resource_type: document.resource_type,
+          },
+        });
+    }
+
     try {
       if (document.resource_type === "external_link") {
         if (!document.external_url) {
@@ -701,6 +730,8 @@ export function LibraryWorkflow() {
             "This online resource does not have a valid link."
           );
         }
+
+        trackLibraryOpen();
 
         window.open(
           document.external_url,
@@ -729,6 +760,8 @@ export function LibraryWorkflow() {
       if (error) throw error;
 
       if (data?.signedUrl) {
+        trackLibraryOpen();
+
         window.open(
           data.signedUrl,
           "_blank",
