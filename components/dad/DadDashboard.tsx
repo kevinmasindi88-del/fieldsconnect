@@ -38,6 +38,33 @@ type SignupTrendRow = {
   is_current_month: boolean;
 };
 
+type TrendReadinessRow = {
+  metric_key: string;
+  display_name: string;
+  domain: string;
+  benchmark_basis:
+    | "direct_trend"
+    | "derived_kpi_required"
+    | "instrumentation_dependency";
+  primary_grain: string;
+  observation_start: string;
+  first_observed_date: string | null;
+  last_observed_date: string | null;
+  complete_days: number;
+  complete_weeks: number;
+  complete_months: number;
+  min_complete_days: number;
+  min_complete_weeks: number;
+  min_complete_months: number;
+  min_denominator_events: number | null;
+  readiness_state:
+    | "blocked"
+    | "insufficient"
+    | "collecting"
+    | "eligible_for_review";
+  readiness_reason: string;
+};
+
 const fallbackMetricLabels: Record<string, string> = {
   users_total: "Total users",
   users_new: "New users",
@@ -404,6 +431,244 @@ function formatGovernanceLabel(value: string) {
     .join(" ");
 }
 
+function BenchmarkReadinessPanel({
+  rows,
+  error,
+}: {
+  rows: TrendReadinessRow[];
+  error: string | null;
+}) {
+  const stateOrder: TrendReadinessRow["readiness_state"][] = [
+    "eligible_for_review",
+    "collecting",
+    "insufficient",
+    "blocked",
+  ];
+
+  const stateLabels: Record<
+    TrendReadinessRow["readiness_state"],
+    string
+  > = {
+    eligible_for_review: "Eligible for review",
+    collecting: "Collecting",
+    insufficient: "Insufficient",
+    blocked: "Blocked",
+  };
+
+  const stateCounts = new Map<
+    TrendReadinessRow["readiness_state"],
+    number
+  >();
+
+  for (const state of stateOrder) {
+    stateCounts.set(
+      state,
+      rows.filter((row) => row.readiness_state === state).length
+    );
+  }
+
+  const basisRank: Record<
+    TrendReadinessRow["benchmark_basis"],
+    number
+  > = {
+    direct_trend: 0,
+    derived_kpi_required: 1,
+    instrumentation_dependency: 2,
+  };
+
+  const orderedRows = [...rows].sort((a, b) => {
+    const basisDifference =
+      basisRank[a.benchmark_basis] -
+      basisRank[b.benchmark_basis];
+
+    if (basisDifference !== 0) {
+      return basisDifference;
+    }
+
+    return a.display_name.localeCompare(b.display_name);
+  });
+
+  return (
+    <section className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm sm:p-6 lg:col-span-2">
+      <div>
+        <h2 className="text-base font-semibold sm:text-lg">
+          Trend &amp; benchmark readiness
+        </h2>
+        <p className="mt-1 max-w-3xl text-xs text-gray-500 sm:text-sm">
+          Evidence maturity from the structured post-baseline observation
+          window. Eligibility permits review; it does not activate a benchmark.
+        </p>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          {error}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          No trend-readiness data is available.
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {stateOrder.map((state) => (
+              <div
+                key={state}
+                className="rounded-xl border bg-gray-50 p-3"
+              >
+                <p className="text-[11px] font-medium text-gray-500 sm:text-xs">
+                  {stateLabels[state]}
+                </p>
+                <p className="mt-1 text-xl font-semibold">
+                  {stateCounts.get(state) ?? 0}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {orderedRows.map((row) => {
+              const requirements: string[] = [];
+
+              if (row.min_complete_days > 0) {
+                requirements.push(
+                  `${row.min_complete_days} complete days`
+                );
+              }
+
+              if (row.min_complete_weeks > 0) {
+                requirements.push(
+                  `${row.min_complete_weeks} complete weeks`
+                );
+              }
+
+              if (row.min_complete_months > 0) {
+                requirements.push(
+                  `${row.min_complete_months} complete months`
+                );
+              }
+
+              if (row.min_denominator_events !== null) {
+                requirements.push(
+                  `${row.min_denominator_events} denominator events`
+                );
+              }
+
+              return (
+                <details
+                  key={row.metric_key}
+                  className="group min-w-0 rounded-xl border bg-gray-50"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {row.display_name}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-gray-500">
+                        {formatGovernanceLabel(row.domain)}
+                        {" · "}
+                        {formatGovernanceLabel(row.benchmark_basis)}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full border bg-white px-2 py-1 text-[10px] font-medium text-gray-600 sm:text-[11px]">
+                        {stateLabels[row.readiness_state]}
+                      </span>
+
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                      >
+                        <path
+                          d="m5 7.5 5 5 5-5"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.5"
+                        />
+                      </svg>
+                    </div>
+                  </summary>
+
+                  <div className="space-y-4 border-t px-4 py-4 text-xs sm:text-sm">
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        Readiness
+                      </p>
+                      <p className="mt-1 text-gray-600">
+                        {row.readiness_reason}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Complete evidence
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {row.complete_days} days
+                          {" · "}
+                          {row.complete_weeks} weeks
+                          {" · "}
+                          {row.complete_months} months
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Review requirement
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {requirements.length > 0
+                            ? requirements.join(" · ")
+                            : "Dependency-specific gate"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Observation window
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          Starts {row.observation_start}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Primary grain
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {formatGovernanceLabel(row.primary_grain)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        Observed range
+                      </p>
+                      <p className="mt-1 text-gray-600">
+                        {row.first_observed_date &&
+                        row.last_observed_date
+                          ? `${row.first_observed_date} → ${row.last_observed_date}`
+                          : "No post-baseline observations yet."}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function MetricGovernancePanel({
   governance,
 }: {
@@ -659,6 +924,8 @@ export function DadDashboard() {
   const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
   const [signupTrend, setSignupTrend] = useState<SignupTrendRow[]>([]);
   const [signupTrendError, setSignupTrendError] = useState<string | null>(null);
+  const [trendReadiness, setTrendReadiness] = useState<TrendReadinessRow[]>([]);
+  const [trendReadinessError, setTrendReadinessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -691,7 +958,12 @@ export function DadDashboard() {
 
     setHasAccess(true);
 
-    const [metricsResult, governanceResult, signupTrendResult] = await Promise.all([
+    const [
+      metricsResult,
+      governanceResult,
+      signupTrendResult,
+      trendReadinessResult,
+    ] = await Promise.all([
       supabase
         .from("dad_daily_metrics")
         .select("metric_date, metric_key, metric_value, calculated_at")
@@ -707,6 +979,9 @@ export function DadDashboard() {
         .eq("is_active", true)
         .order("metric_key", { ascending: true }),
       supabase.rpc("get_dad_signup_monthly_12m", {
+        p_as_of: new Date().toISOString().slice(0, 10),
+      }),
+      supabase.rpc("get_dad_trend_readiness", {
         p_as_of: new Date().toISOString().slice(0, 10),
       }),
     ]);
@@ -732,6 +1007,18 @@ export function DadDashboard() {
         (signupTrendResult.data ?? []) as SignupTrendRow[]
       );
       setSignupTrendError(null);
+    }
+
+    if (trendReadinessResult.error) {
+      setTrendReadiness([]);
+      setTrendReadinessError(
+        "Trend and benchmark readiness is unavailable."
+      );
+    } else {
+      setTrendReadiness(
+        (trendReadinessResult.data ?? []) as TrendReadinessRow[]
+      );
+      setTrendReadinessError(null);
     }
 
     const newestDate = metricsResult.data?.[0]?.metric_date;
@@ -902,6 +1189,11 @@ export function DadDashboard() {
           keys={libraryKeys}
           metrics={metricMap}
           labels={metricLabelMap}
+        />
+
+        <BenchmarkReadinessPanel
+          rows={trendReadiness}
+          error={trendReadinessError}
         />
 
         <AnalystWorkflow />
