@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import {
@@ -116,6 +116,28 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     useState(false);
   const [requestSubmitted, setRequestSubmitted] =
     useState(false);
+  const [isBioExpanded, setIsBioExpanded] =
+    useState(false);
+  const [isBioOverflowing, setIsBioOverflowing] =
+    useState(false);
+  const bioRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    setIsBioExpanded(false);
+    setIsBioOverflowing(false);
+
+    const frame = window.requestAnimationFrame(() => {
+      const element = bioRef.current;
+
+      if (!element) return;
+
+      setIsBioOverflowing(
+        element.scrollHeight > element.clientHeight + 1
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [profile?.bio]);
 
   async function reloadVisibleLibraryDocuments() {
     if (!isSupabaseConfigured()) return;
@@ -616,7 +638,32 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
           {profile.mentor_available && <p className="mt-2 text-xs font-medium sm:text-sm">Available as mentor</p>}
 
-          {profile.bio && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-snug text-gray-700 sm:mt-4">{profile.bio}</p>}
+          {profile.bio && (
+            <div className="mt-3 max-w-3xl sm:mt-4">
+              <p
+                ref={bioRef}
+                className={`whitespace-pre-wrap text-sm leading-snug text-gray-700 ${
+                  !isBioExpanded
+                    ? "line-clamp-3"
+                    : ""
+                }`}
+              >
+                {profile.bio}
+              </p>
+
+              {isBioOverflowing && (
+                <button
+                  className="mt-2 text-xs font-semibold text-gray-700 underline-offset-4 hover:underline sm:text-sm"
+                  onClick={() =>
+                    setIsBioExpanded((current) => !current)
+                  }
+                  type="button"
+                >
+                  {isBioExpanded ? "View less" : "View more"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </header>
 

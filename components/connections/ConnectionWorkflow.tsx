@@ -1788,7 +1788,7 @@ function ConnectionCard({
           {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
         </p>
         {showBio && profile?.bio && (
-          <p className="mt-2 max-w-2xl text-sm leading-snug text-gray-700">
+          <p className="mt-2 line-clamp-3 max-w-2xl text-sm leading-snug text-gray-700">
             {profile.bio}
           </p>
         )}

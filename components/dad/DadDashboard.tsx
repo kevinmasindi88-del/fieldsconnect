@@ -264,7 +264,7 @@ function SignupTrend({
         <div>
           <h3 className="font-semibold">12-month signup trend</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Gross profile signups by UTC calendar month. The current month is provisional.
+            Gross profile signups by UTC calendar month.
           </p>
         </div>
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -372,11 +372,7 @@ function SignupTrend({
                           {movementLabel}
                         </p>
 
-                        {row.is_current_month && (
-                          <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                            Provisional
-                          </p>
-                        )}
+
                       </div>
                     );
                   })}
