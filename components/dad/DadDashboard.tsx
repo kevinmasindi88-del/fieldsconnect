@@ -13,16 +13,23 @@ type MetricRow = {
 type MetricGovernanceRow = {
   metric_key: string;
   display_name: string;
+  domain: string;
   definition: string;
   calculation_definition: string;
+  source_relations: string[];
+  source_type: "durable_record" | "behavioral_event" | "mixed";
   measurement_type: "snapshot" | "daily_flow";
   time_basis: string;
   time_rule: string;
+  unit: string;
   calculation_cadence: string;
   review_cadence: string;
+  privacy_class: string;
+  owner_role: string;
   baseline_status: string;
   benchmark_status: string;
   threshold_status: string;
+  governance_version: number;
 };
 
 type SignupTrendRow = {
@@ -386,6 +393,216 @@ function SignupTrend({
   );
 }
 
+function formatGovernanceLabel(value: string) {
+  return value
+    .split("_")
+    .map((part) =>
+      part.length > 0
+        ? `${part[0].toUpperCase()}${part.slice(1)}`
+        : part
+    )
+    .join(" ");
+}
+
+function MetricGovernancePanel({
+  governance,
+}: {
+  governance: MetricGovernanceRow[];
+}) {
+  return (
+    <section className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm sm:p-6 lg:col-span-2">
+      <div>
+        <h2 className="text-base font-semibold sm:text-lg">
+          Metric governance
+        </h2>
+        <p className="mt-1 max-w-3xl text-xs text-gray-500 sm:text-sm">
+          Read-only definitions, sources, time semantics and readiness states for active DAD metrics.
+        </p>
+      </div>
+
+      {governance.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          Governance metadata is unavailable.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {governance.map((metric) => (
+            <details
+              key={metric.metric_key}
+              className="group min-w-0 rounded-xl border bg-gray-50"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {metric.display_name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    {formatGovernanceLabel(metric.domain)}
+                    {" · "}
+                    {metric.measurement_type === "daily_flow"
+                      ? "Daily flow"
+                      : "Snapshot"}
+                    {" · "}
+                    {metric.time_basis}
+                  </p>
+                </div>
+
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                >
+                  <path
+                    d="m5 7.5 5 5 5-5"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </summary>
+
+              <div className="space-y-4 border-t px-4 py-4 text-xs sm:text-sm">
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    Definition
+                  </p>
+                  <p className="mt-1 text-gray-600">
+                    {metric.definition}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    Calculation
+                  </p>
+                  <p className="mt-1 text-gray-600">
+                    {metric.calculation_definition}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    Time rule
+                  </p>
+                  <p className="mt-1 text-gray-600">
+                    {metric.time_rule}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Source
+                    </p>
+                    <p className="mt-1 break-words text-gray-600">
+                      {metric.source_relations.join(", ") ||
+                        "Not specified"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Source type
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(metric.source_type)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Unit
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(metric.unit)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Owner role
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(metric.owner_role)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Calculation cadence
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(
+                        metric.calculation_cadence
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Review cadence
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(
+                        metric.review_cadence
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Privacy class
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      {formatGovernanceLabel(
+                        metric.privacy_class
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      Governance version
+                    </p>
+                    <p className="mt-1 text-gray-600">
+                      v{metric.governance_version}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full border bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                    Baseline:{" "}
+                    {formatGovernanceLabel(
+                      metric.baseline_status
+                    )}
+                  </span>
+
+                  <span className="rounded-full border bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                    Benchmark:{" "}
+                    {formatGovernanceLabel(
+                      metric.benchmark_status
+                    )}
+                  </span>
+
+                  <span className="rounded-full border bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                    Threshold:{" "}
+                    {formatGovernanceLabel(
+                      metric.threshold_status
+                    )}
+                  </span>
+                </div>
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AnalystWorkflow() {
   return (
     <>
@@ -485,7 +702,7 @@ export function DadDashboard() {
       supabase
         .from("dad_metric_governance")
         .select(
-          "metric_key, display_name, definition, calculation_definition, measurement_type, time_basis, time_rule, calculation_cadence, review_cadence, baseline_status, benchmark_status, threshold_status"
+          "metric_key, display_name, domain, definition, calculation_definition, source_relations, source_type, measurement_type, time_basis, time_rule, unit, calculation_cadence, review_cadence, privacy_class, owner_role, baseline_status, benchmark_status, threshold_status, governance_version"
         )
         .eq("is_active", true)
         .order("metric_key", { ascending: true }),
@@ -688,6 +905,8 @@ export function DadDashboard() {
         />
 
         <AnalystWorkflow />
+
+        <MetricGovernancePanel governance={governance} />
       </div>
     </main>
   );
