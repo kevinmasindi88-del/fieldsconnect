@@ -65,6 +65,29 @@ type TrendReadinessRow = {
   readiness_reason: string;
 };
 
+type DerivedKpiReadinessRow = {
+  kpi_key: string;
+  display_name: string;
+  domain: string;
+  reference_value: number | string | null;
+  latest_value: number | string | null;
+  evidence_numerator: number | string;
+  evidence_denominator: number | string;
+  observation_start: string;
+  first_observed_date: string | null;
+  last_observed_date: string | null;
+  complete_days: number;
+  complete_weeks: number;
+  min_complete_days: number;
+  min_complete_weeks: number;
+  min_denominator_events: number;
+  readiness_state:
+    | "insufficient"
+    | "collecting"
+    | "eligible_for_review";
+  readiness_reason: string;
+};
+
 const fallbackMetricLabels: Record<string, string> = {
   users_total: "Total users",
   users_new: "New users",
@@ -669,6 +692,257 @@ function BenchmarkReadinessPanel({
   );
 }
 
+function formatPercentValue(
+  value: number | string | null
+) {
+  if (value === null) {
+    return "—";
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return "—";
+  }
+
+  return `${numericValue.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function NormalizedKpiReadinessPanel({
+  rows,
+  error,
+}: {
+  rows: DerivedKpiReadinessRow[];
+  error: string | null;
+}) {
+  const stateOrder: DerivedKpiReadinessRow["readiness_state"][] = [
+    "eligible_for_review",
+    "collecting",
+    "insufficient",
+  ];
+
+  const stateLabels: Record<
+    DerivedKpiReadinessRow["readiness_state"],
+    string
+  > = {
+    eligible_for_review: "Eligible for review",
+    collecting: "Collecting",
+    insufficient: "Insufficient",
+  };
+
+  const stateRank: Record<
+    DerivedKpiReadinessRow["readiness_state"],
+    number
+  > = {
+    eligible_for_review: 0,
+    collecting: 1,
+    insufficient: 2,
+  };
+
+  const orderedRows = [...rows].sort((a, b) => {
+    const stateDifference =
+      stateRank[a.readiness_state] -
+      stateRank[b.readiness_state];
+
+    if (stateDifference !== 0) {
+      return stateDifference;
+    }
+
+    return a.display_name.localeCompare(b.display_name);
+  });
+
+  return (
+    <section className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm sm:p-6 lg:col-span-2">
+      <div>
+        <h2 className="text-base font-semibold sm:text-lg">
+          Normalized KPI readiness
+        </h2>
+        <p className="mt-1 max-w-3xl text-xs text-gray-500 sm:text-sm">
+          Conversion, activation and outcome rates that provide normalized
+          analytical companions to scale-dependent cumulative metrics.
+          Pre-pilot references are descriptive only; eligibility permits
+          benchmark review and never activates a benchmark automatically.
+        </p>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          {error}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-500">
+          No normalized KPI readiness data is available.
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {stateOrder.map((state) => (
+              <div
+                key={state}
+                className="rounded-xl border bg-gray-50 p-3"
+              >
+                <p className="text-[11px] font-medium text-gray-500 sm:text-xs">
+                  {stateLabels[state]}
+                </p>
+                <p className="mt-1 text-xl font-semibold">
+                  {
+                    rows.filter(
+                      (row) => row.readiness_state === state
+                    ).length
+                  }
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {orderedRows.map((row) => {
+              const evidenceNumerator =
+                Number(row.evidence_numerator);
+
+              const evidenceDenominator =
+                Number(row.evidence_denominator);
+
+              return (
+                <details
+                  key={row.kpi_key}
+                  className="group min-w-0 rounded-xl border bg-gray-50"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {row.display_name}
+                      </p>
+
+                      <p className="mt-0.5 text-[11px] text-gray-500">
+                        {formatGovernanceLabel(row.domain)}
+                        {" · "}
+                        Normalized rate
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full border bg-white px-2 py-1 text-[10px] font-medium text-gray-600 sm:text-[11px]">
+                        {stateLabels[row.readiness_state]}
+                      </span>
+
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                      >
+                        <path
+                          d="m5 7.5 5 5 5-5"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.5"
+                        />
+                      </svg>
+                    </div>
+                  </summary>
+
+                  <div className="space-y-4 border-t px-4 py-4 text-xs sm:text-sm">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Pre-pilot reference
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {formatPercentValue(row.reference_value)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Latest complete
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {formatPercentValue(row.latest_value)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Evidence
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {evidenceNumerator.toLocaleString()}
+                          {" / "}
+                          {evidenceDenominator.toLocaleString()}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Observation start
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {row.observation_start}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Complete evidence
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {row.complete_days} days
+                          {" · "}
+                          {row.complete_weeks} weeks
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          Review gate
+                        </p>
+                        <p className="mt-1 text-gray-600">
+                          {row.min_complete_days} days
+                          {" · "}
+                          {row.min_complete_weeks} weeks
+                          {" · "}
+                          {row.min_denominator_events} denominator events
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        Readiness
+                      </p>
+                      <p className="mt-1 text-gray-600">
+                        {row.readiness_reason}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        Observed range
+                      </p>
+                      <p className="mt-1 text-gray-600">
+                        {row.first_observed_date &&
+                        row.last_observed_date
+                          ? `${row.first_observed_date} → ${row.last_observed_date}`
+                          : "No complete post-baseline observations yet."}
+                      </p>
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function MetricGovernancePanel({
   governance,
 }: {
@@ -926,6 +1200,8 @@ export function DadDashboard() {
   const [signupTrendError, setSignupTrendError] = useState<string | null>(null);
   const [trendReadiness, setTrendReadiness] = useState<TrendReadinessRow[]>([]);
   const [trendReadinessError, setTrendReadinessError] = useState<string | null>(null);
+  const [derivedKpiReadiness, setDerivedKpiReadiness] = useState<DerivedKpiReadinessRow[]>([]);
+  const [derivedKpiReadinessError, setDerivedKpiReadinessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -963,6 +1239,7 @@ export function DadDashboard() {
       governanceResult,
       signupTrendResult,
       trendReadinessResult,
+      derivedKpiReadinessResult,
     ] = await Promise.all([
       supabase
         .from("dad_daily_metrics")
@@ -982,6 +1259,9 @@ export function DadDashboard() {
         p_as_of: new Date().toISOString().slice(0, 10),
       }),
       supabase.rpc("get_dad_trend_readiness", {
+        p_as_of: new Date().toISOString().slice(0, 10),
+      }),
+      supabase.rpc("get_dad_derived_kpi_readiness", {
         p_as_of: new Date().toISOString().slice(0, 10),
       }),
     ]);
@@ -1019,6 +1299,18 @@ export function DadDashboard() {
         (trendReadinessResult.data ?? []) as TrendReadinessRow[]
       );
       setTrendReadinessError(null);
+    }
+
+    if (derivedKpiReadinessResult.error) {
+      setDerivedKpiReadiness([]);
+      setDerivedKpiReadinessError(
+        "Normalized KPI readiness is unavailable."
+      );
+    } else {
+      setDerivedKpiReadiness(
+        (derivedKpiReadinessResult.data ?? []) as DerivedKpiReadinessRow[]
+      );
+      setDerivedKpiReadinessError(null);
     }
 
     const newestDate = metricsResult.data?.[0]?.metric_date;
@@ -1194,6 +1486,11 @@ export function DadDashboard() {
         <BenchmarkReadinessPanel
           rows={trendReadiness}
           error={trendReadinessError}
+        />
+
+        <NormalizedKpiReadinessPanel
+          rows={derivedKpiReadiness}
+          error={derivedKpiReadinessError}
         />
 
         <AnalystWorkflow />
