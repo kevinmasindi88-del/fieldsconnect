@@ -797,7 +797,7 @@ function NormalizedKpiReadinessPanel({
             ))}
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="mt-4 grid items-start gap-3 lg:grid-cols-2">
             {orderedRows.map((row) => {
               const evidenceNumerator =
                 Number(row.evidence_numerator);
