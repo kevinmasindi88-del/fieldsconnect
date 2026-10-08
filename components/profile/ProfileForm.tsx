@@ -15,6 +15,39 @@ type MentorshipFrequency =
   | "monthly"
   | "flexible";
 
+type MentorshipDuration =
+  | "3_months"
+  | "6_months"
+  | "1_year"
+  | "ongoing";
+
+type MentorshipPaymentMode = "free" | "paid";
+
+type MentorshipPricingState = Record<
+  MentorshipDuration,
+  {
+    paymentMode: MentorshipPaymentMode;
+    price: string;
+  }
+>;
+
+type MentorPaymentAccountSummary = {
+  status: "active" | "disabled" | "pending_verification";
+  can_receive_payments: boolean;
+};
+
+type PaystackBankOption = {
+  name: string;
+  code: string;
+};
+
+type MentorPaymentSettingsResponse = {
+  ok?: boolean;
+  state?: string;
+  banks?: PaystackBankOption[];
+  error?: string;
+};
+
 type MentorSettingsState = {
   mentorshipSummary: string;
   mentoringFields: string;
@@ -59,6 +92,25 @@ const initialMentorSettings: MentorSettingsState = {
   accepts1Year: true,
   acceptsOngoing: false,
   isAcceptingRequests: true,
+};
+
+const initialMentorshipPricing: MentorshipPricingState = {
+  "3_months": {
+    paymentMode: "free",
+    price: "",
+  },
+  "6_months": {
+    paymentMode: "free",
+    price: "",
+  },
+  "1_year": {
+    paymentMode: "free",
+    price: "",
+  },
+  ongoing: {
+    paymentMode: "free",
+    price: "",
+  },
 };
 
 const AVATAR_BUCKET = "profile-avatars";
@@ -306,6 +358,30 @@ export function ProfileForm() {
   const [form, setForm] = useState<ProfileFormState>(initialState);
   const [mentorSettings, setMentorSettings] =
     useState<MentorSettingsState>(initialMentorSettings);
+  const [mentorshipPricing, setMentorshipPricing] =
+    useState<MentorshipPricingState>(
+      initialMentorshipPricing
+    );
+  const [
+    mentorPaymentAccount,
+    setMentorPaymentAccount,
+  ] = useState<MentorPaymentAccountSummary | null>(
+    null
+  );
+  const [payoutBanks, setPayoutBanks] =
+    useState<PaystackBankOption[]>([]);
+  const [payoutBankCode, setPayoutBankCode] =
+    useState("");
+  const [payoutAccountName, setPayoutAccountName] =
+    useState("");
+  const [payoutAccountNumber, setPayoutAccountNumber] =
+    useState("");
+  const [isLoadingPayoutBanks, setIsLoadingPayoutBanks] =
+    useState(false);
+  const [isSavingPayoutAccount, setIsSavingPayoutAccount] =
+    useState(false);
+  const [payoutMessage, setPayoutMessage] =
+    useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
@@ -353,6 +429,14 @@ export function ProfileForm() {
         const [
           { data: profileData, error: profileError },
           { data: mentorData, error: mentorError },
+          {
+            data: paymentAccountData,
+            error: paymentAccountError,
+          },
+          {
+            data: paymentOfferData,
+            error: paymentOfferError,
+          },
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -368,10 +452,72 @@ export function ProfileForm() {
             )
             .eq("mentor_id", userId)
             .maybeSingle(),
+          supabase
+            .from("mentor_payment_accounts")
+            .select(
+              "status, can_receive_payments"
+            )
+            .eq("mentor_id", userId)
+            .maybeSingle(),
+          supabase
+            .from("mentorship_payment_offers")
+            .select(
+              "duration, payment_mode, price_amount_minor, currency, is_active"
+            )
+            .eq("mentor_id", userId),
         ]);
 
         if (profileError) throw profileError;
         if (mentorError) throw mentorError;
+        if (paymentAccountError) throw paymentAccountError;
+        if (paymentOfferError) throw paymentOfferError;
+
+        setMentorPaymentAccount(
+          paymentAccountData
+            ? paymentAccountData as MentorPaymentAccountSummary
+            : null
+        );
+
+        setMentorshipPricing(() => {
+          const next: MentorshipPricingState = {
+            "3_months": {
+              paymentMode: "free",
+              price: "",
+            },
+            "6_months": {
+              paymentMode: "free",
+              price: "",
+            },
+            "1_year": {
+              paymentMode: "free",
+              price: "",
+            },
+            ongoing: {
+              paymentMode: "free",
+              price: "",
+            },
+          };
+
+          for (const offer of paymentOfferData ?? []) {
+            const duration =
+              offer.duration as MentorshipDuration;
+
+            if (!(duration in next)) continue;
+
+            next[duration] = {
+              paymentMode:
+                offer.payment_mode as MentorshipPaymentMode,
+              price:
+                offer.payment_mode === "paid"
+                  ? String(
+                      Number(offer.price_amount_minor) / 100
+                    )
+                  : "",
+            };
+          }
+
+          return next;
+        });
 
         if (profileData) {
           setForm({
@@ -451,6 +597,195 @@ export function ProfileForm() {
   ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  function updateMentorshipPricing(
+    duration: MentorshipDuration,
+    field: "paymentMode" | "price",
+    value: string
+  ) {
+    setMentorshipPricing((current) => ({
+      ...current,
+      [duration]: {
+        ...current[duration],
+        [field]: value,
+      },
+    }));
+  }
+
+  function parseMentorshipPriceMinor(
+    duration: MentorshipDuration
+  ) {
+    const pricing = mentorshipPricing[duration];
+
+    if (pricing.paymentMode === "free") {
+      return 0;
+    }
+
+    const normalized = pricing.price.trim();
+
+    if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
+      throw new Error(
+        "Paid mentorship prices must be valid Rand amounts with no more than two decimal places."
+      );
+    }
+
+    const amountMinor = Math.round(
+      Number(normalized) * 100
+    );
+
+    if (
+      !Number.isSafeInteger(amountMinor) ||
+      amountMinor <= 0
+    ) {
+      throw new Error(
+        "Paid mentorship prices must be greater than R0."
+      );
+    }
+
+    return amountMinor;
+  }
+
+  async function loadPayoutBanks() {
+    if (
+      !isSupabaseConfigured() ||
+      isLoadingPayoutBanks ||
+      payoutBanks.length > 0
+    ) {
+      return;
+    }
+
+    setIsLoadingPayoutBanks(true);
+    setPayoutMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } =
+        await supabase.functions.invoke(
+          "mentor-payment-settings",
+          {
+            body: {
+              action: "list_banks",
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const result =
+        (data ?? {}) as MentorPaymentSettingsResponse;
+
+      if (
+        result.ok !== true ||
+        !Array.isArray(result.banks)
+      ) {
+        throw new Error(
+          result.error ??
+            "Unable to load supported banks."
+        );
+      }
+
+      setPayoutBanks(result.banks);
+    } catch (error) {
+      setPayoutMessage(
+        getActionErrorMessage(
+          error,
+          "load payout banks"
+        )
+      );
+    } finally {
+      setIsLoadingPayoutBanks(false);
+    }
+  }
+
+  async function savePayoutAccount() {
+    if (!isSupabaseConfigured()) return;
+
+    const bankCode = payoutBankCode.trim();
+    const accountName = payoutAccountName.trim();
+    const accountNumber = payoutAccountNumber.trim();
+
+    if (!bankCode) {
+      setPayoutMessage("Select your bank.");
+      return;
+    }
+
+    if (accountName.length < 2) {
+      setPayoutMessage(
+        "Enter the account holder name."
+      );
+      return;
+    }
+
+    if (!/^\d{6,20}$/.test(accountNumber)) {
+      setPayoutMessage(
+        "Enter a valid bank account number using digits only."
+      );
+      return;
+    }
+
+    setIsSavingPayoutAccount(true);
+    setPayoutMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } =
+        await supabase.functions.invoke(
+          "mentor-payment-settings",
+          {
+            body: {
+              action: "configure_account",
+              bankCode,
+              accountName,
+              accountNumber,
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const result =
+        (data ?? {}) as MentorPaymentSettingsResponse;
+
+      if (result.ok !== true) {
+        throw new Error(
+          result.error ??
+            "Unable to save payout account."
+        );
+      }
+
+      setMentorPaymentAccount({
+        status: "active",
+        can_receive_payments: true,
+      });
+      setPayoutAccountNumber("");
+      setPayoutMessage(
+        "Payout account is ready to receive mentorship payments."
+      );
+    } catch (error) {
+      setPayoutMessage(
+        getActionErrorMessage(
+          error,
+          "save payout account"
+        )
+      );
+    } finally {
+      setIsSavingPayoutAccount(false);
+    }
+  }
+
+  useEffect(() => {
+    if (
+      form.mentorAvailable &&
+      currentUserId &&
+      payoutBanks.length === 0
+    ) {
+      void loadPayoutBanks();
+    }
+  }, [
+    form.mentorAvailable,
+    currentUserId,
+    payoutBanks.length,
+  ]);
 
   function updateMentorSetting<K extends keyof MentorSettingsState>(
     key: K,
@@ -767,6 +1102,42 @@ export function ProfileForm() {
         return;
       }
 
+      const payoutReady =
+        mentorPaymentAccount?.status === "active" &&
+        mentorPaymentAccount.can_receive_payments;
+
+      const paidDurations = [
+        ["3_months", mentorSettings.accepts3Month],
+        ["6_months", mentorSettings.accepts6Month],
+        ["1_year", mentorSettings.accepts1Year],
+      ] as const;
+
+      for (const [duration, accepted] of paidDurations) {
+        if (
+          accepted &&
+          mentorshipPricing[duration].paymentMode ===
+            "paid"
+        ) {
+          if (!payoutReady) {
+            setMessage(
+              "Set up a payout account before offering paid mentorship."
+            );
+            return;
+          }
+
+          try {
+            parseMentorshipPriceMinor(duration);
+          } catch (error) {
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "Enter a valid mentorship price."
+            );
+            return;
+          }
+        }
+      }
+
       if (
         !mentorSettings.accepts3Month &&
         !mentorSettings.accepts6Month &&
@@ -845,6 +1216,51 @@ export function ProfileForm() {
           });
 
         if (mentorError) throw mentorError;
+
+        const offerRows = [
+          {
+            duration: "3_months" as const,
+            accepted: mentorSettings.accepts3Month,
+          },
+          {
+            duration: "6_months" as const,
+            accepted: mentorSettings.accepts6Month,
+          },
+          {
+            duration: "1_year" as const,
+            accepted: mentorSettings.accepts1Year,
+          },
+          {
+            duration: "ongoing" as const,
+            accepted: mentorSettings.acceptsOngoing,
+          },
+        ].map(({ duration, accepted }) => {
+          const paymentMode =
+            duration === "ongoing" || !accepted
+              ? "free"
+              : mentorshipPricing[duration].paymentMode;
+
+          return {
+            mentor_id: userId,
+            duration,
+            payment_mode: paymentMode,
+            price_amount_minor:
+              paymentMode === "paid"
+                ? parseMentorshipPriceMinor(duration)
+                : 0,
+            currency: "ZAR",
+            is_active: accepted,
+          };
+        });
+
+        const { error: offerError } =
+          await supabase
+            .from("mentorship_payment_offers")
+            .upsert(offerRows, {
+              onConflict: "mentor_id,duration",
+            });
+
+        if (offerError) throw offerError;
       } else {
         const { error: mentorDisableError } = await supabase
           .from("mentor_profiles")
@@ -854,6 +1270,20 @@ export function ProfileForm() {
           .eq("mentor_id", userId);
 
         if (mentorDisableError) throw mentorDisableError;
+
+        const { error: offerDisableError } =
+          await supabase
+            .from("mentorship_payment_offers")
+            .update({
+              is_active: false,
+              payment_mode: "free",
+              price_amount_minor: 0,
+            })
+            .eq("mentor_id", userId);
+
+        if (offerDisableError) {
+          throw offerDisableError;
+        }
       }
 
       setMessage(
@@ -1298,6 +1728,287 @@ export function ProfileForm() {
                     </label>
                   </div>
                 </fieldset>
+
+                <section className="flex flex-col gap-4 rounded-xl border bg-gray-50 p-4">
+                  <div>
+                    <h3 className="font-semibold">
+                      Mentorship payments
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Set up where you receive paid mentorship
+                      payouts and choose whether each mentorship
+                      period is free or paid.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold">
+                        Payout account
+                      </h4>
+                      <span className="rounded-full border px-3 py-1 text-xs font-medium">
+                        {mentorPaymentAccount?.status ===
+                          "active" &&
+                        mentorPaymentAccount.can_receive_payments
+                          ? "Ready to receive payments"
+                          : mentorPaymentAccount?.status ===
+                              "pending_verification"
+                            ? "Pending verification"
+                            : "Not configured"}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 rounded-lg border border-dashed p-3 text-xs leading-5 text-gray-600">
+                      Your banking details are encrypted in transit and securely processed by our payment provider. FieldsConnect does not store banking details.
+                    </p>
+
+                    <div className="mt-4 grid gap-3">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
+                        Bank
+                        <select
+                          className="rounded-lg border bg-white px-3 py-2"
+                          disabled={isLoadingPayoutBanks}
+                          value={payoutBankCode}
+                          onChange={(event) =>
+                            setPayoutBankCode(
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="">
+                            {isLoadingPayoutBanks
+                              ? "Loading banks..."
+                              : "Select bank"}
+                          </option>
+                          {payoutBanks.map((bank) => (
+                            <option
+                              key={bank.code}
+                              value={bank.code}
+                            >
+                              {bank.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex flex-col gap-2 text-sm font-medium">
+                        Account holder name
+                        <input
+                          className="rounded-lg border bg-white px-3 py-2"
+                          autoComplete="name"
+                          maxLength={120}
+                          value={payoutAccountName}
+                          onChange={(event) =>
+                            setPayoutAccountName(
+                              event.target.value
+                            )
+                          }
+                          placeholder="Name registered with your bank"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-2 text-sm font-medium">
+                        Bank account number
+                        <input
+                          className="rounded-lg border bg-white px-3 py-2"
+                          autoComplete="off"
+                          inputMode="numeric"
+                          maxLength={20}
+                          type="password"
+                          value={payoutAccountNumber}
+                          onChange={(event) =>
+                            setPayoutAccountNumber(
+                              event.target.value.replace(
+                                /\D/g,
+                                ""
+                              )
+                            )
+                          }
+                          placeholder="Enter account number"
+                        />
+                      </label>
+
+                      <button
+                        className="w-fit rounded-lg border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        disabled={isSavingPayoutAccount}
+                        onClick={() =>
+                          void savePayoutAccount()
+                        }
+                        type="button"
+                      >
+                        {isSavingPayoutAccount
+                          ? "Saving payout account..."
+                          : mentorPaymentAccount?.status ===
+                                "active" &&
+                              mentorPaymentAccount.can_receive_payments
+                            ? "Update payout account"
+                            : "Save payout account"}
+                      </button>
+
+                      {payoutMessage && (
+                        <p className="text-sm text-gray-700">
+                          {payoutMessage}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-white p-4">
+                    <h4 className="text-sm font-semibold">
+                      Mentorship pricing
+                    </h4>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      Prices are total programme prices in ZAR,
+                      not hourly rates. Ongoing mentorship is
+                      free-only in this version.
+                    </p>
+
+                    <div className="mt-4 grid gap-3">
+                      {(
+                        [
+                          [
+                            "3_months",
+                            "3 months",
+                            mentorSettings.accepts3Month,
+                          ],
+                          [
+                            "6_months",
+                            "6 months",
+                            mentorSettings.accepts6Month,
+                          ],
+                          [
+                            "1_year",
+                            "1 year",
+                            mentorSettings.accepts1Year,
+                          ],
+                          [
+                            "ongoing",
+                            "Full-time / ongoing",
+                            mentorSettings.acceptsOngoing,
+                          ],
+                        ] as const
+                      )
+                        .filter(
+                          ([, , accepted]) => accepted
+                        )
+                        .map(
+                          ([
+                            duration,
+                            label,
+                          ]) => {
+                            const isOngoing =
+                              duration === "ongoing";
+                            const pricing =
+                              mentorshipPricing[
+                                duration
+                              ];
+
+                            return (
+                              <div
+                                key={duration}
+                                className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_140px_180px] sm:items-end"
+                              >
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {label}
+                                  </p>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    {isOngoing
+                                      ? "Free only"
+                                      : pricing.paymentMode ===
+                                          "paid"
+                                        ? "Paid mentorship"
+                                        : "Free mentorship"}
+                                  </p>
+                                </div>
+
+                                <label className="flex flex-col gap-2 text-xs font-medium">
+                                  Type
+                                  <select
+                                    className="rounded-lg border bg-white px-3 py-2 text-sm"
+                                    disabled={isOngoing}
+                                    value={
+                                      isOngoing
+                                        ? "free"
+                                        : pricing.paymentMode
+                                    }
+                                    onChange={(
+                                      event
+                                    ) =>
+                                      updateMentorshipPricing(
+                                        duration,
+                                        "paymentMode",
+                                        event.target.value
+                                      )
+                                    }
+                                  >
+                                    <option value="free">
+                                      Free
+                                    </option>
+                                    <option
+                                      value="paid"
+                                      disabled={
+                                        !(
+                                          mentorPaymentAccount?.status ===
+                                            "active" &&
+                                          mentorPaymentAccount.can_receive_payments
+                                        )
+                                      }
+                                    >
+                                      Paid
+                                    </option>
+                                  </select>
+                                </label>
+
+                                <label className="flex flex-col gap-2 text-xs font-medium">
+                                  Programme price
+                                  <div className="flex items-center rounded-lg border bg-white px-3">
+                                    <span className="text-sm text-gray-500">
+                                      R
+                                    </span>
+                                    <input
+                                      className="min-w-0 flex-1 px-2 py-2 text-sm outline-none disabled:bg-gray-50"
+                                      disabled={
+                                        isOngoing ||
+                                        pricing.paymentMode !==
+                                          "paid"
+                                      }
+                                      inputMode="decimal"
+                                      min="0.01"
+                                      step="0.01"
+                                      type="number"
+                                      value={pricing.price}
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        updateMentorshipPricing(
+                                          duration,
+                                          "price",
+                                          event.target.value
+                                        )
+                                      }
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </label>
+                              </div>
+                            );
+                          }
+                        )}
+                    </div>
+
+                    {!(
+                      mentorPaymentAccount?.status ===
+                        "active" &&
+                      mentorPaymentAccount.can_receive_payments
+                    ) && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Set up a payout account to enable paid
+                        mentorship pricing.
+                      </p>
+                    )}
+                  </div>
+                </section>
 
                 <label className="flex gap-3 rounded-lg border px-3 py-3 text-sm">
                   <input
