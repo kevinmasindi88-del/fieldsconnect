@@ -718,10 +718,16 @@ export function ConnectionWorkflow() {
         orderId
       )
     ) {
-      setMessage(
-        "Unable to confirm payment because the payment reference is invalid."
-      );
-      return;
+      const invalidReferenceTimer =
+        window.setTimeout(() => {
+          setMessage(
+            "Unable to confirm payment because the payment reference is invalid."
+          );
+        }, 0);
+
+      return () => {
+        window.clearTimeout(invalidReferenceTimer);
+      };
     }
 
     let cancelled = false;
@@ -822,8 +828,10 @@ export function ConnectionWorkflow() {
       );
     }
 
-    setMessage("Confirming payment...");
-    void checkPaymentState();
+    timer = window.setTimeout(() => {
+      setMessage("Confirming payment...");
+      void checkPaymentState();
+    }, 0);
 
     return () => {
       cancelled = true;
