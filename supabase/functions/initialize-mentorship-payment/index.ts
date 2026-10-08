@@ -63,11 +63,43 @@ function createPaystackReference(): string {
   return `FCM-${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-function getCallbackUrl(orderId: string): string {
+function isAllowedCallbackOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== "https:") {
+      return false;
+    }
+
+    if (
+      url.hostname === "fieldsconnect.app" ||
+      url.hostname === "www.fieldsconnect.app"
+    ) {
+      return true;
+    }
+
+    return /^fieldsconnect-repo-docs?-[a-z0-9-]+-kevinmasindi88-8683s-projects\.vercel\.app$/i.test(
+      url.hostname,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getCallbackUrl(
+  request: Request,
+  orderId: string,
+): string {
+  const requestOrigin = request.headers.get("origin")?.trim();
   const configuredOrigin =
     Deno.env.get("APP_ORIGIN")?.trim() || "https://fieldsconnect.app";
 
-  const url = new URL("/connections", configuredOrigin);
+  const callbackOrigin =
+    requestOrigin && isAllowedCallbackOrigin(requestOrigin)
+      ? requestOrigin
+      : configuredOrigin;
+
+  const url = new URL("/connections", callbackOrigin);
   url.searchParams.set("payment", "return");
   url.searchParams.set("order", orderId);
 
@@ -382,7 +414,7 @@ Deno.serve(async (req: Request) => {
     amount: String(prepared.amount_minor),
     currency: prepared.currency,
     reference: prepared.reference,
-    callback_url: getCallbackUrl(orderId),
+    callback_url: getCallbackUrl(req, orderId),
     subaccount: prepared.subaccount_code,
     transaction_charge: prepared.platform_fee_amount_minor,
     bearer: "account",

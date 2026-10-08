@@ -67,6 +67,15 @@ type Mentorship = {
   end_reason: string | null;
 };
 
+type MentorshipPaymentSummary = {
+  id: string;
+  mentorship_id: string;
+  currency: string;
+  gross_amount_minor: number;
+  status: "paid";
+  paid_at: string | null;
+};
+
 type MentorshipCompletionFeedback = {
   id: string;
   mentorship_id: string;
@@ -181,6 +190,13 @@ export function MentorshipWorkspace({
 
   const [profiles, setProfiles] =
     useState<Profile[]>([]);
+
+  const [
+    paymentSummary,
+    setPaymentSummary,
+  ] = useState<MentorshipPaymentSummary | null>(
+    null
+  );
 
   const [updates, setUpdates] =
     useState<MentorshipUpdate[]>([]);
@@ -468,6 +484,7 @@ export function MentorshipWorkspace({
         if (!mentorshipData) {
           setMentorship(null);
           setProfiles([]);
+          setPaymentSummary(null);
           setUpdates([]);
           setMilestones([]);
           setActionItems([]);
@@ -490,6 +507,7 @@ export function MentorshipWorkspace({
           extensionResult,
           acceptedExtensionResult,
           completionFeedbackResult,
+          paymentSummaryResult,
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -565,6 +583,19 @@ export function MentorshipWorkspace({
             .order("submitted_at", {
               ascending: true,
             }),
+
+          supabase
+            .from("mentorship_payment_orders")
+            .select(
+              "id, mentorship_id, currency, gross_amount_minor, status, paid_at"
+            )
+            .eq("mentorship_id", mentorshipId)
+            .eq("status", "paid")
+            .order("paid_at", {
+              ascending: false,
+            })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         if (profileResult.error) {
@@ -595,9 +626,18 @@ export function MentorshipWorkspace({
           throw completionFeedbackResult.error;
         }
 
+        if (paymentSummaryResult.error) {
+          throw paymentSummaryResult.error;
+        }
+
         setMentorship(loadedMentorship);
         setProfiles(
           (profileResult.data ?? []) as Profile[]
+        );
+        setPaymentSummary(
+          paymentSummaryResult.data
+            ? paymentSummaryResult.data as MentorshipPaymentSummary
+            : null
         );
         setUpdates(
           (updatesResult.data ??
@@ -1617,7 +1657,14 @@ export function MentorshipWorkspace({
           mentorship.agreed_duration
         )} · ${formatFrequency(
           mentorship.agreed_frequency
-        )}`}
+        )} · ${
+          paymentSummary
+            ? `Paid · ${formatPaymentAmount(
+                paymentSummary.gross_amount_minor,
+                paymentSummary.currency
+              )}`
+            : "Free"
+        }`}
         title="Mentorship agreement"
       >
         <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -1633,6 +1680,18 @@ export function MentorshipWorkspace({
             value={formatFrequency(
               mentorship.agreed_frequency
             )}
+          />
+
+          <SummaryItem
+            label="Payment"
+            value={
+              paymentSummary
+                ? `Paid · ${formatPaymentAmount(
+                    paymentSummary.gross_amount_minor,
+                    paymentSummary.currency
+                  )}`
+                : "Free mentorship"
+            }
           />
 
           <SummaryItem
@@ -4324,6 +4383,16 @@ function EmptyState({
       {text}
     </p>
   );
+}
+
+function formatPaymentAmount(
+  amountMinor: number,
+  currency: string
+) {
+  return new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency,
+  }).format(amountMinor / 100);
 }
 
 function formatDuration(
