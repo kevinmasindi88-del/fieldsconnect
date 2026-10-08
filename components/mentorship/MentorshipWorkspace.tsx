@@ -1658,12 +1658,7 @@ export function MentorshipWorkspace({
         )} · ${formatFrequency(
           mentorship.agreed_frequency
         )} · ${
-          paymentSummary
-            ? `Paid · ${formatPaymentAmount(
-                paymentSummary.gross_amount_minor,
-                paymentSummary.currency
-              )}`
-            : "Free"
+          paymentSummary ? "Paid" : "Free"
         }`}
         title="Mentorship agreement"
       >
@@ -1686,10 +1681,7 @@ export function MentorshipWorkspace({
             label="Payment"
             value={
               paymentSummary
-                ? `Paid · ${formatPaymentAmount(
-                    paymentSummary.gross_amount_minor,
-                    paymentSummary.currency
-                  )}`
+                ? "Paid mentorship"
                 : "Free mentorship"
             }
           />
@@ -4383,16 +4375,6 @@ function EmptyState({
       {text}
     </p>
   );
-}
-
-function formatPaymentAmount(
-  amountMinor: number,
-  currency: string
-) {
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency,
-  }).format(amountMinor / 100);
 }
 
 function formatDuration(
