@@ -376,6 +376,10 @@ export function ProfileForm() {
     useState("");
   const [payoutAccountNumber, setPayoutAccountNumber] =
     useState("");
+  const [
+    isPayoutAccountNumberVisible,
+    setIsPayoutAccountNumberVisible,
+  ] = useState(false);
   const [isLoadingPayoutBanks, setIsLoadingPayoutBanks] =
     useState(false);
   const [isSavingPayoutAccount, setIsSavingPayoutAccount] =
@@ -758,6 +762,7 @@ export function ProfileForm() {
         can_receive_payments: true,
       });
       setPayoutAccountNumber("");
+      setIsPayoutAccountNumberVisible(false);
       setPayoutMessage(
         "Payout account is ready to receive mentorship payments."
       );
@@ -1809,23 +1814,89 @@ export function ProfileForm() {
 
                       <label className="flex flex-col gap-2 text-sm font-medium">
                         Bank account number
-                        <input
-                          className="rounded-lg border bg-white px-3 py-2"
-                          autoComplete="off"
-                          inputMode="numeric"
-                          maxLength={20}
-                          type="password"
-                          value={payoutAccountNumber}
-                          onChange={(event) =>
-                            setPayoutAccountNumber(
-                              event.target.value.replace(
-                                /\D/g,
-                                ""
+                        <div className="relative">
+                          <input
+                            className="w-full rounded-lg border bg-white px-3 py-2 pr-12"
+                            autoComplete="off"
+                            inputMode="numeric"
+                            maxLength={20}
+                            type={
+                              isPayoutAccountNumberVisible
+                                ? "text"
+                                : "password"
+                            }
+                            value={payoutAccountNumber}
+                            onChange={(event) =>
+                              setPayoutAccountNumber(
+                                event.target.value.replace(
+                                  /\D/g,
+                                  ""
+                                )
                               )
-                            )
-                          }
-                          placeholder="Enter account number"
-                        />
+                            }
+                            placeholder="Enter account number"
+                          />
+                          <button
+                            aria-label={
+                              isPayoutAccountNumberVisible
+                                ? "Hide bank account number"
+                                : "Show bank account number"
+                            }
+                            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-gray-600 hover:text-black"
+                            onClick={() =>
+                              setIsPayoutAccountNumberVisible(
+                                (current) => !current
+                              )
+                            }
+                            title={
+                              isPayoutAccountNumberVisible
+                                ? "Hide account number"
+                                : "Show account number"
+                            }
+                            type="button"
+                          >
+                            {isPayoutAccountNumberVisible ? (
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  d="M3 3l18 18M10.6 10.7a2 2 0 002.7 2.7M9.9 4.3A10.7 10.7 0 0112 4c5.5 0 9.2 5.1 9.2 5.1a13.8 13.8 0 01-3.3 3.8M6.2 6.2C4 7.7 2.8 9.1 2.8 9.1S6.5 14.2 12 14.2c1 0 1.9-.2 2.7-.5"
+                                  stroke="currentColor"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1.7"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  d="M2.8 12S6.5 6.9 12 6.9 21.2 12 21.2 12 17.5 17.1 12 17.1 2.8 12 2.8 12z"
+                                  stroke="currentColor"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1.7"
+                                />
+                                <circle
+                                  cx="12"
+                                  cy="12"
+                                  r="2.3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <span className="text-xs font-normal text-gray-500">
+                          Use the eye icon to verify the number before saving.
+                        </span>
                       </label>
 
                       <button
