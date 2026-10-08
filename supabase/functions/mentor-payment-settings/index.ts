@@ -286,7 +286,7 @@ Deno.serve(async (req: Request) => {
   const {
     data: mentorProfile,
     error: mentorProfileError,
-  } = await adminClient
+  } = await userClient
     .from("mentor_profiles")
     .select("mentor_id")
     .eq("mentor_id", userData.user.id)
@@ -297,6 +297,10 @@ Deno.serve(async (req: Request) => {
       "Unable to check mentor profile for payout configuration.",
       {
         userId: userData.user.id,
+        code: mentorProfileError.code ?? null,
+        message: mentorProfileError.message ?? null,
+        details: mentorProfileError.details ?? null,
+        hint: mentorProfileError.hint ?? null,
       },
     );
 
@@ -322,7 +326,7 @@ Deno.serve(async (req: Request) => {
   const {
     data: paymentPolicy,
     error: policyError,
-  } = await adminClient
+  } = await userClient
     .from("mentorship_payment_policies")
     .select("platform_fee_bps")
     .eq("is_active", true)
@@ -353,7 +357,7 @@ Deno.serve(async (req: Request) => {
   const {
     data: existingAccount,
     error: accountLookupError,
-  } = await adminClient
+  } = await userClient
     .from("mentor_payment_accounts")
     .select("provider_account_code")
     .eq("mentor_id", userData.user.id)
@@ -364,6 +368,10 @@ Deno.serve(async (req: Request) => {
       "Unable to resolve mentor payment account.",
       {
         userId: userData.user.id,
+        code: accountLookupError.code ?? null,
+        message: accountLookupError.message ?? null,
+        details: accountLookupError.details ?? null,
+        hint: accountLookupError.hint ?? null,
       },
     );
 
@@ -455,6 +463,8 @@ Deno.serve(async (req: Request) => {
       {
         status: providerResponse.status,
         userId: userData.user.id,
+        providerMessage:
+          providerPayload.message ?? null,
       },
     );
 

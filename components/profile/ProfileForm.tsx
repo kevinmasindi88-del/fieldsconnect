@@ -48,6 +48,26 @@ type MentorPaymentSettingsResponse = {
   error?: string;
 };
 
+const mentorPaymentErrorMessages: Record<
+  string,
+  string
+> = {
+  invalid_bank_details:
+    "Check the bank, account holder name and account number, then try again.",
+  mentor_profile_required:
+    "Save your mentor profile before setting up a payout account.",
+  mentor_profile_lookup_failed:
+    "FieldsConnect could not verify your mentor profile. Please try again.",
+  payment_policy_unavailable:
+    "Mentorship payments are temporarily unavailable. Please try again later.",
+  payment_account_lookup_failed:
+    "FieldsConnect could not load your payout configuration. Please try again.",
+  payout_account_configuration_failed:
+    "Our payment provider could not accept those bank details. Check the selected bank and account number, then try again.",
+  payment_account_save_failed:
+    "Your payout account could not be activated in FieldsConnect. Please try again later.",
+};
+
 type MentorSettingsState = {
   mentorshipSummary: string;
   mentoringFields: string;
@@ -602,6 +622,49 @@ export function ProfileForm() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  async function getMentorPaymentFunctionErrorMessage(
+    error: unknown,
+    fallback: string
+  ) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "context" in error
+    ) {
+      const context = (
+        error as { context?: unknown }
+      ).context;
+
+      if (context instanceof Response) {
+        try {
+          const payload =
+            await context.clone().json() as {
+              error?: unknown;
+            };
+
+          if (
+            typeof payload.error === "string" &&
+            payload.error
+          ) {
+            return (
+              mentorPaymentErrorMessages[
+                payload.error
+              ] ??
+              fallback
+            );
+          }
+        } catch {
+          // Fall through to the normal action error.
+        }
+      }
+    }
+
+    return getActionErrorMessage(
+      error,
+      fallback
+    );
+  }
+
   function updateMentorshipPricing(
     duration: MentorshipDuration,
     field: "paymentMode" | "price",
@@ -691,9 +754,9 @@ export function ProfileForm() {
       setPayoutBanks(result.banks);
     } catch (error) {
       setPayoutMessage(
-        getActionErrorMessage(
+        await getMentorPaymentFunctionErrorMessage(
           error,
-          "load payout banks"
+          "Unable to load payout banks."
         )
       );
     } finally {
@@ -768,9 +831,9 @@ export function ProfileForm() {
       );
     } catch (error) {
       setPayoutMessage(
-        getActionErrorMessage(
+        await getMentorPaymentFunctionErrorMessage(
           error,
-          "save payout account"
+          "Unable to save payout account."
         )
       );
     } finally {
