@@ -46,6 +46,15 @@ type MentorProfile = {
   is_accepting_requests: boolean;
 };
 
+type MentorshipPaymentOffer = {
+  id: string;
+  duration: MentorshipDuration;
+  payment_mode: "free" | "paid";
+  price_amount_minor: number;
+  currency: string;
+  is_active: boolean;
+};
+
 type MentorshipRequestForm = {
   mentorshipField: string;
   mentorshipLevel: string;
@@ -101,6 +110,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [mentorProfile, setMentorProfile] =
     useState<MentorProfile | null>(null);
+  const [paymentOffers, setPaymentOffers] =
+    useState<MentorshipPaymentOffer[]>([]);
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
   const [requestForm, setRequestForm] =
@@ -196,6 +207,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         const [
           { data: profileData, error: profileError },
           { data: mentorData, error: mentorError },
+          { data: paymentOfferData, error: paymentOfferError },
           { data: skillData, error: skillError },
           { data: documentData, error: documentError },
         ] = await Promise.all([
@@ -211,6 +223,13 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             )
             .eq("mentor_id", profileId)
             .maybeSingle(),
+          supabase
+            .from("mentorship_payment_offers")
+            .select(
+              "id, duration, payment_mode, price_amount_minor, currency, is_active"
+            )
+            .eq("mentor_id", profileId)
+            .order("created_at", { ascending: true }),
           supabase
             .from("skills")
             .select("id, name, description, rating, is_published")
@@ -231,12 +250,16 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
         if (profileError) throw profileError;
         if (mentorError) throw mentorError;
+        if (paymentOfferError) throw paymentOfferError;
         if (skillError) throw skillError;
         if (documentError) throw documentError;
 
         setProfile((profileData ?? null) as Profile | null);
         setMentorProfile(
           (mentorData ?? null) as MentorProfile | null
+        );
+        setPaymentOffers(
+          (paymentOfferData ?? []) as MentorshipPaymentOffer[]
         );
         setSkills((skillData ?? []) as Skill[]);
         setDocuments((documentData ?? []) as LibraryDocument[]);
@@ -392,46 +415,95 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     }));
   }
 
+  function getActivePaymentOffer(
+    duration: MentorshipDuration
+  ) {
+    return (
+      paymentOffers.find(
+        (offer) =>
+          offer.duration === duration &&
+          offer.is_active
+      ) ?? null
+    );
+  }
+
+  function formatOfferPrice(
+    duration: MentorshipDuration
+  ) {
+    const offer = getActivePaymentOffer(duration);
+
+    if (!offer) {
+      return paymentOffers.length === 0
+        ? "Free"
+        : null;
+    }
+
+    if (
+      offer.payment_mode === "free" ||
+      offer.price_amount_minor === 0
+    ) {
+      return "Free";
+    }
+
+    return new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: offer.currency,
+    }).format(offer.price_amount_minor / 100);
+  }
+
   function getAcceptedDurations() {
     if (!mentorProfile) {
       return [] as Array<{
         value: MentorshipDuration;
         label: string;
+        priceLabel: string;
       }>;
     }
 
     const durations: Array<{
       value: MentorshipDuration;
       label: string;
+      priceLabel: string;
     }> = [];
 
-    if (mentorProfile.accepts_3_month) {
+    function addDuration(
+      accepted: boolean,
+      value: MentorshipDuration,
+      label: string
+    ) {
+      if (!accepted) return;
+
+      const priceLabel = formatOfferPrice(value);
+
+      if (priceLabel === null) return;
+
       durations.push({
-        value: "3_months",
-        label: "3 months",
+        value,
+        label,
+        priceLabel,
       });
     }
 
-    if (mentorProfile.accepts_6_month) {
-      durations.push({
-        value: "6_months",
-        label: "6 months",
-      });
-    }
-
-    if (mentorProfile.accepts_1_year) {
-      durations.push({
-        value: "1_year",
-        label: "1 year",
-      });
-    }
-
-    if (mentorProfile.accepts_ongoing) {
-      durations.push({
-        value: "ongoing",
-        label: "Full-time / ongoing",
-      });
-    }
+    addDuration(
+      mentorProfile.accepts_3_month,
+      "3_months",
+      "3 months"
+    );
+    addDuration(
+      mentorProfile.accepts_6_month,
+      "6_months",
+      "6 months"
+    );
+    addDuration(
+      mentorProfile.accepts_1_year,
+      "1_year",
+      "1 year"
+    );
+    addDuration(
+      mentorProfile.accepts_ongoing,
+      "ongoing",
+      "Full-time / ongoing"
+    );
 
     return durations;
   }
@@ -771,7 +843,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                       key={duration.value}
                       className="rounded-full border px-3 py-1 text-xs"
                     >
-                      {duration.label}
+                      {duration.label} · {duration.priceLabel}
                     </span>
                   )
                 )}
@@ -937,7 +1009,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                           key={duration.value}
                           value={duration.value}
                         >
-                          {duration.label}
+                          {duration.label} · {duration.priceLabel}
                         </option>
                       )
                     )}

@@ -61,10 +61,18 @@ type MentorshipRequest = {
   status:
     | "pending"
     | "change_proposed"
+    | "awaiting_payment"
     | "accepted"
     | "declined"
     | "cancelled"
     | "expired";
+  requested_payment_mode: "free" | "paid";
+  requested_price_amount_minor: number;
+  requested_currency: string;
+  proposed_payment_mode: "free" | "paid" | null;
+  proposed_price_amount_minor: number | null;
+  proposed_currency: string | null;
+  payment_due_at: string | null;
   requested_at: string;
   expires_at: string | null;
 };
@@ -99,6 +107,49 @@ type Mentorship = {
   updated_at: string;
 };
 
+type PaymentOrder = {
+  id: string;
+  request_id: string;
+  mentorship_id: string | null;
+  mentor_id: string;
+  mentee_id: string;
+  currency: string;
+  gross_amount_minor: number;
+  status:
+    | "awaiting_payment"
+    | "paid"
+    | "failed"
+    | "expired"
+    | "cancelled"
+    | "refunded"
+    | "review_required";
+  payment_expires_at: string;
+  paid_at: string | null;
+  agreed_duration:
+    | "3_months"
+    | "6_months"
+    | "1_year";
+  agreed_frequency:
+    | "weekly"
+    | "fortnightly"
+    | "monthly"
+    | "flexible";
+  mentorship_field: string;
+  payment_review_reason: string | null;
+  created_at: string;
+};
+
+type PaymentInitializationResponse = {
+  ok?: boolean;
+  state?: string;
+  orderId?: string;
+  mentorshipId?: string | null;
+  authorizationUrl?: string;
+  accessCode?: string;
+  paymentExpiresAt?: string | null;
+  error?: string;
+};
+
 type Skill = {
   profile_id: string;
   name: string;
@@ -120,6 +171,8 @@ export function ConnectionWorkflow() {
     useState<MentorshipRequest[]>([]);
   const [mentorships, setMentorships] =
     useState<Mentorship[]>([]);
+  const [paymentOrders, setPaymentOrders] =
+    useState<PaymentOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mentorFilter, setMentorFilter] = useState("all");
@@ -332,7 +385,7 @@ export function ConnectionWorkflow() {
     const { data, error } = await supabase
       .from("mentorship_requests")
       .select(
-        "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_at, expires_at"
+        "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_payment_mode, requested_price_amount_minor, requested_currency, proposed_payment_mode, proposed_price_amount_minor, proposed_currency, payment_due_at, requested_at, expires_at"
       )
       .or(`mentee_id.eq.${userId},mentor_id.eq.${userId}`)
       .order("requested_at", { ascending: false });
@@ -348,6 +401,30 @@ export function ConnectionWorkflow() {
     setMentorshipRequests(
       (data ?? []) as MentorshipRequest[]
     );
+  }
+
+  async function loadPaymentOrders(userId: string) {
+    if (!isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const { data, error } = await supabase
+      .from("mentorship_payment_orders")
+      .select(
+        "id, request_id, mentorship_id, mentor_id, mentee_id, currency, gross_amount_minor, status, payment_expires_at, paid_at, agreed_duration, agreed_frequency, mentorship_field, payment_review_reason, created_at"
+      )
+      .or(`mentee_id.eq.${userId},mentor_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        "Unable to refresh mentorship payment orders:",
+        error
+      );
+      return;
+    }
+
+    setPaymentOrders((data ?? []) as PaymentOrder[]);
   }
 
   async function loadData() {
@@ -385,6 +462,10 @@ export function ConnectionWorkflow() {
           data: mentorshipData,
           error: mentorshipError,
         },
+        {
+          data: paymentOrderData,
+          error: paymentOrderError,
+        },
       ] = await Promise.all([
         supabase
           .from("connections")
@@ -398,7 +479,7 @@ export function ConnectionWorkflow() {
         supabase
           .from("mentorship_requests")
           .select(
-            "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_at, expires_at"
+            "id, mentee_id, mentor_id, mentorship_field, objective, motivation, requested_duration, requested_frequency, proposed_duration, proposed_frequency, proposal_message, status, requested_payment_mode, requested_price_amount_minor, requested_currency, proposed_payment_mode, proposed_price_amount_minor, proposed_currency, payment_due_at, requested_at, expires_at"
           )
           .or(
             `mentee_id.eq.${userId},mentor_id.eq.${userId}`
@@ -417,6 +498,17 @@ export function ConnectionWorkflow() {
           .order("created_at", {
             ascending: false,
           }),
+        supabase
+          .from("mentorship_payment_orders")
+          .select(
+            "id, request_id, mentorship_id, mentor_id, mentee_id, currency, gross_amount_minor, status, payment_expires_at, paid_at, agreed_duration, agreed_frequency, mentorship_field, payment_review_reason, created_at"
+          )
+          .or(
+            `mentor_id.eq.${userId},mentee_id.eq.${userId}`
+          )
+          .order("created_at", {
+            ascending: false,
+          }),
       ]);
 
       if (connectionsError) throw connectionsError;
@@ -426,6 +518,9 @@ export function ConnectionWorkflow() {
       if (mentorshipError) {
         throw mentorshipError;
       }
+      if (paymentOrderError) {
+        throw paymentOrderError;
+      }
 
       const connectionRows =
         (connectionsData ?? []) as Connection[];
@@ -433,6 +528,8 @@ export function ConnectionWorkflow() {
         (mentorshipRequestData ?? []) as MentorshipRequest[];
       const mentorshipRows =
         (mentorshipData ?? []) as Mentorship[];
+      const paymentOrderRows =
+        (paymentOrderData ?? []) as PaymentOrder[];
 
       const relatedProfileIds =
         new Set<string>([userId]);
@@ -450,6 +547,11 @@ export function ConnectionWorkflow() {
       mentorshipRows.forEach((mentorship) => {
         relatedProfileIds.add(mentorship.mentor_id);
         relatedProfileIds.add(mentorship.mentee_id);
+      });
+
+      paymentOrderRows.forEach((order) => {
+        relatedProfileIds.add(order.mentor_id);
+        relatedProfileIds.add(order.mentee_id);
       });
 
       let profilesData: Profile[] = [];
@@ -520,6 +622,7 @@ export function ConnectionWorkflow() {
         mentorshipRequestRows
       );
       setMentorships(mentorshipRows);
+      setPaymentOrders(paymentOrderRows);
       setSkills(skillsData);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load connection data.");
@@ -572,10 +675,162 @@ export function ConnectionWorkflow() {
           void loadData();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "mentorship_payment_orders",
+        },
+        () => {
+          void loadData();
+        }
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !isSupabaseConfigured() ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    if (params.get("payment") !== "return") {
+      return;
+    }
+
+    const orderId = params.get("order");
+
+    if (
+      !orderId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        orderId
+      )
+    ) {
+      setMessage(
+        "Unable to confirm payment because the payment reference is invalid."
+      );
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    let timer: number | undefined;
+
+    async function checkPaymentState() {
+      attempts += 1;
+
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } = await supabase
+        .from("mentorship_payment_orders")
+        .select(
+          "id, request_id, mentorship_id, mentor_id, mentee_id, currency, gross_amount_minor, status, payment_expires_at, paid_at, agreed_duration, agreed_frequency, mentorship_field, payment_review_reason, created_at"
+        )
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        setMessage(
+          "Payment was submitted, but FieldsConnect could not confirm it yet. Please refresh shortly."
+        );
+        return;
+      }
+
+      if (!data) {
+        setMessage(
+          "This payment order is not available to your account."
+        );
+        return;
+      }
+
+      const order = data as PaymentOrder;
+
+      setPaymentOrders((current) => [
+        order,
+        ...current.filter(
+          (item) => item.id !== order.id
+        ),
+      ]);
+
+      if (order.status === "paid") {
+        await loadData();
+
+        if (cancelled) return;
+
+        setMessage(
+          "Payment confirmed. Your mentorship is now active."
+        );
+        window.history.replaceState(
+          {},
+          "",
+          "/connections"
+        );
+        return;
+      }
+
+      if (order.status === "review_required") {
+        setMessage(
+          "Payment was received, but this mentorship needs payment review before activation."
+        );
+        window.history.replaceState(
+          {},
+          "",
+          "/connections"
+        );
+        return;
+      }
+
+      if (
+        ["expired", "failed", "cancelled", "refunded"].includes(
+          order.status
+        )
+      ) {
+        setMessage(
+          `Payment status: ${order.status.replaceAll("_", " ")}.`
+        );
+        window.history.replaceState(
+          {},
+          "",
+          "/connections"
+        );
+        return;
+      }
+
+      if (attempts >= 15) {
+        setMessage(
+          "Payment has been submitted and confirmation is still processing. Refresh this page shortly."
+        );
+        return;
+      }
+
+      timer = window.setTimeout(
+        () => void checkPaymentState(),
+        2000
+      );
+    }
+
+    setMessage("Confirming payment...");
+    void checkPaymentState();
+
+    return () => {
+      cancelled = true;
+
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
     };
   }, [currentUserId]);
 
@@ -595,6 +850,17 @@ export function ConnectionWorkflow() {
       setMessage("Add a short message explaining the proposed changes.");
       return;
     }
+
+    const targetRequest =
+      mentorshipRequests.find(
+        (request) => request.id === requestId
+      ) ?? null;
+
+    const effectivePaymentMode =
+      targetRequest?.status === "change_proposed" &&
+      targetRequest.proposed_payment_mode
+        ? targetRequest.proposed_payment_mode
+        : targetRequest?.requested_payment_mode;
 
     setIsWorking(true);
     setMessage(null);
@@ -626,7 +892,9 @@ export function ConnectionWorkflow() {
 
       setMessage(
         action === "accept"
-          ? "Mentorship request accepted."
+          ? effectivePaymentMode === "paid"
+            ? "Mentorship terms accepted. Awaiting mentee payment before activation."
+            : "Mentorship request accepted."
           : action === "decline"
             ? "Mentorship request declined."
             : "Mentorship counterproposal sent."
@@ -643,6 +911,7 @@ export function ConnectionWorkflow() {
         await Promise.all([
           loadMentorshipRequests(currentUserId),
           loadMentorships(currentUserId),
+          loadPaymentOrders(currentUserId),
         ]);
       }
     } catch (error) {
@@ -650,6 +919,67 @@ export function ConnectionWorkflow() {
         getActionErrorMessage(
           error,
           `${action} mentorship request`
+        )
+      );
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  async function startMentorshipPayment(
+    order: PaymentOrder
+  ) {
+    if (!isSupabaseConfigured()) return;
+
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      const { data, error } =
+        await supabase.functions.invoke(
+          "initialize-mentorship-payment",
+          {
+            body: {
+              orderId: order.id,
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const result =
+        (data ?? {}) as PaymentInitializationResponse;
+
+      if (result.state === "paid") {
+        await loadData();
+        setMessage(
+          "Payment is already confirmed. Your mentorship is active."
+        );
+        return;
+      }
+
+      if (
+        typeof result.authorizationUrl !== "string" ||
+        !result.authorizationUrl.startsWith(
+          "https://checkout.paystack.com/"
+        )
+      ) {
+        throw new Error(
+          result.error ??
+            "FieldsConnect could not open the secure payment checkout."
+        );
+      }
+
+      window.location.assign(
+        result.authorizationUrl
+      );
+    } catch (error) {
+      setMessage(
+        getActionErrorMessage(
+          error,
+          "start mentorship payment"
         )
       );
     } finally {
@@ -1128,6 +1458,10 @@ export function ConnectionWorkflow() {
                           request.requested_frequency
                         )}
                       </span>
+
+                      <span className="rounded-full border px-3 py-1 font-semibold">
+                        {formatRequestPayment(request)}
+                      </span>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
@@ -1297,6 +1631,162 @@ export function ConnectionWorkflow() {
             )}
           </ConnectionSection>
 
+          <ConnectionSection
+            title={`Mentorship payments · ${paymentOrders.length}`}
+          >
+            {paymentOrders.length === 0 ? (
+              <EmptyState text="No mentorship payments yet." />
+            ) : (
+              paymentOrders.map((order) => {
+                const isMentee =
+                  order.mentee_id === currentUserId;
+                const otherProfileId = isMentee
+                  ? order.mentor_id
+                  : order.mentee_id;
+                const otherProfile =
+                  profileById.get(otherProfileId);
+
+                return (
+                  <article
+                    key={order.id}
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <ProfileAvatar
+                          avatarPath={otherProfile?.avatar_url}
+                          displayName={otherProfile?.display_name}
+                          size={40}
+                        />
+
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold hover:underline"
+                            href={`/profile/${otherProfileId}`}
+                          >
+                            {otherProfile?.display_name ??
+                              "Unknown profile"}
+                          </Link>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            {order.mentorship_field}
+                          </p>
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            {isMentee
+                              ? "You are the mentee"
+                              : "You are the mentor"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium capitalize">
+                        {order.status.replaceAll(
+                          "_",
+                          " "
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border px-3 py-1 font-semibold">
+                        {formatPaymentAmount(
+                          order.gross_amount_minor,
+                          order.currency
+                        )}
+                      </span>
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipDuration(
+                          order.agreed_duration
+                        )}
+                      </span>
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipFrequency(
+                          order.agreed_frequency
+                        )}
+                      </span>
+                    </div>
+
+                    {order.status ===
+                      "awaiting_payment" && (
+                      <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700">
+                        <p>
+                          Payment is required before this
+                          mentorship becomes active.
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Payment window ends{" "}
+                          {new Intl.DateTimeFormat(
+                            undefined,
+                            {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }
+                          ).format(
+                            new Date(
+                              order.payment_expires_at
+                            )
+                          )}
+                          .
+                        </p>
+                      </div>
+                    )}
+
+                    {order.status ===
+                      "review_required" && (
+                      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                        Payment was received but requires
+                        review before mentorship activation.
+                      </p>
+                    )}
+
+                    {order.status === "paid" &&
+                      order.mentorship_id && (
+                        <Link
+                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                          href={`/mentorships/${order.mentorship_id}`}
+                        >
+                          Open mentorship
+                        </Link>
+                      )}
+
+                    {order.status ===
+                      "awaiting_payment" &&
+                      isMentee && (
+                        <button
+                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() =>
+                            void startMentorshipPayment(
+                              order
+                            )
+                          }
+                          type="button"
+                        >
+                          {isWorking
+                            ? "Opening secure checkout..."
+                            : `Pay ${formatPaymentAmount(
+                                order.gross_amount_minor,
+                                order.currency
+                              )}`}
+                        </button>
+                      )}
+
+                    {order.status ===
+                      "awaiting_payment" &&
+                      !isMentee && (
+                        <p className="text-sm text-gray-600">
+                          Waiting for the mentee to complete
+                          payment. The mentorship will only
+                          activate after server verification.
+                        </p>
+                      )}
+                  </article>
+                );
+              })
+            )}
+          </ConnectionSection>
+
           <ConnectionSection title="Outgoing mentorship requests">
             {outgoingMentorshipRequests.length === 0 ? (
               <EmptyState text="No outgoing mentorship requests pending." />
@@ -1349,6 +1839,10 @@ export function ConnectionWorkflow() {
 
                       <span className="rounded-full border px-3 py-1 capitalize">
                         {request.status.replace("_", " ")}
+                      </span>
+
+                      <span className="rounded-full border px-3 py-1 font-semibold">
+                        {formatRequestPayment(request)}
                       </span>
                     </div>
 
@@ -1819,6 +2313,47 @@ function ConnectionCard({
       )}
       <div>{children}</div>
     </article>
+  );
+}
+
+function formatPaymentAmount(
+  amountMinor: number,
+  currency: string
+) {
+  return new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency,
+  }).format(amountMinor / 100);
+}
+
+function formatRequestPayment(
+  request: MentorshipRequest
+) {
+  const useProposed =
+    request.status === "change_proposed" &&
+    request.proposed_payment_mode !== null;
+
+  const paymentMode = useProposed
+    ? request.proposed_payment_mode
+    : request.requested_payment_mode;
+  const amountMinor = useProposed
+    ? request.proposed_price_amount_minor
+    : request.requested_price_amount_minor;
+  const currency = useProposed
+    ? request.proposed_currency
+    : request.requested_currency;
+
+  if (
+    paymentMode !== "paid" ||
+    amountMinor === null ||
+    currency === null
+  ) {
+    return "Free";
+  }
+
+  return formatPaymentAmount(
+    amountMinor,
+    currency
   );
 }
 
