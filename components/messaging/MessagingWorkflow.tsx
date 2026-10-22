@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
 import { useOnlinePresence } from "@/components/navigation/AppShell";
 import {
@@ -871,11 +872,7 @@ export function MessagingWorkflow() {
                       type="button"
                     >
                       <span className="flex min-w-0 items-center gap-3">
-                        <ProfileAvatar
-                          avatarPath={null}
-                          displayName={item.sender_label}
-                          size={36}
-                        />
+                        <FcLogoAvatar size={36} />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold leading-snug">
@@ -1034,11 +1031,7 @@ export function MessagingWorkflow() {
                     type="button"
                   >
                     <span className="flex w-full items-center gap-3">
-                      <ProfileAvatar
-                        avatarPath={null}
-                        displayName={item.sender_label}
-                        size={32}
-                      />
+                      <FcLogoAvatar size={32} />
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">
@@ -1171,11 +1164,7 @@ export function MessagingWorkflow() {
 
           {activeSystemMessage ? (
             <div className="flex min-w-0 items-center gap-3">
-              <ProfileAvatar
-                avatarPath={null}
-                displayName={activeSystemMessage.sender_label}
-                size={40}
-              />
+              <FcLogoAvatar size={40} />
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold leading-snug sm:text-xl">
                   {activeSystemMessage.sender_label}
@@ -1248,11 +1237,7 @@ export function MessagingWorkflow() {
               </div>
 
               <article className="flex max-w-[88%] gap-2 self-start rounded-xl border p-3 text-sm sm:max-w-2xl sm:gap-3">
-                <ProfileAvatar
-                  avatarPath={null}
-                  displayName={activeSystemMessage.sender_label}
-                  size={28}
-                />
+                <FcLogoAvatar size={28} />
 
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium sm:text-sm">
