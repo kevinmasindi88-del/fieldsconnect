@@ -46,6 +46,15 @@ type UnreadMessageNotification = {
   read_at: string | null;
 };
 
+type SystemInboxMessage = {
+  id: string;
+  recipient_id: string;
+  sender_label: string;
+  title: string;
+  body: string;
+  created_at: string;
+};
+
 
 const MESSAGE_PAGE_SIZE = 10;
 const MOBILE_THREAD_PAGE_SIZE = 10;
@@ -56,6 +65,10 @@ export function MessagingWorkflow() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [systemInboxMessages, setSystemInboxMessages] =
+    useState<SystemInboxMessage[]>([]);
+  const [activeSystemMessageId, setActiveSystemMessageId] =
+    useState<string | null>(null);
   const [unreadMessageNotifications, setUnreadMessageNotifications] =
     useState<UnreadMessageNotification[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -92,6 +105,11 @@ export function MessagingWorkflow() {
       item.conversation_id ===
       activeConversationId
   );
+
+  const activeSystemMessage =
+    systemInboxMessages.find(
+      (item) => item.id === activeSystemMessageId
+    ) ?? null;
 
   const chatConnections = useMemo(() => {
     return connections;
@@ -400,6 +418,7 @@ export function MessagingWorkflow() {
         { data: connectionData, error: connectionError },
         { data: profileData, error: profileError },
         { data: unreadNotificationData, error: unreadNotificationError },
+        { data: systemInboxData, error: systemInboxError },
       ] = await Promise.all([
         supabase
           .from("connections")
@@ -415,15 +434,26 @@ export function MessagingWorkflow() {
           .select("id, actor_id, read_at")
           .eq("notification_type", "new_message")
           .is("read_at", null),
+        supabase
+          .from("system_inbox_messages")
+          .select(
+            "id, recipient_id, sender_label, title, body, created_at"
+          )
+          .eq("recipient_id", userId)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (connectionError) throw connectionError;
       if (profileError) throw profileError;
       if (unreadNotificationError) throw unreadNotificationError;
+      if (systemInboxError) throw systemInboxError;
 
       const acceptedConnections = (connectionData ?? []) as Connection[];
       setConnections(acceptedConnections);
       setProfiles((profileData ?? []) as Profile[]);
+      setSystemInboxMessages(
+        (systemInboxData ?? []) as SystemInboxMessage[]
+      );
       setUnreadMessageNotifications(
         (unreadNotificationData ?? []) as UnreadMessageNotification[]
       );
@@ -594,9 +624,18 @@ export function MessagingWorkflow() {
     return profileById.get(otherId);
   }
 
+  function openSystemMessage(item: SystemInboxMessage) {
+    setActiveSystemMessageId(item.id);
+    setActiveConnectionId(null);
+    setActiveConversationId(null);
+    setMessages([]);
+    setHasOlderMessages(false);
+  }
+
   async function openConversation(connection: Connection) {
     if (!currentUserId || !isSupabaseConfigured()) return;
 
+    setActiveSystemMessageId(null);
     setIsWorking(true);
     setMessage(null);
 
@@ -704,6 +743,7 @@ export function MessagingWorkflow() {
   }
 
   function closeMobileConversation() {
+    setActiveSystemMessageId(null);
     setActiveConnectionId(null);
     setActiveConversationId(null);
     setMessages([]);
@@ -781,12 +821,15 @@ export function MessagingWorkflow() {
 
   const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
   const activeProfile = activeConnection ? getOtherProfile(activeConnection) : null;
+  const hasActiveThread =
+    Boolean(activeConversationId) ||
+    Boolean(activeSystemMessage);
 
   return (
     <section className="mx-auto grid w-full max-w-6xl gap-4 px-3 pb-1 pt-4 sm:gap-6 sm:px-6 sm:py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside
         className={`min-w-0 rounded-xl border bg-white p-3 sm:p-4 ${
-          activeConversationId
+          hasActiveThread
             ? "hidden lg:block"
             : "block"
         }`}
@@ -805,19 +848,47 @@ export function MessagingWorkflow() {
           <p className="text-sm text-gray-600">
             Loading messages...
           </p>
-        ) : connections.length === 0 ? (
+        ) : connections.length === 0 &&
+          systemInboxMessages.length === 0 ? (
           <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-            No accepted connections yet.
+            No messages yet.
           </p>
         ) : (
           <>
             <div className="flex flex-col gap-2 lg:hidden">
-              {chatConnections.length === 0 ? (
+              {chatConnections.length === 0 &&
+              systemInboxMessages.length === 0 ? (
                 <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
                   No conversations yet.
                 </p>
               ) : (
                 <>
+                  {systemInboxMessages.map((item) => (
+                    <button
+                      key={item.id}
+                      className="w-full rounded-xl border p-3 text-left"
+                      onClick={() => openSystemMessage(item)}
+                      type="button"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <ProfileAvatar
+                          avatarPath={null}
+                          displayName={item.sender_label}
+                          size={36}
+                        />
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold leading-snug">
+                            {item.sender_label}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-gray-600">
+                            {item.title}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+
                   {visibleMobileChatConnections.map(
                     (connection) => {
                       const profile =
@@ -949,6 +1020,39 @@ export function MessagingWorkflow() {
             </div>
 
             <div className="hidden flex-col gap-3 lg:flex">
+              {systemInboxMessages.map((item) => {
+                const isActive =
+                  activeSystemMessageId === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    className={`rounded-xl border p-3 text-left text-sm ${
+                      isActive ? "bg-gray-100" : ""
+                    }`}
+                    onClick={() => openSystemMessage(item)}
+                    type="button"
+                  >
+                    <span className="flex w-full items-center gap-3">
+                      <ProfileAvatar
+                        avatarPath={null}
+                        displayName={item.sender_label}
+                        size={32}
+                      />
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">
+                          {item.sender_label}
+                        </span>
+                        <span className="block truncate text-gray-600">
+                          {item.title}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+
               {connections.map(
                 (connection) => {
                   const profile =
@@ -1046,13 +1150,13 @@ export function MessagingWorkflow() {
 
       <main
         className={`h-[78dvh] min-h-[500px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px] lg:flex ${
-          activeConversationId
+          hasActiveThread
             ? "flex"
             : "hidden"
         }`}
       >
         <div className="flex min-w-0 items-center gap-3 border-b p-3 sm:p-4">
-          {activeConversationId && (
+          {hasActiveThread && (
             <button
               aria-label="Back to messages"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg lg:hidden"
@@ -1065,7 +1169,23 @@ export function MessagingWorkflow() {
             </button>
           )}
 
-          {activeProfile ? (
+          {activeSystemMessage ? (
+            <div className="flex min-w-0 items-center gap-3">
+              <ProfileAvatar
+                avatarPath={null}
+                displayName={activeSystemMessage.sender_label}
+                size={40}
+              />
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold leading-snug sm:text-xl">
+                  {activeSystemMessage.sender_label}
+                </h2>
+                <p className="truncate text-xs text-gray-500 sm:text-sm">
+                  {activeSystemMessage.title}
+                </p>
+              </div>
+            </div>
+          ) : activeProfile ? (
             <Link
               className="flex min-w-0 items-center gap-3 rounded-lg hover:bg-gray-50"
               href={`/profile/${activeProfile.id}`}
@@ -1114,7 +1234,42 @@ export function MessagingWorkflow() {
           className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4"
           onScroll={handleMessageScroll}
         >
-          {!activeConversationId ? null : activeMessages.length ===
+          {activeSystemMessage ? (
+            <>
+              <div className="flex w-full items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-gray-200" />
+                <span className="shrink-0 text-[11px] font-medium text-gray-500">
+                  {formatMessageDateLabel(
+                    activeSystemMessage.created_at,
+                    currentLocalDate
+                  )}
+                </span>
+                <span className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              <article className="flex max-w-[88%] gap-2 self-start rounded-xl border p-3 text-sm sm:max-w-2xl sm:gap-3">
+                <ProfileAvatar
+                  avatarPath={null}
+                  displayName={activeSystemMessage.sender_label}
+                  size={28}
+                />
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium sm:text-sm">
+                    {activeSystemMessage.sender_label}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap leading-snug text-gray-800">
+                    {activeSystemMessage.body}
+                  </p>
+                  <p className="mt-1 text-left text-[10px] text-gray-500">
+                    {formatMessageTime(
+                      activeSystemMessage.created_at
+                    )}
+                  </p>
+                </div>
+              </article>
+            </>
+          ) : !activeConversationId ? null : activeMessages.length ===
             0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
               No messages yet. Send the first message in this 1:1 conversation.
@@ -1278,6 +1433,7 @@ export function MessagingWorkflow() {
           )}
         </div>
 
+        {!activeSystemMessage && (
         <form
           onSubmit={sendMessage}
           className="flex flex-col gap-3 border-t p-3 sm:flex-row sm:p-4"
@@ -1309,6 +1465,7 @@ export function MessagingWorkflow() {
             Send
           </button>
         </form>
+        )}
       </main>
     </section>
   );
