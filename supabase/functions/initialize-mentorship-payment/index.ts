@@ -135,6 +135,12 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Paid mentorship is test-only until FC banking, Paystack KYC and policies are approved.
+  // Default deny: this requires a deliberate server-side production launch opt-in.
+  if (Deno.env.get("FC_PAID_MENTORSHIPS_ENABLED") !== "true") {
+    return jsonResponse({ ok: false, error: "payment_launch_deferred" }, 503);
+  }
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
