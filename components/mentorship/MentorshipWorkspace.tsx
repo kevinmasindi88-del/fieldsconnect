@@ -82,6 +82,7 @@ type MentorshipCompletionFeedback = {
   author_id: string;
   author_role: "mentor" | "mentee";
   feedback: string;
+  mentor_rating: number | null;
   submitted_at: string;
 };
 
@@ -230,6 +231,8 @@ export function MentorshipWorkspace({
     completionFeedbackText,
     setCompletionFeedbackText,
   ] = useState("");
+
+  const [completionMentorRating, setCompletionMentorRating] = useState<number | null>(null);
 
   const [
     submittingCompletionFeedback,
@@ -577,7 +580,7 @@ export function MentorshipWorkspace({
           supabase
             .from("mentorship_completion_feedback")
             .select(
-              "id, mentorship_id, author_id, author_role, feedback, submitted_at"
+              "id, mentorship_id, author_id, author_role, feedback, mentor_rating, submitted_at"
             )
             .eq("mentorship_id", mentorshipId)
             .order("submitted_at", {
@@ -1172,6 +1175,14 @@ export function MentorshipWorkspace({
       return;
     }
 
+    if (
+      currentUserId === mentorship.mentee_id &&
+      (completionMentorRating === null || completionMentorRating < 1 || completionMentorRating > 5)
+    ) {
+      setMessage("Select a rating from 1 to 5 stars for your mentor.");
+      return;
+    }
+
     setSubmittingCompletionFeedback(true);
     setMessage(null);
 
@@ -1184,6 +1195,7 @@ export function MentorshipWorkspace({
         {
           target_mentorship_id: mentorship.id,
           feedback_text: feedback,
+          rating_value: currentUserId === mentorship.mentee_id ? completionMentorRating : null,
         }
       );
 
@@ -1192,6 +1204,7 @@ export function MentorshipWorkspace({
       }
 
       setCompletionFeedbackText("");
+      setCompletionMentorRating(null);
       setMessage("Completion feedback submitted.");
 
       await loadWorkspace();
@@ -2300,10 +2313,12 @@ export function MentorshipWorkspace({
         completionFeedbackText={
           completionFeedbackText
         }
+        completionMentorRating={completionMentorRating}
         profileById={profileById}
         setCompletionFeedbackText={
           setCompletionFeedbackText
         }
+        setCompletionMentorRating={setCompletionMentorRating}
         submitCompletionFeedback={
           submitCompletionFeedback
         }
