@@ -16,7 +16,7 @@ alter table public.mentorship_completion_feedback
 create or replace function public.submit_mentorship_completion_feedback(
   target_mentorship_id uuid,
   feedback_text text,
-  mentor_rating integer
+  rating_value integer
 )
 returns uuid
 language plpgsql
@@ -41,11 +41,11 @@ begin
   end if;
 
   if auth.uid() = target_mentorship.mentee_id then
-    if mentor_rating is null or mentor_rating not between 1 and 5 then
+    if rating_value is null or rating_value not between 1 and 5 then
       raise exception 'Select a mentor rating from 1 to 5 stars';
     end if;
   elsif auth.uid() = target_mentorship.mentor_id then
-    if mentor_rating is not null then
+    if rating_value is not null then
       raise exception 'Only the mentee can rate the mentor';
     end if;
   else
@@ -60,7 +60,7 @@ begin
 
   if auth.uid() = target_mentorship.mentee_id then
     update public.mentorship_completion_feedback
-    set mentor_rating = mentor_rating::smallint
+    set mentor_rating = rating_value::smallint
     where id = feedback_id
       and author_id = auth.uid();
   end if;
