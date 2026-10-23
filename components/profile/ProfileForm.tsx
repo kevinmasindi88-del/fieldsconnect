@@ -1531,30 +1531,30 @@ export function ProfileForm() {
             </div>
           </section>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Display name
             <input
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.displayName}
               onChange={(event) => updateField("displayName", event.target.value)}
               required
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Username
             <input
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.username}
               onChange={(event) => updateField("username", event.target.value)}
               placeholder="Optional"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Role type
             <select
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.roleType}
               onChange={(event) => updateField("roleType", event.target.value as RoleType)}
             >
@@ -1564,30 +1564,30 @@ export function ProfileForm() {
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Field
             <input
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.field}
               onChange={(event) => updateField("field", event.target.value)}
               placeholder="Example: Pharmacy, Engineering, Finance"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Bio
             <textarea
-              className="min-h-28 rounded-lg border px-3 py-2"
+              className="min-h-28 w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.bio}
               onChange={(event) => updateField("bio", event.target.value)}
               placeholder="Briefly introduce yourself."
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Profile visibility
             <select
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.profileVisibility}
               onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
             >
@@ -1634,10 +1634,10 @@ export function ProfileForm() {
 
             {form.mentorAvailable && (
               <div className="flex w-full min-w-0 flex-col gap-4 border-t pt-4">
-                <label className="flex flex-col gap-2 text-sm font-medium">
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                   Mentorship summary
                   <textarea
-                    className="min-h-24 rounded-lg border px-3 py-2"
+                    className="min-h-24 w-full min-w-0 rounded-lg border px-3 py-2"
                     maxLength={1000}
                     value={mentorSettings.mentorshipSummary}
                     onChange={(event) =>
@@ -1653,10 +1653,10 @@ export function ProfileForm() {
                   </span>
                 </label>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                   Mentoring fields
                   <input
-                    className="rounded-lg border px-3 py-2"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
                     value={mentorSettings.mentoringFields}
                     onChange={(event) =>
                       updateMentorSetting(
@@ -1671,12 +1671,12 @@ export function ProfileForm() {
                   </span>
                 </label>
 
-                <fieldset className="flex flex-col gap-2">
+                <fieldset className="flex w-full min-w-0 flex-col gap-2">
                   <legend className="text-sm font-medium">
                     Mentee levels
                   </legend>
 
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
                     {(
                       [
                         ["student", "Students"],
@@ -1703,10 +1703,10 @@ export function ProfileForm() {
                   </div>
                 </fieldset>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                   Preferred contact frequency
                   <select
-                    className="rounded-lg border px-3 py-2"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
                     value={mentorSettings.preferredFrequency}
                     onChange={(event) =>
                       updateMentorSetting(
@@ -1724,10 +1724,10 @@ export function ProfileForm() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                   Maximum active mentees
                   <input
-                    className="rounded-lg border px-3 py-2"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
                     min={1}
                     max={50}
                     step={1}
@@ -1745,12 +1745,12 @@ export function ProfileForm() {
                   </span>
                 </label>
 
-                <fieldset className="flex flex-col gap-2">
+                <fieldset className="flex w-full min-w-0 flex-col gap-2">
                   <legend className="text-sm font-medium">
                     Mentorship periods accepted
                   </legend>
 
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
                       <input
                         type="checkbox"
