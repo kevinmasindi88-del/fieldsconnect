@@ -2558,6 +2558,8 @@ function CompletionFeedbackPanel({
   submitting,
   submitFeedback,
   submitExistingRating,
+  updateReviewPublication,
+  isUpdatingReviewPublication,
 }: {
   currentUserId: string | null;
   feedbackEntries: MentorshipCompletionFeedback[];
@@ -2570,6 +2572,8 @@ function CompletionFeedbackPanel({
   submitting: boolean;
   submitFeedback: () => Promise<void>;
   submitExistingRating: () => Promise<void>;
+  updateReviewPublication: (publish: boolean) => Promise<void>;
+  isUpdatingReviewPublication: boolean;
 }) {
   const currentUserFeedback =
     feedbackEntries.find(
@@ -2747,6 +2751,8 @@ function LifecyclePanel({
   setPauseReason,
   submitCompletionFeedback,
   submitExistingMentorRating,
+  updateReviewPublication,
+  isUpdatingReviewPublication,
   submitExtensionRequest,
   submittingCompletionFeedback,
   unfinishedActionItemCount,
@@ -2809,7 +2815,9 @@ function LifecyclePanel({
   setPauseReason: (value: string) => void;
   submitCompletionFeedback: () => Promise<void>;
   submitExistingMentorRating: () => Promise<void>;
-  submitExtensionRequest: () => Promise<void>;
+  updateReviewPublication: (publish: boolean) => Promise<void>;
+  isUpdatingReviewPublication: boolean;
+  submitExtensionRequest: () => Promise<void;
   submittingCompletionFeedback: boolean;
   unfinishedActionItemCount: number;
   unfinishedMilestoneCount: number;
@@ -3398,6 +3406,8 @@ function LifecyclePanel({
           submitting={submittingCompletionFeedback}
           submitFeedback={submitCompletionFeedback}
           submitExistingRating={submitExistingMentorRating}
+          updateReviewPublication={updateReviewPublication}
+          isUpdatingReviewPublication={isUpdatingReviewPublication}
         />
       )}
 
