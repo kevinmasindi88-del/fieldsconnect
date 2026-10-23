@@ -161,6 +161,9 @@ type PeopleSearchCriteria = {
   mentor: string;
 };
 
+const PUBLIC_PAID_MENTORSHIPS_ENABLED =
+  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
+
 const PEOPLE_SEARCH_PAGE_SIZE = 20;
 
 export function ConnectionWorkflow() {
@@ -870,6 +873,11 @@ export function ConnectionWorkflow() {
         ? targetRequest.proposed_payment_mode
         : targetRequest?.requested_payment_mode;
 
+    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED && action === "accept" && effectivePaymentMode === "paid") {
+      setMessage("Paid mentorship is not available yet. Please use free mentorship or wait for the payments launch.");
+      return;
+    }
+
     setIsWorking(true);
     setMessage(null);
 
@@ -937,7 +945,7 @@ export function ConnectionWorkflow() {
   async function startMentorshipPayment(
     order: PaymentOrder
   ) {
-    if (!isSupabaseConfigured()) return;
+    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED || !isSupabaseConfigured()) return;
 
     setIsWorking(true);
     setMessage(null);
@@ -1719,8 +1727,9 @@ export function ConnectionWorkflow() {
                       "awaiting_payment" && (
                       <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700">
                         <p>
-                          Payment is required before this
-                          mentorship becomes active.
+                          {PUBLIC_PAID_MENTORSHIPS_ENABLED
+                            ? "Payment is required before this mentorship becomes active."
+                            : "Payments are temporarily unavailable until FieldsConnect completes its payment launch approval. This existing order may expire without payment."}
                         </p>
                         <p className="mt-1 text-xs text-gray-500">
                           Payment window ends{" "}
@@ -1758,7 +1767,8 @@ export function ConnectionWorkflow() {
                         </Link>
                       )}
 
-                    {order.status ===
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                      order.status ===
                       "awaiting_payment" &&
                       isMentee && (
                         <button
@@ -1780,7 +1790,8 @@ export function ConnectionWorkflow() {
                         </button>
                       )}
 
-                    {order.status ===
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                      order.status ===
                       "awaiting_payment" &&
                       !isMentee && (
                         <p className="text-sm text-gray-600">
