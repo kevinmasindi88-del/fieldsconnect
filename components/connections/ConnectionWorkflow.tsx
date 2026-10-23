@@ -2341,7 +2341,7 @@ function ConnectionCard({
 
         {showMentorAvailability && profile?.mentor_available && (
           <p className="mt-2 text-xs font-medium sm:text-sm">
-            Available as mentor{showMentorRating && <> <span className="text-gray-400">·</span> <MentorRating summary={mentorRating} /></>}
+            Available as mentor
           </p>
         )}
       </div>
@@ -2350,13 +2350,24 @@ function ConnectionCard({
 
   return (
     <article className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center">
-      {profile ? (
-        <Link className="flex min-w-0 gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
-          {identity}
-        </Link>
-      ) : (
-        <div className="flex flex-col gap-3 sm:flex-row">{identity}</div>
-      )}
+      <div className="min-w-0 flex-1">
+        {profile ? (
+          <Link className="flex min-w-0 gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
+            {identity}
+          </Link>
+        ) : (
+          <div className="flex flex-col gap-3 sm:flex-row">{identity}</div>
+        )}
+        {showMentorRating && profile?.mentor_available && (
+          <div className="ml-[52px] mt-1 text-xs sm:text-sm">
+            <MentorRating
+              summary={mentorRating}
+              mentorId={profile.id}
+              mentorName={profile.display_name}
+            />
+          </div>
+        )}
+      </div>
       <div>{children}</div>
     </article>
   );
