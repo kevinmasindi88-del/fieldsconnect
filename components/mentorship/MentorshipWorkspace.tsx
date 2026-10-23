@@ -1215,6 +1215,35 @@ export function MentorshipWorkspace({
     }
   }
 
+  async function submitExistingMentorRating() {
+    if (!mentorship || !currentUserId || currentUserId !== mentorship.mentee_id) return;
+    if (completionMentorRating === null || completionMentorRating < 1 || completionMentorRating > 5) {
+      setMessage("Select a rating from 1 to 5 stars for your mentor.");
+      return;
+    }
+
+    setSubmittingCompletionFeedback(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.rpc(
+        "rate_existing_mentorship_completion_feedback",
+        {
+          target_mentorship_id: mentorship.id,
+          rating_value: completionMentorRating,
+        }
+      );
+      if (error) throw error;
+      setCompletionMentorRating(null);
+      setMessage("Mentor rating submitted.");
+      await loadWorkspace();
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setSubmittingCompletionFeedback(false);
+    }
+  }
+
   async function submitExtensionRequest() {
     if (!mentorship || !currentUserId) {
       return;
@@ -2322,6 +2351,7 @@ export function MentorshipWorkspace({
         submitCompletionFeedback={
           submitCompletionFeedback
         }
+        submitExistingMentorRating={submitExistingMentorRating}
         submittingCompletionFeedback={
           submittingCompletionFeedback
         }
