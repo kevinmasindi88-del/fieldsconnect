@@ -2382,7 +2382,7 @@ export function MentorshipWorkspace({
         submitExistingMentorRating={submitExistingMentorRating}
         updateReviewPublication={updateReviewPublication}
         isUpdatingReviewPublication={isUpdatingReviewPublication}
-        submittingCompletionFeedback=
+        submittingCompletionFeedback={
           submittingCompletionFeedback
         }
         unfinishedActionItemCount={
