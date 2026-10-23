@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -181,6 +182,7 @@ export function ConnectionWorkflow() {
   const [mentorFilter, setMentorFilter] = useState("all");
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
+  const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
   const [peopleSearchCriteria, setPeopleSearchCriteria] =
     useState<PeopleSearchCriteria | null>(null);
   const [peopleSearchOffset, setPeopleSearchOffset] =
@@ -1312,6 +1314,7 @@ export function ConnectionWorkflow() {
     if (!append) {
       setPeopleSearchCriteria(criteria);
       setPeopleSearchResults([]);
+      setMentorRatingsById({});
       setPeopleSearchOffset(0);
       setHasMorePeople(false);
       setHasSearchedPeople(true);
@@ -1357,6 +1360,24 @@ export function ConnectionWorkflow() {
       setPeopleSearchOffset(
         offset + page.length
       );
+
+      const mentorIds = page
+        .filter((profile) => profile.mentor_available)
+        .map((profile) => profile.id);
+      if (mentorIds.length > 0) {
+        const { data: ratingRows, error: ratingError } = await supabase.rpc(
+          "get_mentor_rating_summaries",
+          { target_mentor_ids: mentorIds }
+        );
+        if (ratingError) {
+          console.warn("Unable to load mentor ratings:", ratingError);
+        } else {
+          const nextRatings = Object.fromEntries(
+            ((ratingRows ?? []) as MentorRatingSummary[]).map((item) => [item.mentor_id, item])
+          );
+          setMentorRatingsById((current) => append ? { ...current, ...nextRatings } : nextRatings);
+        }
+      }
 
       setPeopleSearchResults(
         (currentResults) => {
@@ -2229,6 +2250,8 @@ export function ConnectionWorkflow() {
                     <ConnectionCard
                       key={profile.id}
                       profile={profile}
+                      showMentorRating
+                      mentorRating={mentorRatingsById[profile.id] ?? null}
                     >
                       <button
                         className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
@@ -2282,12 +2305,16 @@ function ConnectionCard({
   skills = [],
   showBio = true,
   showMentorAvailability = true,
+  showMentorRating = false,
+  mentorRating,
   children,
 }: {
   profile?: Profile;
   skills?: string[];
   showBio?: boolean;
   showMentorAvailability?: boolean;
+  showMentorRating?: boolean;
+  mentorRating?: MentorRatingSummary | null;
   children: React.ReactNode;
 }) {
   const identity = (
@@ -2314,7 +2341,7 @@ function ConnectionCard({
 
         {showMentorAvailability && profile?.mentor_available && (
           <p className="mt-2 text-xs font-medium sm:text-sm">
-            Available as mentor
+            Available as mentor{showMentorRating && <> <span className="text-gray-400">·</span> <MentorRating summary={mentorRating} /></>}
           </p>
         )}
       </div>
