@@ -83,6 +83,7 @@ type MentorshipCompletionFeedback = {
   author_role: "mentor" | "mentee";
   feedback: string;
   mentor_rating: number | null;
+  is_public_review: boolean;
   submitted_at: string;
 };
 
@@ -238,6 +239,8 @@ export function MentorshipWorkspace({
     submittingCompletionFeedback,
     setSubmittingCompletionFeedback,
   ] = useState(false);
+
+  const [isUpdatingReviewPublication, setIsUpdatingReviewPublication] = useState(false);
 
   const [
     extensionDuration,
@@ -580,7 +583,7 @@ export function MentorshipWorkspace({
           supabase
             .from("mentorship_completion_feedback")
             .select(
-              "id, mentorship_id, author_id, author_role, feedback, mentor_rating, submitted_at"
+              "id, mentorship_id, author_id, author_role, feedback, mentor_rating, is_public_review, submitted_at"
             )
             .eq("mentorship_id", mentorshipId)
             .order("submitted_at", {
@@ -1241,6 +1244,31 @@ export function MentorshipWorkspace({
       setMessage(getErrorMessage(error));
     } finally {
       setSubmittingCompletionFeedback(false);
+    }
+  }
+
+  async function updateReviewPublication(publish: boolean) {
+    if (!mentorship || !currentUserId || currentUserId !== mentorship.mentee_id) return;
+
+    setIsUpdatingReviewPublication(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.rpc("set_mentorship_review_publication", {
+        target_mentorship_id: mentorship.id,
+        publish_review: publish,
+      });
+      if (error) throw error;
+      await loadWorkspace();
+      setMessage(
+        publish
+          ? "Your written review is now visible in your mentor's public reviews."
+          : "Your written review is private again."
+      );
+    } catch (error) {
+      setMessage(getErrorMessage(error));
+    } finally {
+      setIsUpdatingReviewPublication(false);
     }
   }
 
@@ -2352,7 +2380,9 @@ export function MentorshipWorkspace({
           submitCompletionFeedback
         }
         submitExistingMentorRating={submitExistingMentorRating}
-        submittingCompletionFeedback={
+        updateReviewPublication={updateReviewPublication}
+        isUpdatingReviewPublication={isUpdatingReviewPublication}
+        submittingCompletionFeedback=
           submittingCompletionFeedback
         }
         unfinishedActionItemCount={
