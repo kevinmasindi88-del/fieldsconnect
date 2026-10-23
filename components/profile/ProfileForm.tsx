@@ -1081,6 +1081,8 @@ export function ProfileForm() {
         throw profileError;
       }
 
+      window.dispatchEvent(new Event("fc:profile-updated"));
+
       if (oldAvatarPath && oldAvatarPath !== newAvatarPath) {
         const { error: oldDeleteError } = await supabase.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
         if (oldDeleteError) throw oldDeleteError;
@@ -1120,6 +1122,8 @@ export function ProfileForm() {
         .eq("id", currentUserId);
 
       if (profileError) throw profileError;
+
+      window.dispatchEvent(new Event("fc:profile-updated"));
 
       const { error: storageError } = await supabase.storage.from(AVATAR_BUCKET).remove([pathToDelete]);
 
@@ -1262,6 +1266,8 @@ export function ProfileForm() {
         });
 
       if (profileError) throw profileError;
+
+      window.dispatchEvent(new Event("fc:profile-updated"));
 
       if (form.mentorAvailable) {
         const { error: mentorError } = await supabase
