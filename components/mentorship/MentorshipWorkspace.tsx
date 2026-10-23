@@ -2716,6 +2716,27 @@ function CompletionFeedbackPanel({
           </div>
         </div>
       )}
+
+      {isMentee && currentUserFeedback?.mentor_rating !== null && currentUserFeedback?.mentor_rating !== undefined && (
+        <label className="mt-4 flex items-start gap-3 rounded-xl border bg-blue-50/40 p-4 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+            checked={currentUserFeedback.is_public_review}
+            disabled={isUpdatingReviewPublication}
+            onChange={(event) => void updateReviewPublication(event.target.checked)}
+          />
+          <span>
+            <span className="block font-semibold text-gray-900">
+              Share my written review publicly
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-gray-600">
+              Optional. Only your written reflection is shared in mentor reviews, without your name.
+              You can turn this off again at any time. Your star rating remains visible anonymously.
+            </span>
+          </span>
+        </label>
+      )}
     </div>
   );
 }
