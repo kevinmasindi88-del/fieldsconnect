@@ -873,6 +873,12 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             <p className="rounded-xl border p-4 text-sm font-medium">
               Your mentorship request has been sent.
             </p>
+          ) : getAcceptedDurations().length === 0 ? (
+            <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+              This mentor has no free mentorship periods available right now.
+              Paid mentorship requests are paused until the FieldsConnect
+              payment launch is approved.
+            </p>
           ) : (
             <form
               className="flex flex-col gap-4 border-t pt-5"
