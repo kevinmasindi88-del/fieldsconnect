@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -114,6 +115,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [mentorProfile, setMentorProfile] =
     useState<MentorProfile | null>(null);
+  const [mentorRating, setMentorRating] = useState<MentorRatingSummary | null>(null);
   const [paymentOffers, setPaymentOffers] =
     useState<MentorshipPaymentOffer[]>([]);
   const [currentUserId, setCurrentUserId] =
@@ -214,6 +216,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           { data: paymentOfferData, error: paymentOfferError },
           { data: skillData, error: skillError },
           { data: documentData, error: documentError },
+          { data: ratingData, error: ratingError },
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -250,6 +253,9 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             .eq("is_published", true)
             .is("deleted_at", null)
             .order("created_at", { ascending: false }),
+          supabase.rpc("get_mentor_rating_summaries", {
+            target_mentor_ids: [profileId],
+          }),
         ]);
 
         if (profileError) throw profileError;
@@ -262,6 +268,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         setMentorProfile(
           (mentorData ?? null) as MentorProfile | null
         );
+        if (ratingError) console.warn("Unable to load mentor rating:", ratingError);
+        setMentorRating(ratingError ? null : (ratingData?.[0] ?? null) as MentorRatingSummary | null);
         setPaymentOffers(
           (paymentOfferData ?? []) as MentorshipPaymentOffer[]
         );
@@ -717,7 +725,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             {[profile.role_type, profile.field].filter(Boolean).join(" - ") || "Profile"}
           </p>
 
-          {profile.mentor_available && <p className="mt-2 text-xs font-medium sm:text-sm">Available as mentor</p>}
+          {profile.mentor_available && <p className="mt-2 text-xs font-medium sm:text-sm">Available as mentor <span className="text-gray-400">·</span> <MentorRating summary={mentorRating} /></p>}
 
           {profile.bio && (
             <div className="mt-3 max-w-3xl sm:mt-4">
