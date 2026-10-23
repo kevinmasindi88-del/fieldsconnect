@@ -2556,43 +2556,8 @@ function CompletionFeedbackPanel({
         Share a final reflection on the mentorship cycle.
       </p>
 
-      {feedbackEntries.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {feedbackEntries.map((entry) => (
-            <div
-              className="rounded-xl border bg-gray-50 p-4"
-              key={entry.id}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold">
-                  {
-                    profileById.get(entry.author_id)
-                      ?.display_name ??
-                    (entry.author_role === "mentor"
-                      ? "Mentor"
-                      : "Mentee")
-                  }
-                </p>
 
-                <p className="text-xs text-gray-500">
-                  {formatDateTime(entry.submitted_at)}
-                </p>
-              </div>
-
-              {entry.author_role === "mentee" && entry.mentor_rating !== null && (
-                <p className="mt-2 text-sm font-semibold text-gray-800" aria-label={`Mentor rating: ${entry.mentor_rating} out of 5 stars`}>
-                  <span aria-hidden="true" className="text-amber-500">★</span> {entry.mentor_rating}/5
-                </p>
-              )}
-
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                {entry.feedback}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
+      {/* Put the rating action before historical feedback so it is visible on small screens. */}
       {currentUserFeedback ? (
         isMentee && currentUserFeedback.mentor_rating === null ? (
           <div className="mt-4 rounded-xl border border-dashed p-4">
@@ -2682,6 +2647,44 @@ function CompletionFeedbackPanel({
           </div>
         </div>
       )}
+
+      {feedbackEntries.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {feedbackEntries.map((entry) => (
+            <div
+              className="rounded-xl border bg-gray-50 p-4"
+              key={entry.id}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {
+                    profileById.get(entry.author_id)
+                      ?.display_name ??
+                    (entry.author_role === "mentor"
+                      ? "Mentor"
+                      : "Mentee")
+                  }
+                </p>
+
+                <p className="text-xs text-gray-500">
+                  {formatDateTime(entry.submitted_at)}
+                </p>
+              </div>
+
+              {entry.author_role === "mentee" && entry.mentor_rating !== null && (
+                <p className="mt-2 text-sm font-semibold text-gray-800" aria-label={`Mentor rating: ${entry.mentor_rating} out of 5 stars`}>
+                  <span aria-hidden="true" className="text-amber-500">★</span> {entry.mentor_rating}/5
+                </p>
+              )}
+
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                {entry.feedback}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
     </div>
   );
 }
