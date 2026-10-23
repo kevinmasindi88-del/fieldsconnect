@@ -2817,7 +2817,7 @@ function LifecyclePanel({
   submitExistingMentorRating: () => Promise<void>;
   updateReviewPublication: (publish: boolean) => Promise<void>;
   isUpdatingReviewPublication: boolean;
-  submitExtensionRequest: () => Promise<void;
+  submitExtensionRequest: () => Promise<void>;
   submittingCompletionFeedback: boolean;
   unfinishedActionItemCount: number;
   unfinishedMilestoneCount: number;
