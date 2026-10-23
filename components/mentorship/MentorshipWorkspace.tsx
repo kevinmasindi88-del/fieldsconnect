@@ -84,6 +84,7 @@ type MentorshipCompletionFeedback = {
   feedback: string;
   mentor_rating: number | null;
   is_public_review: boolean;
+  is_public_named_review: boolean;
   submitted_at: string;
 };
 
@@ -583,7 +584,7 @@ export function MentorshipWorkspace({
           supabase
             .from("mentorship_completion_feedback")
             .select(
-              "id, mentorship_id, author_id, author_role, feedback, mentor_rating, is_public_review, submitted_at"
+              "id, mentorship_id, author_id, author_role, feedback, mentor_rating, is_public_review, is_public_named_review, submitted_at"
             )
             .eq("mentorship_id", mentorshipId)
             .order("submitted_at", {
@@ -1254,7 +1255,7 @@ export function MentorshipWorkspace({
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.rpc("set_mentorship_review_publication", {
+      const { error } = await supabase.rpc("set_mentorship_named_review_publication", {
         target_mentorship_id: mentorship.id,
         publish_review: publish,
       });
@@ -1262,8 +1263,8 @@ export function MentorshipWorkspace({
       await loadWorkspace();
       setMessage(
         publish
-          ? "Your written review is now visible in your mentor's public reviews."
-          : "Your written review is private again."
+          ? "Your name, mentorship field and written review are now visible on your mentor's reviews page."
+          : "Your name and written review are no longer public."
       );
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -2722,17 +2723,18 @@ function CompletionFeedbackPanel({
           <input
             type="checkbox"
             className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
-            checked={currentUserFeedback.is_public_review}
+            checked={currentUserFeedback.is_public_review && currentUserFeedback.is_public_named_review}
             disabled={isUpdatingReviewPublication}
             onChange={(event) => void updateReviewPublication(event.target.checked)}
           />
           <span>
             <span className="block font-semibold text-gray-900">
-              Share my written review publicly
+              Publish my name and written review
             </span>
             <span className="mt-1 block text-xs leading-5 text-gray-600">
-              Optional. Only your written reflection is shared in mentor reviews, without your name.
-              You can turn this off again at any time. Your star rating remains visible anonymously.
+              Optional. Your display name, mentorship field (as the cycle title), and written feedback
+              will appear together on a mentor reviews page. You can withdraw publication at any time.
+              Your star rating remains visible anonymously even if you do not opt in.
             </span>
           </span>
         </label>
