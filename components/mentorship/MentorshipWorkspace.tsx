@@ -76,6 +76,8 @@ type MentorshipPaymentSummary = {
   paid_at: string | null;
 };
 
+type ReviewPublicationMode = "private" | "anonymous" | "named";
+
 type MentorshipCompletionFeedback = {
   id: string;
   mentorship_id: string;
@@ -1248,23 +1250,30 @@ export function MentorshipWorkspace({
     }
   }
 
-  async function updateReviewPublication(publish: boolean) {
-    if (!mentorship || !currentUserId || currentUserId !== mentorship.mentee_id) return;
+  async function updateReviewPublication(mode: ReviewPublicationMode) {
+    if (!mentorship || !currentUserId || currentUserId !== mentorship.mentee_id || isUpdatingReviewPublication) return;
 
     setIsUpdatingReviewPublication(true);
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.rpc("set_mentorship_named_review_publication", {
+      // The legacy publication RPC is intentionally anonymous-only and clears named consent.
+      // The named RPC enables identity only when the mentee expressly chooses it.
+      const rpcName = mode === "anonymous"
+        ? "set_mentorship_review_publication"
+        : "set_mentorship_named_review_publication";
+      const { error } = await supabase.rpc(rpcName, {
         target_mentorship_id: mentorship.id,
-        publish_review: publish,
+        publish_review: mode !== "private",
       });
       if (error) throw error;
       await loadWorkspace();
       setMessage(
-        publish
-          ? "Your name, mentorship field and written review are now visible on your mentor's reviews page."
-          : "Your name and written review are no longer public."
+        mode === "named"
+          ? "Your written review is now public with your display name."
+          : mode === "anonymous"
+            ? "Your written review is now public anonymously. Your name is hidden."
+            : "Your written review is now private. Your star rating remains visible."
       );
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -2573,13 +2582,17 @@ function CompletionFeedbackPanel({
   submitting: boolean;
   submitFeedback: () => Promise<void>;
   submitExistingRating: () => Promise<void>;
-  updateReviewPublication: (publish: boolean) => Promise<void>;
+  updateReviewPublication: (mode: ReviewPublicationMode) => Promise<void>;
   isUpdatingReviewPublication: boolean;
 }) {
   const currentUserFeedback =
     feedbackEntries.find(
       (entry) => entry.author_id === currentUserId
     ) ?? null;
+  const reviewPublicationMode: ReviewPublicationMode =
+    currentUserFeedback?.is_public_review
+      ? currentUserFeedback.is_public_named_review ? "named" : "anonymous"
+      : "private";
 
   return (
     <div className="mt-5 rounded-xl border p-4">
@@ -2728,25 +2741,50 @@ function CompletionFeedbackPanel({
       )}
 
       {isMentee && currentUserFeedback && currentUserFeedback.mentor_rating !== null && (
-        <label className="mt-4 flex items-start gap-3 rounded-xl border bg-blue-50/40 p-4 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
-            checked={currentUserFeedback.is_public_review && currentUserFeedback.is_public_named_review}
-            disabled={isUpdatingReviewPublication}
-            onChange={(event) => void updateReviewPublication(event.target.checked)}
-          />
-          <span>
-            <span className="block font-semibold text-gray-900">
-              Publish my name and written review
-            </span>
-            <span className="mt-1 block text-xs leading-5 text-gray-600">
-              Optional. Your display name, mentorship field (as the cycle title), and written feedback
-              will appear together on a mentor reviews page. You can withdraw publication at any time.
-              Your star rating remains visible anonymously even if you do not opt in.
-            </span>
-          </span>
-        </label>
+        <fieldset className="mt-4 rounded-xl border bg-blue-50/40 p-4" disabled={isUpdatingReviewPublication}>
+          <legend className="px-1 text-sm font-semibold text-gray-900">
+            Who can see your written review?
+          </legend>
+          <div className="mt-2 grid gap-2">
+            {([
+              {
+                value: "private",
+                title: "Keep my comment private",
+                description: "Only your star rating appears publicly.",
+              },
+              {
+                value: "anonymous",
+                title: "Publish anonymously",
+                description: "Your comment is public under Anonymous mentee. Your name and mentorship field stay hidden.",
+              },
+              {
+                value: "named",
+                title: "Publish with my name",
+                description: "Your display name, mentorship field and comment appear together on the mentor reviews page.",
+              },
+            ] as const).map((option) => (
+              <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-lg border bg-white p-3 text-sm">
+                <input
+                  type="radio"
+                  name={`mentor-review-publication-${currentUserFeedback.id}`}
+                  value={option.value}
+                  checked={reviewPublicationMode === option.value}
+                  onChange={() => void updateReviewPublication(option.value)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+                />
+                <span>
+                  <span className="block font-semibold text-gray-900">{option.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-gray-600">{option.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-gray-600">
+            You can change this choice at any time. Your rating and submitted feedback are not edited.
+            Avoid including identifying details in a comment you publish anonymously.
+          </p>
+          {isUpdatingReviewPublication && <p className="mt-2 text-xs text-blue-700" role="status">Updating review visibility…</p>}
+        </fieldset>
       )}
     </div>
   );
@@ -2847,7 +2885,7 @@ function LifecyclePanel({
   setPauseReason: (value: string) => void;
   submitCompletionFeedback: () => Promise<void>;
   submitExistingMentorRating: () => Promise<void>;
-  updateReviewPublication: (publish: boolean) => Promise<void>;
+  updateReviewPublication: (mode: ReviewPublicationMode) => Promise<void>;
   isUpdatingReviewPublication: boolean;
   submitExtensionRequest: () => Promise<void>;
   submittingCompletionFeedback: boolean;

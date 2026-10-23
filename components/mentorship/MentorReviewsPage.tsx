@@ -106,8 +106,7 @@ export function MentorReviewsPage({ mentorId }: { mentorId: string }) {
                     <div className="min-w-0">
                       <h2 className="break-words text-base font-semibold text-gray-950 sm:text-lg">{review.cycle_title}</h2>
                       <p className="mt-1 text-sm text-gray-600">
-                        Review by <span className="font-medium text-gray-800">{review.mentee_name}</span>
-                        {!review.is_identified && <span className="ml-1 text-xs">(anonymous)</span>}
+                        Review by <span className="font-medium text-gray-800">{review.is_identified ? review.mentee_name : "Anonymous mentee"}</span>
                       </p>
                     </div>
                     <p className="shrink-0 text-sm font-semibold text-gray-800" aria-label={`Rating: ${rating} out of 5 stars`}>
