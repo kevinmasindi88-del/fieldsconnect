@@ -2490,16 +2490,22 @@ function CompletionFeedbackPanel({
   currentUserId,
   feedbackEntries,
   feedbackText,
+  isMentee,
+  mentorRating,
   profileById,
   setFeedbackText,
+  setMentorRating,
   submitting,
   submitFeedback,
 }: {
   currentUserId: string | null;
   feedbackEntries: MentorshipCompletionFeedback[];
   feedbackText: string;
+  isMentee: boolean;
+  mentorRating: number | null;
   profileById: Map<string, Profile>;
   setFeedbackText: (value: string) => void;
+  setMentorRating: (value: number) => void;
   submitting: boolean;
   submitFeedback: () => Promise<void>;
 }) {
@@ -2541,6 +2547,12 @@ function CompletionFeedbackPanel({
                 </p>
               </div>
 
+              {entry.author_role === "mentee" && entry.mentor_rating !== null && (
+                <p className="mt-2 text-sm font-semibold text-gray-800" aria-label={`Mentor rating: ${entry.mentor_rating} out of 5 stars`}>
+                  <span aria-hidden="true" className="text-amber-500">★</span> {entry.mentor_rating}/5
+                </p>
+              )}
+
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
                 {entry.feedback}
               </p>
@@ -2556,6 +2568,26 @@ function CompletionFeedbackPanel({
         </p>
       ) : (
         <div className="mt-4">
+          {isMentee && (
+            <fieldset className="mb-4">
+              <legend className="text-sm font-semibold text-gray-800">Rate your mentor</legend>
+              <p className="mt-1 text-xs text-gray-600">Choose 1 to 5 stars for this completed mentorship.</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`Rate your mentor ${star} ${star === 1 ? "star" : "stars"}`}
+                    aria-pressed={mentorRating === star}
+                    className={`flex h-11 w-11 items-center justify-center rounded-lg border text-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${star <= (mentorRating ?? 0) ? "border-amber-400 bg-amber-50 text-amber-500" : "border-gray-200 text-gray-300 hover:text-amber-400"}`}
+                    onClick={() => setMentorRating(star)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <textarea
             className="min-h-28 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             maxLength={2000}
@@ -2571,7 +2603,8 @@ function CompletionFeedbackPanel({
               className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               disabled={
                 submitting ||
-                feedbackText.trim().length < 10
+                feedbackText.trim().length < 10 ||
+                (isMentee && mentorRating === null)
               }
               onClick={() => {
                 void submitFeedback();
