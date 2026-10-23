@@ -94,10 +94,6 @@ export function MentorReviewsPage({ mentorId }: { mentorId: string }) {
           <p className="mt-2 text-sm text-gray-700"><span aria-hidden="true" className="text-amber-500">★</span>{" "}
             {average.toFixed(1)} out of 5 · {count} verified {count === 1 ? "rating" : "ratings"}</p>
         )}
-        <p className="mt-3 text-sm leading-6 text-gray-600">
-          Ratings come from completed mentorship cycles. A mentee's name, cycle title and feedback
-          are published together only with their explicit consent.
-        </p>
       </header>
       {reviews.length > 0 && (
         <ol className="flex flex-col gap-4">
@@ -119,10 +115,8 @@ export function MentorReviewsPage({ mentorId }: { mentorId: string }) {
                       <span className="ml-2">{rating}/5</span>
                     </p>
                   </div>
-                  {review.public_comment ? (
-                    <blockquote className="mt-4 whitespace-pre-wrap break-words border-l-2 border-blue-200 pl-4 text-sm leading-6 text-gray-700">{review.public_comment}</blockquote>
-                  ) : (
-                    <p className="mt-4 text-sm italic text-gray-500">The mentee has not published a written feedback statement.</p>
+                  {review.public_comment && (
+                    <blockquote className="mt-4 whitespace-pre-wrap break-words rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-700">{review.public_comment}</blockquote>
                   )}
                 </article>
               </li>

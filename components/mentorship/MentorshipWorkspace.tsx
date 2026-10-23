@@ -2632,7 +2632,7 @@ function CompletionFeedbackPanel({
         isMentee && currentUserFeedback.mentor_rating === null ? (
           <div className="mt-4 rounded-xl border border-dashed p-4">
             <p className="text-sm text-gray-700">
-              Your written feedback is read-only. You can still add one star rating for your mentor.
+              Your earlier written feedback will be linked to this star rating. It remains read-only.
             </p>
             <fieldset className="mt-3">
               <legend className="text-sm font-semibold text-gray-800">Rate your mentor</legend>
@@ -2687,15 +2687,24 @@ function CompletionFeedbackPanel({
               </div>
             </fieldset>
           )}
+          <label htmlFor="completion-feedback-comment" className="mb-2 block text-sm font-semibold text-gray-800">
+            {isMentee ? "Comment on your rating (at least 10 characters)" : "Final reflection"}
+          </label>
           <textarea
+            id="completion-feedback-comment"
             className="min-h-28 w-full resize-y rounded-xl border px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
             maxLength={2000}
             onChange={(event) =>
               setFeedbackText(event.target.value)
             }
-            placeholder="Share your final reflection on this mentorship."
+            placeholder={isMentee ? "How was your experience with this mentor?" : "Share your final reflection on this mentorship."}
             value={feedbackText}
           />
+          {isMentee && (
+            <p className="mt-2 text-xs leading-5 text-gray-600">
+              This comment is saved as your written feedback. You can choose whether to publish it after submitting.
+            </p>
+          )}
 
           <div className="mt-3 flex justify-end">
             <button
