@@ -133,6 +133,11 @@ const initialMentorshipPricing: MentorshipPricingState = {
   },
 };
 
+// This opt-in is OFF until FC completes business banking,
+// Paystack production verification, and financial governance checks.
+const PUBLIC_PAID_MENTORSHIPS_ENABLED =
+  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
+
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
 const AVATAR_OUTPUT_SIZE = 512;
@@ -714,6 +719,7 @@ export function ProfileForm() {
 
   async function loadPayoutBanks() {
     if (
+      !PUBLIC_PAID_MENTORSHIPS_ENABLED ||
       !isSupabaseConfigured() ||
       isLoadingPayoutBanks ||
       payoutBanks.length > 0
@@ -765,7 +771,7 @@ export function ProfileForm() {
   }
 
   async function savePayoutAccount() {
-    if (!isSupabaseConfigured()) return;
+    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED || !isSupabaseConfigured()) return;
 
     const bankCode = payoutBankCode.trim();
     const accountName = payoutAccountName.trim();
@@ -843,6 +849,7 @@ export function ProfileForm() {
 
   useEffect(() => {
     if (
+      PUBLIC_PAID_MENTORSHIPS_ENABLED &&
       form.mentorAvailable &&
       currentUserId &&
       payoutBanks.length === 0
@@ -1182,6 +1189,7 @@ export function ProfileForm() {
 
       for (const [duration, accepted] of paidDurations) {
         if (
+          PUBLIC_PAID_MENTORSHIPS_ENABLED &&
           accepted &&
           mentorshipPricing[duration].paymentMode ===
             "paid"
@@ -1285,7 +1293,10 @@ export function ProfileForm() {
 
         if (mentorError) throw mentorError;
 
-        const offerRows = [
+        // Preserve existing paid offers in test mode while launch is deferred.
+        // Never silently convert a paid offer into a free offer.
+        if (PUBLIC_PAID_MENTORSHIPS_ENABLED) {
+          const offerRows = [
           {
             duration: "3_months" as const,
             accepted: mentorSettings.accepts3Month,
@@ -1328,7 +1339,8 @@ export function ProfileForm() {
               onConflict: "mentor_id,duration",
             });
 
-        if (offerError) throw offerError;
+          if (offerError) throw offerError;
+        }
       } else {
         const { error: mentorDisableError } = await supabase
           .from("mentor_profiles")
@@ -1369,7 +1381,7 @@ export function ProfileForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-6"
+      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 rounded-xl border bg-white p-3 sm:gap-4 sm:p-6"
     >
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading profile...</p>
@@ -1585,7 +1597,7 @@ export function ProfileForm() {
             </select>
           </label>
 
-          <section className="flex flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
+          <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
             <div>
               <h2 className="text-lg font-semibold">
                 Mentorship
@@ -1621,7 +1633,7 @@ export function ProfileForm() {
             </label>
 
             {form.mentorAvailable && (
-              <div className="flex flex-col gap-4 border-t pt-4">
+              <div className="flex w-full min-w-0 flex-col gap-4 border-t pt-4">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Mentorship summary
                   <textarea
@@ -1797,7 +1809,8 @@ export function ProfileForm() {
                   </div>
                 </fieldset>
 
-                <section className="flex flex-col gap-4 rounded-xl border bg-gray-50 p-4">
+                {PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
+                <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border bg-gray-50 p-3 sm:gap-4 sm:p-4">
                   <div>
                     <h3 className="font-semibold">
                       Mentorship payments
@@ -1809,7 +1822,7 @@ export function ProfileForm() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border bg-white p-4">
+                  <div className="w-full min-w-0 rounded-xl border bg-white p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="text-sm font-semibold">
                         Payout account
@@ -1830,11 +1843,11 @@ export function ProfileForm() {
                       Your banking details are encrypted in transit and securely processed by our payment provider. FieldsConnect does not store banking details.
                     </p>
 
-                    <div className="mt-4 grid gap-3">
-                      <label className="flex flex-col gap-2 text-sm font-medium">
+                    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                         Bank
                         <select
-                          className="rounded-lg border bg-white px-3 py-2"
+                          className="w-full min-w-0 rounded-lg border bg-white px-3 py-2"
                           disabled={isLoadingPayoutBanks}
                           value={payoutBankCode}
                           onChange={(event) =>
@@ -1859,10 +1872,10 @@ export function ProfileForm() {
                         </select>
                       </label>
 
-                      <label className="flex flex-col gap-2 text-sm font-medium">
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                         Account holder name
                         <input
-                          className="rounded-lg border bg-white px-3 py-2"
+                          className="w-full min-w-0 rounded-lg border bg-white px-3 py-2"
                           autoComplete="name"
                           maxLength={120}
                           value={payoutAccountName}
@@ -1875,11 +1888,11 @@ export function ProfileForm() {
                         />
                       </label>
 
-                      <label className="flex flex-col gap-2 text-sm font-medium">
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                         Bank account number
-                        <div className="relative">
+                        <div className="relative min-w-0">
                           <input
-                            className="w-full rounded-lg border bg-white px-3 py-2 pr-12"
+                            className="w-full min-w-0 rounded-lg border bg-white px-3 py-2 pr-12"
                             autoComplete="off"
                             inputMode="numeric"
                             maxLength={20}
@@ -1987,7 +2000,7 @@ export function ProfileForm() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border bg-white p-4">
+                  <div className="w-full min-w-0 rounded-xl border bg-white p-3 sm:p-4">
                     <h4 className="text-sm font-semibold">
                       Mentorship pricing
                     </h4>
@@ -1997,7 +2010,7 @@ export function ProfileForm() {
                       free-only in this version.
                     </p>
 
-                    <div className="mt-4 grid gap-3">
+                    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
                       {(
                         [
                           [
@@ -2040,7 +2053,7 @@ export function ProfileForm() {
                             return (
                               <div
                                 key={duration}
-                                className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_140px_180px] sm:items-end"
+                                className="grid w-full min-w-0 grid-cols-1 gap-3 rounded-lg border p-3 lg:grid-cols-[minmax(0,1fr)_140px_180px] lg:items-end"
                               >
                                 <div>
                                   <p className="text-sm font-medium">
@@ -2056,7 +2069,7 @@ export function ProfileForm() {
                                   </p>
                                 </div>
 
-                                <label className="flex flex-col gap-2 text-xs font-medium">
+                                <label className="flex min-w-0 flex-col gap-2 text-xs font-medium">
                                   Type
                                   <select
                                     className="rounded-lg border bg-white px-3 py-2 text-sm"
@@ -2094,9 +2107,9 @@ export function ProfileForm() {
                                   </select>
                                 </label>
 
-                                <label className="flex flex-col gap-2 text-xs font-medium">
+                                <label className="flex min-w-0 flex-col gap-2 text-xs font-medium">
                                   Programme price
-                                  <div className="flex items-center rounded-lg border bg-white px-3">
+                                  <div className="flex w-full min-w-0 items-center rounded-lg border bg-white px-3">
                                     <span className="text-sm text-gray-500">
                                       R
                                     </span>
@@ -2143,6 +2156,21 @@ export function ProfileForm() {
                     )}
                   </div>
                 </section>
+                ) : (
+                <section className="w-full min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4" aria-label="Mentorship payments launch status">
+                  <h3 className="font-semibold">Paid mentorship is coming soon</h3>
+                  <p className="mt-2 break-words text-sm leading-6 text-gray-600">
+                    FieldsConnect is completing its business banking, payment provider
+                    verification and financial policies. Payout account setup and
+                    paid programme pricing are unavailable until launch.
+                  </p>
+                  <p className="mt-2 break-words text-sm leading-6 text-gray-600">
+                    You can continue offering free mentorship. Previously configured
+                    paid offers are preserved but cannot receive new requests until
+                    paid mentorship launches.
+                  </p>
+                </section>
+                )}
 
                 <label className="flex gap-3 rounded-lg border px-3 py-3 text-sm">
                   <input
