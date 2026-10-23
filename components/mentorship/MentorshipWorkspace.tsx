@@ -2717,7 +2717,7 @@ function CompletionFeedbackPanel({
         </div>
       )}
 
-      {isMentee && currentUserFeedback?.mentor_rating !== null && currentUserFeedback?.mentor_rating !== undefined && (
+      {isMentee && currentUserFeedback && currentUserFeedback.mentor_rating !== null && (
         <label className="mt-4 flex items-start gap-3 rounded-xl border bg-blue-50/40 p-4 text-sm">
           <input
             type="checkbox"
