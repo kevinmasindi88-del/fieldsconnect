@@ -9,6 +9,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { usePathname, useRouter } from "next/navigation";
 import {
   getSupabaseBrowserClient,
@@ -198,6 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const [user, setUser] = useState<User | null>(null);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const [accountAvatarPath, setAccountAvatarPath] = useState<string | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [showLoadingScreen, setShowLoadingScreen] =
     useState(false);
@@ -359,18 +361,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
       setWelcomeName(null);
+      setAccountAvatarPath(null);
       return;
     }
 
+    let isActive = true;
     const supabase = getSupabaseBrowserClient();
     const authenticatedUser = user;
 
-    async function loadWelcomeName() {
+    async function loadAccountProfile() {
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, avatar_url")
         .eq("id", authenticatedUser.id)
         .maybeSingle();
+
+      if (!isActive) return;
+
+      setAccountAvatarPath(
+        !error && typeof data?.avatar_url === "string"
+          ? data.avatar_url
+          : null
+      );
 
       if (!error && data?.display_name?.trim()) {
         setWelcomeName(data.display_name.trim());
@@ -391,8 +403,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       );
     }
 
-    void loadWelcomeName();
-  }, [user]);
+    void loadAccountProfile();
+    window.addEventListener("fc:profile-updated", loadAccountProfile);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("fc:profile-updated", loadAccountProfile);
+    };
+  }, [user, pathname]);
 
   useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
@@ -748,12 +766,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ) : user ? (
                 <details className="group relative">
                   <summary
-                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                     aria-label={`Account menu for ${welcomeName ?? "user"}`}
                   >
-                    <MobileNavIcon
-                      name="account"
-                      className="h-5 w-5"
+                    <ProfileAvatar
+                      avatarPath={accountAvatarPath}
+                      displayName={welcomeName}
+                      size={40}
                     />
                   </summary>
 
