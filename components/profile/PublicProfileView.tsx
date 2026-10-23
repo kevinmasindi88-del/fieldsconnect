@@ -725,7 +725,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             {[profile.role_type, profile.field].filter(Boolean).join(" - ") || "Profile"}
           </p>
 
-          {profile.mentor_available && <p className="mt-2 text-xs font-medium sm:text-sm">Available as mentor <span className="text-gray-400">·</span> <MentorRating summary={mentorRating} /></p>}
+          {profile.mentor_available && <div className="mt-2 flex flex-wrap items-center gap-1 text-xs font-medium sm:text-sm"><span>Available as mentor</span><span className="text-gray-400">·</span><MentorRating summary={mentorRating} mentorId={profile.id} mentorName={profile.display_name} /></div>}
 
           {profile.bio && (
             <div className="mt-3 max-w-3xl sm:mt-4">
