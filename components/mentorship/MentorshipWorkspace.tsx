@@ -2626,6 +2626,7 @@ function LifecyclePanel({
   embedded = false,
   completionFeedback,
   completionFeedbackText,
+  completionMentorRating,
   completionRequestNote,
   completionResponseNote,
   currentUserId,
@@ -2642,6 +2643,7 @@ function LifecyclePanel({
   respondToExtension,
   runLifecycleAction,
   setCompletionFeedbackText,
+  setCompletionMentorRating,
   setCompletionRequestNote,
   setCompletionResponseNote,
   setExtensionDuration,
@@ -2658,6 +2660,7 @@ function LifecyclePanel({
   embedded?: boolean;
   completionFeedback: MentorshipCompletionFeedback[];
   completionFeedbackText: string;
+  completionMentorRating: number | null;
   completionRequestNote: string;
   completionResponseNote: string;
   currentUserId: string | null;
@@ -2688,6 +2691,7 @@ function LifecyclePanel({
   setCompletionFeedbackText: (
     value: string
   ) => void;
+  setCompletionMentorRating: (value: number) => void;
   setCompletionRequestNote: (
     value: string
   ) => void;
@@ -3290,8 +3294,11 @@ function LifecyclePanel({
           currentUserId={currentUserId}
           feedbackEntries={completionFeedback}
           feedbackText={completionFeedbackText}
+          isMentee={currentUserId === mentorship.mentee_id}
+          mentorRating={completionMentorRating}
           profileById={profileById}
           setFeedbackText={setCompletionFeedbackText}
+          setMentorRating={setCompletionMentorRating}
           submitting={submittingCompletionFeedback}
           submitFeedback={submitCompletionFeedback}
         />
