@@ -2594,10 +2594,42 @@ function CompletionFeedbackPanel({
       )}
 
       {currentUserFeedback ? (
-        <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-600">
-          Your completion feedback has been submitted and
-          is now read-only.
-        </p>
+        isMentee && currentUserFeedback.mentor_rating === null ? (
+          <div className="mt-4 rounded-xl border border-dashed p-4">
+            <p className="text-sm text-gray-700">
+              Your written feedback is read-only. You can still add one star rating for your mentor.
+            </p>
+            <fieldset className="mt-3">
+              <legend className="text-sm font-semibold text-gray-800">Rate your mentor</legend>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`Rate your mentor ${star} ${star === 1 ? "star" : "stars"}`}
+                    aria-pressed={mentorRating === star}
+                    className={`flex h-11 w-11 items-center justify-center rounded-lg border text-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${star <= (mentorRating ?? 0) ? "border-amber-400 bg-amber-50 text-amber-500" : "border-gray-200 text-gray-300 hover:text-amber-400"}`}
+                    onClick={() => setMentorRating(star)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <button
+              className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              type="button"
+              disabled={submitting || mentorRating === null}
+              onClick={() => { void submitExistingRating(); }}
+            >
+              {submitting ? "Submitting..." : "Submit rating"}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed p-4 text-sm text-gray-600">
+            Your completion feedback and rating (if applicable) are read-only.
+          </p>
+        )
       ) : (
         <div className="mt-4">
           {isMentee && (
