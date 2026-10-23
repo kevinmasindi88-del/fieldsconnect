@@ -2158,17 +2158,7 @@ export function ProfileForm() {
                 </section>
                 ) : (
                 <section className="w-full min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4" aria-label="Mentorship payments launch status">
-                  <h3 className="font-semibold">Paid mentorship is coming soon</h3>
-                  <p className="mt-2 break-words text-sm leading-6 text-gray-600">
-                    FieldsConnect is completing its business banking, payment provider
-                    verification and financial policies. Payout account setup and
-                    paid programme pricing are unavailable until launch.
-                  </p>
-                  <p className="mt-2 break-words text-sm leading-6 text-gray-600">
-                    You can continue offering free mentorship. Previously configured
-                    paid offers are preserved but cannot receive new requests until
-                    paid mentorship launches.
-                  </p>
+                  <h3 className="font-semibold">Paid mentorship option coming soon</h3>
                 </section>
                 )}
 
