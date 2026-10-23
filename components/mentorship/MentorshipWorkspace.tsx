@@ -2527,6 +2527,7 @@ function CompletionFeedbackPanel({
   setMentorRating,
   submitting,
   submitFeedback,
+  submitExistingRating,
 }: {
   currentUserId: string | null;
   feedbackEntries: MentorshipCompletionFeedback[];
@@ -2538,6 +2539,7 @@ function CompletionFeedbackPanel({
   setMentorRating: (value: number) => void;
   submitting: boolean;
   submitFeedback: () => Promise<void>;
+  submitExistingRating: () => Promise<void>;
 }) {
   const currentUserFeedback =
     feedbackEntries.find(
@@ -2682,6 +2684,7 @@ function LifecyclePanel({
   setEarlyEndingReason,
   setPauseReason,
   submitCompletionFeedback,
+  submitExistingMentorRating,
   submitExtensionRequest,
   submittingCompletionFeedback,
   unfinishedActionItemCount,
@@ -2743,6 +2746,7 @@ function LifecyclePanel({
   ) => void;
   setPauseReason: (value: string) => void;
   submitCompletionFeedback: () => Promise<void>;
+  submitExistingMentorRating: () => Promise<void>;
   submitExtensionRequest: () => Promise<void>;
   submittingCompletionFeedback: boolean;
   unfinishedActionItemCount: number;
@@ -3331,6 +3335,7 @@ function LifecyclePanel({
           setMentorRating={setCompletionMentorRating}
           submitting={submittingCompletionFeedback}
           submitFeedback={submitCompletionFeedback}
+          submitExistingRating={submitExistingMentorRating}
         />
       )}
 
