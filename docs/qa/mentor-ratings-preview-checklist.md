@@ -17,13 +17,14 @@
 6. Inspect mentor's public profile. After the mentee review, see “★ 4.0 (1 review)”.
 7. Use Connections > Find people to search the mentor. Verify the card shows the same score and count inline next to “Available as mentor”.
 8. Search for an unrated mentor. Verify “No ratings yet” in the public profile and Find People.
-9. Verify incomplete/paused/cancelled mentorship cannot be rated and nonparticipants cannot submit ratings.
-10. Test 320–414 px and desktop: stars, labels, profile header and search cards wrap without overflow.
-11. Verify the mentor cannot edit submitted stars, and duplicate submissions fail.
-12. Confirm mobile avatar, free mentorship, and gated paid option remain unchanged.
+9. As a mentee who already submitted completion feedback before the rating feature, open the completed cycle. Submit a one-time 1–5 star rating without editing their written feedback. Verify the aggregate updates and a second rating attempt is rejected.
+10. Verify incomplete/paused/cancelled mentorship cannot be rated and nonparticipants cannot submit ratings.
+11. Test 320–414 px and desktop: stars, labels, profile header and search cards wrap without overflow.
+12. Verify the mentor cannot edit submitted stars, and duplicate submissions fail.
+13. Confirm mobile avatar, free mentorship, and gated paid option remain unchanged.
 
 ## Launch gates
 - Preview build must be Ready, and a real two-user free mentorship end-to-end test must pass.
 - SQL migration `add_verified_mentor_ratings` applied to Supabase; both old and new feedback RPC signatures remain available for legacy compatibility.
-- Do not assign ratings retroactively to historical text-only submissions without the mentee's explicit input.
+- Historical written feedback can receive a one-time explicit mentee rating via `rate_existing_mentorship_completion_feedback`. Never invent or assign ratings without the mentee’s action.
 - Promote only the exact tested immutable Preview; record production deployment ID.
