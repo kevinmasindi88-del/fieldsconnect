@@ -40,6 +40,8 @@ const publicRoutes = new Set([
   "/signup",
   "/reset-password",
   "/code-of-conduct",
+  "/terms-of-use",
+  "/privacy-policy",
 ]);
 
 const suspensionAllowedRoutes = new Set([

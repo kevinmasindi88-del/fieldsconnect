@@ -1414,6 +1414,8 @@ export function ProfileForm() {
             : "Profile saved. Any paid mentorship prices were saved as private drafts; checkout is still disabled."
           : "Profile saved."
       );
+      // Final onboarding only after the whole mentor/profile save succeeds.
+      window.dispatchEvent(new Event("fc:profile-saved"));
     } catch (error) {
       setMessage(getActionErrorMessage(error, "save profile"));
     } finally {

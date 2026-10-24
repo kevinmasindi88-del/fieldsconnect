@@ -1,142 +1,172 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
-import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
-
-type AcceptanceKey =
-  | "termsAccepted"
-  | "privacyAccepted"
-  | "communityGuidelinesAccepted"
-  | "ageConfirmed";
-
-const initialState: Record<AcceptanceKey, boolean> = {
-  termsAccepted: false,
-  privacyAccepted: false,
-  communityGuidelinesAccepted: false,
-  ageConfirmed: false,
-};
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getSupabaseBrowserClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/browser";
+import {
+  LegalAgreementCheckbox,
+  LEGAL_AGREEMENT_VERSION,
+} from "@/components/onboarding/LegalAgreementCheckbox";
 
 export function AcceptanceForm() {
-  const [accepted, setAccepted] = useState(initialState);
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  const [accepted, setAccepted] = useState(false);
+  const [hasRecordedAgreement, setHasRecordedAgreement] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const canSubmit = Object.values(accepted).every(Boolean);
-
-  function toggle(key: AcceptanceKey) {
-    setAccepted((current) => ({ ...current, [key]: !current[key] }));
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-
-    if (!canSubmit) {
-      setMessage("All required confirmations must be accepted before continuing.");
-      return;
-    }
-
+  // A policy agreement is NOT an age statement or evidence of guardian consent.
+  const refreshAgreement = useCallback(async () => {
     if (!isSupabaseConfigured()) {
-      setMessage("Supabase is not configured yet. Acceptance recording will work once environment variables are set.");
+      setMessage("Supabase is not configured.");
+      setIsChecking(false);
       return;
     }
-
-    setIsSubmitting(true);
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Please log in to finish setting up your profile.");
 
-      if (sessionError) throw sessionError;
-
-      const userId = sessionData.session?.user.id;
-
-      if (!userId) {
-        setMessage("Please log in before completing onboarding.");
-        return;
-      }
-
-      const { data: profileData, error: profileError } =
-        await supabase
+      const [agreementResult, profileResult] = await Promise.all([
+        supabase
+          .from("user_legal_agreements")
+          .select("agreement_version")
+          .eq("user_id", userId)
+          .eq("agreement_version", LEGAL_AGREEMENT_VERSION)
+          .maybeSingle(),
+        supabase
           .from("profiles")
-          .select("display_name")
+          .select("display_name, terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at")
           .eq("id", userId)
-          .maybeSingle();
+          .maybeSingle(),
+      ]);
+      if (agreementResult.error) throw agreementResult.error;
+      if (profileResult.error) throw profileResult.error;
 
-      if (profileError) throw profileError;
-
-      if (!profileData?.display_name?.trim()) {
-        setMessage(
-          "Please complete your profile name before finishing onboarding."
-        );
+      const profile = profileResult.data;
+      if (profile?.display_name?.trim() &&
+        profile.terms_accepted_at &&
+        profile.privacy_accepted_at &&
+        profile.community_guidelines_accepted_at) {
+        router.replace("/timeline");
         return;
       }
+
+      const agreementRecorded = Boolean(agreementResult.data);
+      setHasRecordedAgreement(agreementRecorded);
+      if (agreementRecorded && profile?.display_name?.trim()) {
+        // Synchronise legacy agreement timestamps after the profile exists.
+        // Do not modify the old age_confirmed_at column.
+        const now = new Date().toISOString();
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            terms_accepted_at: now,
+            privacy_accepted_at: now,
+            community_guidelines_accepted_at: now,
+          })
+          .eq("id", userId);
+        if (updateError) throw updateError;
+        router.replace("/timeline");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to check your agreement.");
+    } finally {
+      setIsChecking(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    void refreshAgreement();
+    function handleProfileSaved() { void refreshAgreement(); }
+    window.addEventListener("fc:profile-saved", handleProfileSaved);
+    return () => window.removeEventListener("fc:profile-saved", handleProfileSaved);
+  }, [refreshAgreement]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!accepted || hasRecordedAgreement || isSubmitting) return;
+
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      if (!isSupabaseConfigured()) throw new Error("Supabase is not configured.");
+      const supabase = getSupabaseBrowserClient();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Please log in before completing onboarding.");
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!profile?.display_name?.trim()) {
+        throw new Error("Save your profile below, then finish onboarding.");
+      }
+
+      const { error: agreementError } = await supabase.rpc("accept_fc_legal_agreement_v1");
+      if (agreementError) throw agreementError;
 
       const now = new Date().toISOString();
-
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({
           terms_accepted_at: now,
           privacy_accepted_at: now,
           community_guidelines_accepted_at: now,
-          age_confirmed_at: now,
         })
         .eq("id", userId);
-
-      if (error) throw error;
-
-      setMessage("Onboarding acceptance recorded."); window.location.href = "/timeline";
+      if (updateError) throw updateError;
+      router.replace("/timeline");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      setMessage(error instanceof Error ? error.message : "Unable to save the agreement.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  if (isChecking) {
+    return <div className="mx-auto w-full max-w-2xl rounded-xl border bg-white p-4 text-sm text-gray-600">Checking your signup agreement…</div>;
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-xl border p-4 sm:gap-4 sm:p-6">
-      <div>
-        <h1 className="text-xl font-semibold leading-snug sm:text-2xl">Required onboarding acceptance</h1>
-        <p className="mt-2 text-sm leading-snug text-gray-600">
-          FieldsConnect MVP requires policy acceptance and 18+ confirmation before core features are enabled.
+    <section className="mx-auto w-full max-w-2xl rounded-xl border bg-white p-4 sm:p-6">
+      <h1 className="text-xl font-semibold">Complete your FieldsConnect setup</h1>
+      {hasRecordedAgreement ? (
+        <p className="mt-3 text-sm leading-6 text-gray-600">
+          Your agreement is already recorded. Save your profile below to continue.
         </p>
-      </div>
-
-      <label className="flex gap-3 text-sm">
-        <input type="checkbox" checked={accepted.termsAccepted} onChange={() => toggle("termsAccepted")} />
-        I accept the FieldsConnect Terms.
-      </label>
-
-      <label className="flex gap-3 text-sm">
-        <input type="checkbox" checked={accepted.privacyAccepted} onChange={() => toggle("privacyAccepted")} />
-        I accept the FieldsConnect Privacy Policy.
-      </label>
-
-      <label className="flex gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={accepted.communityGuidelinesAccepted}
-          onChange={() => toggle("communityGuidelinesAccepted")}
-        />
-        I accept the FieldsConnect Community Guidelines.
-      </label>
-
-      <label className="flex gap-3 text-sm">
-        <input type="checkbox" checked={accepted.ageConfirmed} onChange={() => toggle("ageConfirmed")} />
-        I confirm that I am 18 or older.
-      </label>
-
-      <button
-        className="w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-fit"
-        type="submit"
-        disabled={!canSubmit || isSubmitting}
-      >
-        {isSubmitting ? "Saving..." : "Complete onboarding"}
-      </button>
-
-      {message && <p className="text-sm text-gray-700">{message}</p>}
-    </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            If you joined before the signup agreement was added, confirm it below after saving your profile.
+          </p>
+          <LegalAgreementCheckbox
+            id="fc-onboarding-agreement"
+            checked={accepted}
+            onChange={setAccepted}
+          />
+          <button
+            className="w-fit rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            type="submit"
+            disabled={!accepted || isSubmitting}
+          >
+            {isSubmitting ? "Saving..." : "Continue to FieldsConnect"}
+          </button>
+        </form>
+      )}
+      {message && <p role="status" className="mt-3 text-sm text-gray-700">{message}</p>}
+    </section>
   );
 }
-

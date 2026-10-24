@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { LegalAgreementCheckbox, LEGAL_AGREEMENT_VERSION } from "@/components/onboarding/LegalAgreementCheckbox";
 
 type AuthMode = "login" | "signup" | "reset";
 
@@ -21,6 +22,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   const title =
     mode === "login"
@@ -35,7 +37,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     const { data: profile, error } = await supabase
       .from("profiles")
       .select(
-        "terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at, age_confirmed_at"
+        "terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at"
       )
       .eq("id", userId)
       .maybeSingle();
@@ -45,8 +47,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     const onboardingComplete =
       profile?.terms_accepted_at &&
       profile?.privacy_accepted_at &&
-      profile?.community_guidelines_accepted_at &&
-      profile?.age_confirmed_at;
+      profile?.community_guidelines_accepted_at;
 
     router.push(onboardingComplete ? "/timeline" : "/onboarding");
     router.refresh();
@@ -63,6 +64,11 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     if (mode === "signup" && password !== confirmPassword) {
       setMessage("The passwords do not match.");
+      return;
+    }
+
+    if (mode === "signup" && !agreementAccepted) {
+      setMessage("Please accept the FieldsConnect agreement before continuing.");
       return;
     }
 
@@ -90,6 +96,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/login`,
+            // User attestation at registration; the server stores an immutable
+            // versioned record when the account is first created.
+            data: {
+              fc_agreement_accepted: true,
+              fc_agreement_version: LEGAL_AGREEMENT_VERSION,
+            },
           },
         });
 
@@ -314,6 +326,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         </label>
       )}
 
+      {mode === "signup" && (
+        <LegalAgreementCheckbox
+          id="fc-signup-agreement"
+          checked={agreementAccepted}
+          onChange={setAgreementAccepted}
+        />
+      )}
+
       {mode === "login" && (
         <div className="text-right">
           <Link className="text-sm font-medium underline" href="/reset-password">
@@ -325,7 +345,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       <button
         className="min-h-12 rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || (mode === "signup" && !agreementAccepted)}
       >
         {isSubmitting ? "Please wait..." : title}
       </button>
