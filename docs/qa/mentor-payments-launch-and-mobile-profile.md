@@ -32,3 +32,12 @@ Check `/connections` for old `awaiting_payment` orders: history stays visible bu
 3. Test the full paid flow in an isolated, controlled release with a real settlement account, including failed and disputed payments.
 4. Explicitly enable the server secret and public client flag only after written go-live approval; deploy both Edge Functions and the frontend from the reviewed branch.
 5. Repeat mobile and payment regression testing, confirm test references are not live.
+
+## 24 October — mentor paid-pricing setup restored safely
+
+- The mentor profile payment/pricing panel is visible again in Preview without enabling checkout.
+- Pricing choices can be saved privately into `mentorship_payment_offer_drafts` (owner-only RLS), not `mentorship_payment_offers`. Existing offers, completed payment orders and payment policies are preserved.
+- Public paid mentorship requests and Paystack checkout remain disabled until both frontend `NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED=true` and server `FC_PAID_MENTORSHIPS_ENABLED=true` are explicitly approved and validated. The UI never changes either flag.
+- Payout banking forms stay hidden while checkout is off because the production Edge Function also denies bank-config writes until activation; existing payout readiness state remains visible as on-record, not verified live.
+- Before live activation: confirm Paystack Business status approved/pre-approved, Capitec settlement bank confirmation, live/test key environments, webhook signature delivery, mentor subaccount settlement correctness and processor fee treatment. Never copy keys into chat.
+- This update is a setup restoration, **not** permission to take payments. QA should verify draft persistence on profile reload, no public exposure of draft prices, existing free mentorship unaffected, and no Paystack redirect.

@@ -133,8 +133,9 @@ const initialMentorshipPricing: MentorshipPricingState = {
   },
 };
 
-// This opt-in is OFF until FC completes business banking,
-// Paystack production verification, and financial governance checks.
+// Restores private mentor pricing setup without enabling real transactions.
+// Only the separate public and server checkout flags authorize payment collection.
+const PAYMENT_SETUP_UI_ENABLED = true;
 const PUBLIC_PAID_MENTORSHIPS_ENABLED =
   process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
 
@@ -466,6 +467,10 @@ export function ProfileForm() {
             data: paymentOfferData,
             error: paymentOfferError,
           },
+          {
+            data: paymentDraftData,
+            error: paymentDraftError,
+          },
         ] = await Promise.all([
           supabase
             .from("profiles")
@@ -494,12 +499,17 @@ export function ProfileForm() {
               "duration, payment_mode, price_amount_minor, currency, is_active"
             )
             .eq("mentor_id", userId),
+          supabase
+            .from("mentorship_payment_offer_drafts")
+            .select("duration, payment_mode, price_amount_minor, currency")
+            .eq("mentor_id", userId),
         ]);
 
         if (profileError) throw profileError;
         if (mentorError) throw mentorError;
         if (paymentAccountError) throw paymentAccountError;
         if (paymentOfferError) throw paymentOfferError;
+        if (paymentDraftError) throw paymentDraftError;
 
         setMentorPaymentAccount(
           paymentAccountData
@@ -527,7 +537,12 @@ export function ProfileForm() {
             },
           };
 
-          for (const offer of paymentOfferData ?? []) {
+          // Persisted drafts take priority in the setup UI, without modifying
+          // existing active offers or their associated mentorship contracts.
+          const visiblePricing = PUBLIC_PAID_MENTORSHIPS_ENABLED
+            ? (paymentOfferData ?? [])
+            : [...(paymentOfferData ?? []), ...(paymentDraftData ?? [])];
+          for (const offer of visiblePricing) {
             const duration =
               offer.duration as MentorshipDuration;
 
@@ -1193,12 +1208,12 @@ export function ProfileForm() {
 
       for (const [duration, accepted] of paidDurations) {
         if (
-          PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+          PAYMENT_SETUP_UI_ENABLED &&
           accepted &&
           mentorshipPricing[duration].paymentMode ===
             "paid"
         ) {
-          if (!payoutReady) {
+          if (PUBLIC_PAID_MENTORSHIPS_ENABLED && !payoutReady) {
             setMessage(
               "Set up a payout account before offering paid mentorship."
             );
@@ -1299,9 +1314,33 @@ export function ProfileForm() {
 
         if (mentorError) throw mentorError;
 
-        // Preserve existing paid offers in test mode while launch is deferred.
-        // Never silently convert a paid offer into a free offer.
-        if (PUBLIC_PAID_MENTORSHIPS_ENABLED) {
+        // Keep production offers untouched during pre-launch preparation.
+        // Mentor-entered pricing is stored privately until payment activation.
+        if (!PUBLIC_PAID_MENTORSHIPS_ENABLED && PAYMENT_SETUP_UI_ENABLED) {
+          const draftRows = ([
+            ["3_months", mentorSettings.accepts3Month],
+            ["6_months", mentorSettings.accepts6Month],
+            ["1_year", mentorSettings.accepts1Year],
+            ["ongoing", mentorSettings.acceptsOngoing],
+          ] as const).map(([duration, accepted]) => {
+            const paymentMode = accepted && duration !== "ongoing"
+              ? mentorshipPricing[duration].paymentMode
+              : "free";
+            return {
+              mentor_id: userId,
+              duration,
+              payment_mode: paymentMode,
+              price_amount_minor: paymentMode === "paid"
+                ? parseMentorshipPriceMinor(duration)
+                : 0,
+              currency: "ZAR",
+            };
+          });
+          const { error: draftError } = await supabase
+            .from("mentorship_payment_offer_drafts")
+            .upsert(draftRows, { onConflict: "mentor_id,duration" });
+          if (draftError) throw draftError;
+        } else if (PUBLIC_PAID_MENTORSHIPS_ENABLED) {
           const offerRows = [
           {
             duration: "3_months" as const,
@@ -1360,11 +1399,7 @@ export function ProfileForm() {
         const { error: offerDisableError } =
           await supabase
             .from("mentorship_payment_offers")
-            .update({
-              is_active: false,
-              payment_mode: "free",
-              price_amount_minor: 0,
-            })
+            .update({ is_active: false })
             .eq("mentor_id", userId);
 
         if (offerDisableError) {
@@ -1374,7 +1409,9 @@ export function ProfileForm() {
 
       setMessage(
         form.mentorAvailable
-          ? "Profile and mentor settings saved."
+          ? PUBLIC_PAID_MENTORSHIPS_ENABLED
+            ? "Profile and mentor settings saved."
+            : "Profile saved. Any paid mentorship prices were saved as private drafts; checkout is still disabled."
           : "Profile saved."
       );
     } catch (error) {
@@ -1815,16 +1852,17 @@ export function ProfileForm() {
                   </div>
                 </fieldset>
 
-                {PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
+                {PAYMENT_SETUP_UI_ENABLED ? (
                 <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border bg-gray-50 p-3 sm:gap-4 sm:p-4">
                   <div>
                     <h3 className="font-semibold">
                       Mentorship payments
                     </h3>
                     <p className="mt-1 text-sm text-gray-600">
-                      Set up where you receive paid mentorship
-                      payouts and choose whether each mentorship
-                      period is free or paid.
+                      Choose free or paid programme pricing and review your payout setup.
+                      {PUBLIC_PAID_MENTORSHIPS_ENABLED
+                        ? " Approved paid requests use Paystack checkout."
+                        : " Paid prices are private drafts until Paystack and FieldsConnect approve live transactions."}
                     </p>
                   </div>
 
@@ -1837,7 +1875,9 @@ export function ProfileForm() {
                         {mentorPaymentAccount?.status ===
                           "active" &&
                         mentorPaymentAccount.can_receive_payments
-                          ? "Ready to receive payments"
+                          ? PUBLIC_PAID_MENTORSHIPS_ENABLED
+                            ? "Payout account configured"
+                            : "Payout account on record"
                           : mentorPaymentAccount?.status ===
                               "pending_verification"
                             ? "Pending verification"
@@ -1849,6 +1889,7 @@ export function ProfileForm() {
                       Your banking details are encrypted in transit and securely processed by our payment provider. FieldsConnect does not store banking details.
                     </p>
 
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
                     <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
                       <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
                         Bank
@@ -2004,6 +2045,14 @@ export function ProfileForm() {
                         </p>
                       )}
                     </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-gray-600">
+                        Bank account linking and changes will open after FieldsConnect verifies
+                        its Paystack business activation, settlement details and production
+                        credentials. Existing payout records are retained. Do not enter bank
+                        account numbers in mentorship feedback or profile text.
+                      </p>
+                    )}
                   </div>
 
                   <div className="w-full min-w-0 rounded-xl border bg-white p-3 sm:p-4">
@@ -2101,6 +2150,7 @@ export function ProfileForm() {
                                     <option
                                       value="paid"
                                       disabled={
+                                        PUBLIC_PAID_MENTORSHIPS_ENABLED &&
                                         !(
                                           mentorPaymentAccount?.status ===
                                             "active" &&
@@ -2150,7 +2200,14 @@ export function ProfileForm() {
                         )}
                     </div>
 
-                    {!(
+                    {!PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
+                      <p className="mt-3 text-xs leading-5 text-gray-600">
+                        Save your profile to retain these prices privately as drafts.
+                        Mentees cannot select or pay for draft offers. The existing
+                        15% FieldsConnect / 85% mentor allocation applies after launch,
+                        subject to processing fees and approved payment terms.
+                      </p>
+                    ) : !(
                       mentorPaymentAccount?.status ===
                         "active" &&
                       mentorPaymentAccount.can_receive_payments
