@@ -210,7 +210,7 @@ export function QuickOnboarding() {
             ONE QUICK STEP
           </span>
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">
-            Make FieldsConnect yours.
+            FieldsConnect - Connect and Grow.
           </h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-600 sm:text-base">
             Just the essentials for now. Your photo, skills, bio and mentorship preferences can come later.
