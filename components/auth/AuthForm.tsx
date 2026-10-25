@@ -33,23 +33,79 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function routeAfterLogin(userId: string) {
     const supabase = getSupabaseBrowserClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!authData.user || authData.user.id !== userId) {
+      throw new Error("Unable to verify your signed-in account.");
+    }
 
-    const { data: profile, error } = await supabase
+    const { data: existingProfile, error: profileLookupError } = await supabase
       .from("profiles")
-      .select(
-        "terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at"
-      )
+      .select("id, terms_accepted_at, privacy_accepted_at, community_guidelines_accepted_at")
       .eq("id", userId)
       .maybeSingle();
+    if (profileLookupError) throw profileLookupError;
 
-    if (error) throw error;
+    const completePolicies = Boolean(
+      existingProfile?.terms_accepted_at &&
+      existingProfile.privacy_accepted_at &&
+      existingProfile.community_guidelines_accepted_at
+    );
+    if (completePolicies) {
+      router.push("/timeline");
+      router.refresh();
+      return;
+    }
 
-    const onboardingComplete =
-      profile?.terms_accepted_at &&
-      profile?.privacy_accepted_at &&
-      profile?.community_guidelines_accepted_at;
+    // Require the protected server-side signup record, not user-editable
+    // metadata, as evidence of policy acknowledgement.
+    const { data: agreement, error: agreementError } = await supabase
+      .from("user_legal_agreements")
+      .select("agreement_version")
+      .eq("user_id", userId)
+      .eq("agreement_version", LEGAL_AGREEMENT_VERSION)
+      .maybeSingle();
+    if (agreementError) throw agreementError;
 
-    router.push(onboardingComplete ? "/timeline" : "/onboarding");
+    const hasAgreement = Boolean(agreement);
+    const now = new Date().toISOString();
+    const policyTimes = hasAgreement
+      ? {
+          terms_accepted_at: now,
+          privacy_accepted_at: now,
+          community_guidelines_accepted_at: now,
+        }
+      : {};
+
+    if (!existingProfile) {
+      // Provision the minimum private profile without guessing someone's
+      // school/career category or requiring another registration screen.
+      const local = authData.user.email?.split("@")[0] ?? "";
+      const provisionalName = local.replace(/[._-]+/g, " ").trim().slice(0, 120) || "New member";
+      const { error: createError } = await supabase.from("profiles").insert({
+        id: userId,
+        display_name: provisionalName,
+        role_type: null,
+        field: null,
+        profile_visibility: "private",
+        mentor_available: false,
+        ...policyTimes,
+      });
+      if (createError && createError.code !== "23505") throw createError;
+    } else if (hasAgreement) {
+      // Only fill missing legacy acceptance timestamps, keeping existing
+      // profile preferences and historical acceptance dates untouched.
+      const { error: updateError } = await supabase.from("profiles")
+        .update({
+          terms_accepted_at: existingProfile.terms_accepted_at ?? now,
+          privacy_accepted_at: existingProfile.privacy_accepted_at ?? now,
+          community_guidelines_accepted_at: existingProfile.community_guidelines_accepted_at ?? now,
+        })
+        .eq("id", userId);
+      if (updateError) throw updateError;
+    }
+
+    router.push(hasAgreement ? "/timeline" : "/onboarding");
     router.refresh();
   }
 

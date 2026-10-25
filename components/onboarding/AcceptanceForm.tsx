@@ -112,7 +112,7 @@ export function AcceptanceForm() {
         .maybeSingle();
       if (profileError) throw profileError;
       if (!profile?.display_name?.trim()) {
-        throw new Error("Save your profile below, then finish onboarding.");
+        throw new Error("Your account needs updating. Please sign out and sign in again.");
       }
 
       const { error: agreementError } = await supabase.rpc("accept_fc_legal_agreement_v1");
@@ -145,12 +145,12 @@ export function AcceptanceForm() {
       <h1 className="text-xl font-semibold">Complete your FieldsConnect setup</h1>
       {hasRecordedAgreement ? (
         <p className="mt-3 text-sm leading-6 text-gray-600">
-          Your agreement is already recorded. Save your profile below to continue.
+          Your agreement has already been recorded. Continue to FieldsConnect.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
           <p className="text-sm text-gray-600">
-            If you joined before the signup agreement was added, confirm it below after saving your profile.
+            You registered before the consolidated agreement was introduced. Confirm it once here to continue.
           </p>
           <LegalAgreementCheckbox
             id="fc-onboarding-agreement"

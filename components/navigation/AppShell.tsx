@@ -42,8 +42,6 @@ const publicRoutes = new Set([
   "/code-of-conduct",
   "/terms-of-use",
   "/privacy-policy",
-  // Non-production-only read-only onboarding demonstration.
-  "/onboarding/preview",
 ]);
 
 const suspensionAllowedRoutes = new Set([
