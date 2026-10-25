@@ -6,7 +6,7 @@ const sections: readonly PolicySection[] = [
     paragraphs:[
       "FieldsConnect is the South African business operating fieldsconnect.app and is the responsible party for personal information collected and used to operate its own platform, except where another party independently determines the purpose and means of processing. References to we, us and our mean that operating business.",
       "This notice applies to visitors, registered members, mentors, mentees and persons whose information is contained in reports or materials uploaded to FieldsConnect. It should be read with the Terms of Use and Community Guidelines.",
-      "The company's exact CIPC particulars, business address and publicly reachable Information Officer contact must be confirmed from the registered business record and displayed before this notice is released to Production as the final statutory disclosure."
+      "For enquiries about this Privacy Policy or the processing of your information, contact FieldsConnect through its Feedback and support facility. Requests concerning personal information are directed to the appropriate privacy contact for handling."
     ]
   },
   {
@@ -56,7 +56,7 @@ const sections: readonly PolicySection[] = [
     paragraphs:[
       "FieldsConnect aims to benefit learners at different educational levels, including talented young students. South Africa's POPIA places special restrictions on processing the personal information of children. Where a person is under 18, we must determine whether an applicable statutory authorisation exists, which may include prior consent from a legally competent person.",
       "A learner's acceptance of Terms, email confirmation or self-declaration does not prove guardian consent. Where legally required authorisation or adequate safeguards are not available, we may pause onboarding, restrict personal information processing, disable certain interactions, seek appropriate verification or close the account.",
-      "Child-safety arrangements may include limiting discoverability, direct contact, location sharing and off-platform solicitation; guardian or school involvement in mentorship; and enhanced moderation. We will not represent proposed safeguards as active until implemented and tested."
+      "Age-appropriate measures may include limits on profile visibility, direct contact or off-platform solicitation, as well as guardian or educational-institution involvement in certain mentorship activities. Access to features may be restricted when adequate safeguards or legally required permissions are not in place."
     ]
   },
   {
@@ -99,7 +99,7 @@ const sections: readonly PolicySection[] = [
     id:"cross-border", heading:"Storage and transfers outside South Africa",
     paragraphs:[
       "Cloud and payment infrastructure can involve processing or storage outside South Africa. International disclosures and transfers are assessed under POPIA section 72 and relevant protections, including suitable recipient safeguards or other lawful transfer grounds.",
-      "Provider location, transfer safeguards and contractual controls must be checked when services are configured or materially changed. We do not promise that every item of information remains physically stored in South Africa."
+      "We do not represent all information as being stored exclusively in South Africa. Processing by international service providers is subject to applicable safeguards and conditions under South African privacy law."
     ]
   },
   {
@@ -148,14 +148,14 @@ const sections: readonly PolicySection[] = [
     id:"cookies", heading:"Cookies and session technology",
     paragraphs:[
       "Authentication and security functions may use session cookies, local browser storage or comparable technical mechanisms to maintain your sign-in, protect access and provide requested services. Browser settings can affect these features.",
-      "If optional tracking, behavioural advertising or non-essential analytics technology is introduced, its purpose, provider and relevant consent or objection choices must be disclosed before deployment where required."
+      "For non-essential tracking or analytics, we provide information about its purpose and the applicable consent or objection choices where required."
     ]
   },
   {
     id:"automation", heading:"Automated processing and analytics",
     paragraphs:[
       "FieldsConnect may use software to rank or filter search results, surface notifications, enforce configuration rules, detect obvious misuse or calculate aggregated engagement measures. These functions do not amount to a promise of verified professional credentials or guaranteed mentorship outcomes.",
-      "We will consider additional legal requirements before deploying solely automated decisions that create significant legal or similarly substantial effects on an individual, and provide meaningful review where the law requires."
+      "If a decision with significant legal or comparable effects is made solely through automated processing, any applicable rights to notification, explanation, review or challenge are respected."
     ]
   },
   {
@@ -169,7 +169,7 @@ const sections: readonly PolicySection[] = [
     id:"requests", heading:"Privacy questions, correction and complaints",
     paragraphs:[
       "Signed-in users can submit a privacy or access request through the FieldsConnect Feedback centre and identify the request as intended for the Information Officer. Please do not include unnecessary identity-document scans or confidential data in an ordinary feedback request.",
-      "The public contact details and company particulars for formal PAIA or POPIA requests must be verified and published before this becomes the final statutory notice. The Information Regulator's official website is https://inforegulator.org.za/ for regulatory information and complaint procedures."
+      "You may also contact the Information Regulator of South Africa for information about privacy rights and its complaints procedure at https://inforegulator.org.za/."
     ]
   },
   {

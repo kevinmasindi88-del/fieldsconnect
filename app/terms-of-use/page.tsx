@@ -156,7 +156,7 @@ const sections: readonly PolicySection[] = [
     id:"contact", heading:"Contact and legal notices",
     paragraphs:[
       "Questions about account access, policy interpretation, mentorship disputes or platform conduct can be raised through FieldsConnect's in-app Feedback and support facility. Privacy enquiries should identify that they are for the Information Officer or privacy function.",
-      "Full statutory business-identification particulars, the registered contact address and direct legal/privacy contact channels must be verified against the company's CIPC and business records and published before these Terms are used as the final production disclosure. We do not substitute invented registration particulars or an unverified email address."
+      "FieldsConnect provides support for account, policy, privacy and dispute enquiries through its Feedback and support facility. Formal enquiries will be handled through the appropriate business or privacy contact."
     ]
   },
 ];
