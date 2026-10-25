@@ -1,5 +1,5 @@
 # FieldsConnect | Guardian-led admission and age assurance
-**Status:** Design approved for QA implementation planning only; NOT a live consent capability or a legal certification.  
+**Status:** Proposed architecture for review and QA implementation planning; NOT a live consent capability, approved release, or legal certification.  
 **Date:** 25 October 2026  
 **Owner:** Quality, Security & Continuous Improvement, with Product and Information Officer approval.
 
