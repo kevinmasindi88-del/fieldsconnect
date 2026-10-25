@@ -7,6 +7,8 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 import { LegalAgreementCheckbox, LEGAL_AGREEMENT_VERSION } from "@/components/onboarding/LegalAgreementCheckbox";
 
 type AuthMode = "login" | "signup" | "reset";
+type NetworkCategory = "student" | "professional" | "institution";
+const networkCategories: NetworkCategory[] = ["student", "professional", "institution"];
 
 type AuthFormProps = {
   mode: AuthMode;
@@ -15,6 +17,9 @@ type AuthFormProps = {
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [networkCategory, setNetworkCategory] = useState<NetworkCategory | "">("");
+  const [fieldOfInterest, setFieldOfInterest] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -78,15 +83,28 @@ export function AuthForm({ mode }: AuthFormProps) {
       : {};
 
     if (!existingProfile) {
-      // Provision the minimum private profile without guessing someone's
-      // school/career category or requiring another registration screen.
-      const local = authData.user.email?.split("@")[0] ?? "";
-      const provisionalName = local.replace(/[._-]+/g, " ").trim().slice(0, 120) || "New member";
+      // Signup already collects the member's name, category and field.
+      // Read those self-declared profile details after verified sign-in.
+      // User metadata is not used to grant any permissions or determine
+      // legal guardian consent; it is only source data for the user's profile.
+      const metadata = authData.user.user_metadata;
+      const storedName = typeof metadata?.display_name === "string"
+        ? metadata.display_name.trim().slice(0, 120)
+        : "";
+      const storedCategory = networkCategories.includes(metadata?.role_type as NetworkCategory)
+        ? (metadata.role_type as NetworkCategory)
+        : null;
+      const storedField = typeof metadata?.field === "string"
+        ? metadata.field.trim().slice(0, 120)
+        : "";
+      const emailLocal = authData.user.email?.split("@")[0] ?? "";
+      const provisionalName =
+        storedName || emailLocal.replace(/[._-]+/g, " ").trim().slice(0, 120) || "New member";
       const { error: createError } = await supabase.from("profiles").insert({
         id: userId,
         display_name: provisionalName,
-        role_type: null,
-        field: null,
+        role_type: storedCategory,
+        field: storedField || null,
         profile_visibility: "private",
         mentor_available: false,
         ...policyTimes,
@@ -134,6 +152,23 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
+    if (mode === "signup") {
+      const name = displayName.trim();
+      const interest = fieldOfInterest.trim();
+      if (name.length < 2 || name.length > 120) {
+        setMessage("Enter your name (2–120 characters).");
+        return;
+      }
+      if (!networkCategory) {
+        setMessage("Select your career or educational category.");
+        return;
+      }
+      if (interest.length < 2 || interest.length > 120) {
+        setMessage("Enter your field of interest (2–120 characters).");
+        return;
+      }
+    }
+
     if (mode === "signup" && password !== confirmPassword) {
       setMessage("The passwords do not match.");
       return;
@@ -171,6 +206,9 @@ export function AuthForm({ mode }: AuthFormProps) {
             // User attestation at registration; the server stores an immutable
             // versioned record when the account is first created.
             data: {
+              display_name: displayName.trim(),
+              role_type: networkCategory,
+              field: fieldOfInterest.trim(),
               fc_agreement_accepted: true,
               fc_agreement_version: LEGAL_AGREEMENT_VERSION,
             },
@@ -283,6 +321,54 @@ export function AuthForm({ mode }: AuthFormProps) {
           required
         />
       </label>
+
+      {mode === "signup" && (
+        <>
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Name
+            <input
+              autoComplete="name"
+              className="min-h-11 rounded-lg border px-3 py-2"
+              type="text"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              maxLength={120}
+              minLength={2}
+              placeholder="Your name"
+              required
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Career or educational category
+            <select
+              className="min-h-11 rounded-lg border px-3 py-2"
+              value={networkCategory}
+              onChange={(event) => setNetworkCategory(event.target.value as NetworkCategory | "")}
+              required
+            >
+              <option value="" disabled>Select a category</option>
+              <option value="student">Student / Learner</option>
+              <option value="professional">Professional</option>
+              <option value="institution">Institution</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Field of interest
+            <input
+              className="min-h-11 rounded-lg border px-3 py-2"
+              type="text"
+              value={fieldOfInterest}
+              onChange={(event) => setFieldOfInterest(event.target.value)}
+              maxLength={120}
+              minLength={2}
+              placeholder="e.g. Pharmacy, Engineering, Law"
+              required
+            />
+          </label>
+        </>
+      )}
 
       {mode !== "reset" && (
         <label className="flex flex-col gap-2 text-sm font-medium">
@@ -417,7 +503,11 @@ export function AuthForm({ mode }: AuthFormProps) {
       <button
         className="min-h-12 rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
         type="submit"
-        disabled={isSubmitting || (mode === "signup" && !agreementAccepted)}
+        disabled={
+          isSubmitting ||
+          (mode === "signup" &&
+            (!agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim()))
+        }
       >
         {isSubmitting ? "Please wait..." : title}
       </button>
