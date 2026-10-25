@@ -38,6 +38,7 @@ const publicRoutes = new Set([
   "/",
   "/login",
   "/signup",
+  "/guardian-registration",
   "/reset-password",
   "/code-of-conduct",
   "/terms-of-use",

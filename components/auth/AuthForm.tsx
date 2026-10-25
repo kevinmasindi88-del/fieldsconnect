@@ -28,6 +28,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [isAdultDeclared, setIsAdultDeclared] = useState(false);
 
   const title =
     mode === "login"
@@ -153,6 +154,10 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
 
     if (mode === "signup") {
+      if (!isAdultDeclared) {
+        setMessage("If you are under 18, please use the guardian-assisted registration route.");
+        return;
+      }
       const name = displayName.trim();
       const interest = fieldOfInterest.trim();
       if (name.length < 2 || name.length > 120) {
@@ -209,6 +214,8 @@ export function AuthForm({ mode }: AuthFormProps) {
               display_name: displayName.trim(),
               role_type: networkCategory,
               field: fieldOfInterest.trim(),
+              // Age is self-declared: this is not verified identity or guardian consent.
+              fc_age_18_plus_declared: true,
               fc_agreement_accepted: true,
               fc_agreement_version: LEGAL_AGREEMENT_VERSION,
             },
@@ -338,6 +345,29 @@ export function AuthForm({ mode }: AuthFormProps) {
           required
         />
       </label>
+
+      {mode === "signup" && (
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-800">
+            <input
+              type="checkbox"
+              id="fc-age-18-plus"
+              checked={isAdultDeclared}
+              onChange={(event) => setIsAdultDeclared(event.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 accent-blue-700"
+            />
+            <span>I confirm that I am 18 years old or older.</span>
+          </label>
+          {!isAdultDeclared && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+              <p>Under 18? Your parent or legal guardian can help you register through the guardian-assisted process.</p>
+              <Link className="mt-2 inline-flex font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900" href="/guardian-registration">
+                Guardian-assisted registration
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {mode === "signup" && (
         <>
@@ -508,7 +538,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         disabled={
           isSubmitting ||
           (mode === "signup" &&
-            (!agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim()))
+            (!isAdultDeclared || !agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim()))
         }
       >
         {isSubmitting ? "Please wait..." : title}

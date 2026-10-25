@@ -24,3 +24,8 @@ Publish user rights and member duties in clear, calm language. Store moderator p
 - POPIA: https://www.justice.gov.za/legislation/acts/2013-004.pdf
 - ECTA: https://lawlibrary.org.za/akn/za/act/2002/25/eng%402021-12-01
 - CPA: https://lawlibrary.org.za/akn/za/act/2008/68/eng%402015-03-13
+
+## Age-declaration frontend update (25 October 2026)
+- Adult members self-confirm being 18+ with a dedicated checkbox. No routine DOB or government ID collection for adults. The legal/COC agreement remains one separate checkbox.
+- Unchecked declaration blocks the ordinary signup action and offers a guardian-assisted information route. No guardian PII is collected while secure consent approval is unavailable.
+- Account authorisation remains a server-side concern. Until guardian consent and backend enforcement ship, this is a UI routing and self-attestation change, **not verified age assurance**.

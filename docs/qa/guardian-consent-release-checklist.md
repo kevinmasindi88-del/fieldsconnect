@@ -3,8 +3,11 @@
 **Release state:** Blocked until each high-priority item below is implemented and evidenced.
 
 ## Functional paths
-- [ ] Adult (18+) completes existing name-first single signup form, DOB or permitted age check, one policy checkbox, email verification and direct timeline access.
-- [ ] Under-18 member sees the guardian route *before* unrestricted account creation or data processing.
+- [x] QA frontend displays a separate adult self-declaration checkbox alongside the consolidated policy agreement.
+- [x] If adult checkbox is unchecked, ordinary signup is blocked and the guardian-assisted route is offered without collecting guardian details.
+- [ ] Adult (18+) completes existing name-first single signup form, adult self-declaration checkbox, one policy checkbox, email verification and direct timeline access; no routine adult DOB or ID collection.
+- [x] Guardian information route is accessible without authentication; it accurately states secure approval is not yet available.
+- [ ] Guardian approval system is implemented and account admission is restricted at server/database level, not merely the signup UI.
 - [ ] Guardian enters full name, requested DOB/age evidence, relationship, independently reachable email and positive, specific consent.
 - [ ] Guardian email verified by one-time expiring link; this alone does not promote status to legal guardian authority verified.
 - [ ] Adult age and relationship authority checked under a documented proportionate risk model.

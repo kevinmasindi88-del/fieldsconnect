@@ -9,7 +9,7 @@ FieldsConnect supports legitimate educational and professional networking. A lea
 **Primary legal reference:** Information Regulator, *Guidance Note on Processing Personal Information of Children* (28 June 2021), https://www.inforegulator.org.za/wp-content/uploads/2020/07/GuidanceNote-Processing-PersonalInformation-Children-20210628-1.pdf .
 
 ## Non-negotiable outcomes
-1. Adults keep exactly two registration stages: a single FieldsConnect signup form, then email confirmation. Date of birth or an age/eligibility check may be embedded in that first form, without a post-verification wizard.
+1. Adults keep exactly two registration stages: a single FieldsConnect signup form with a **self-declaration checkbox** ("I confirm that I am 18 years old or older"), then email confirmation. Adults are not routinely asked for DOB, government ID or guardian details.
 2. A protected younger member cannot be discoverable, message, connect, upload, accept mentorship or access other authenticated services before lawful adult authorisation.
 3. Guardian approval is obtained and recorded **before** creating or activating a child's networking account, except for narrowly necessary, lawful pre-consent handling that the Information Officer has approved. Prefer adult/guardian initiation over capturing the child's account data in advance.
 4. User-editable Supabase `user_metadata` is never used as proof of guardian authorisation, an age-based access entitlement, or for any RLS decision.
@@ -18,11 +18,12 @@ FieldsConnect supports legitimate educational and professional networking. A lea
 
 ## User flow
 **A. Adult (18+)**
-- Signup collects Name, Email, category, Field of interest, date of birth/eligible age check, Password, Confirmation and one consolidated agreement checkbox. No additional profile step.
-- The adult verifies their email and enters FieldsConnect.
-- DOB should not be public. The Information Officer must approve whether full DOB is needed in long-term storage, or whether a server-side over-18 result is sufficient.
+- Signup collects Name, Email, category, Field of interest, Password and Confirmation, plus an adult age-declaration checkbox and one consolidated policy agreement checkbox. No additional profile step.
+- When adult status is self-declared, signup and email verification proceed normally, without routine DOB or identity checks.
+- Record the declared adult status separately from formal guardian authorisation. Self-declaration is an ordinary eligibility signal, **not independently verified proof** of age. Apply additional checks only to specific safety concerns or risk-based cases.
 
 **B. Protected learner (under 18)**
+- An **unchecked 18+ checkbox** reveals the guardian-assisted route and prevents ordinary adult signup. The age-declaration option does not automatically treat every unchecked box as proof the applicant is a child: the guardian path is available to anyone unable to make that declaration.
 - Signup distinguishes adult registration from guardian-assisted enrolment *before* capturing or publishing the learner's full account information.
 - Guardian starts a separate secure request, is given a plain-language notice covering the learner's profile, search/discovery, direct messaging, mentors, file sharing, data processors and reporting.
 - Guardian provides full name, DOB for age assessment where necessary, verified email, relationship/legal authority and a signed affirmative authorisation to specific processing. Collect the least sensitive proof appropriate to the level of risk.
