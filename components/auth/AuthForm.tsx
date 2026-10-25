@@ -10,6 +10,27 @@ type AuthMode = "login" | "signup" | "reset";
 type NetworkCategory = "student" | "professional" | "institution";
 const networkCategories: NetworkCategory[] = ["student", "professional", "institution"];
 
+function isAdultDateOfBirth(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return false;
+  const now = new Date();
+  let age = now.getFullYear() - year;
+  if (
+    now.getMonth() + 1 < month ||
+    (now.getMonth() + 1 === month && now.getDate() < day)
+  ) age--;
+  return age >= 18;
+}
+
 type AuthFormProps = {
   mode: AuthMode;
 };
@@ -29,6 +50,10 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [signupComplete, setSignupComplete] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [isAdultDeclared, setIsAdultDeclared] = useState(false);
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianDateOfBirth, setGuardianDateOfBirth] = useState("");
+  const [guardianEmail, setGuardianEmail] = useState("");
+  const [guardianApproved, setGuardianApproved] = useState(false);
 
   const title =
     mode === "login"
@@ -155,8 +180,22 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     if (mode === "signup") {
       if (!isAdultDeclared) {
-        setMessage("If you are under 18, please use the guardian-assisted registration route.");
-        return;
+        if (guardianName.trim().length < 2) {
+          setMessage("Enter the parent or guardian's name.");
+          return;
+        }
+        if (!isAdultDateOfBirth(guardianDateOfBirth)) {
+          setMessage("Enter a valid adult date of birth.");
+          return;
+        }
+        if (!guardianEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim())) {
+          setMessage("Enter the parent or guardian's email.");
+          return;
+        }
+        if (!guardianApproved) {
+          setMessage("The parent or guardian must confirm approval.");
+          return;
+        }
       }
       const name = displayName.trim();
       const interest = fieldOfInterest.trim();
@@ -214,8 +253,13 @@ export function AuthForm({ mode }: AuthFormProps) {
               display_name: displayName.trim(),
               role_type: networkCategory,
               field: fieldOfInterest.trim(),
-              // Age is self-declared: this is not verified identity or guardian consent.
-              fc_age_18_plus_declared: true,
+              fc_age_18_plus_declared: isAdultDeclared,
+              ...(!isAdultDeclared ? {
+                fc_guardian_name: guardianName.trim(),
+                fc_guardian_dob: guardianDateOfBirth,
+                fc_guardian_email: guardianEmail.trim().toLowerCase(),
+                fc_guardian_approved: guardianApproved,
+              } : {}),
               fc_agreement_accepted: true,
               fc_agreement_version: LEGAL_AGREEMENT_VERSION,
             },
@@ -359,11 +403,50 @@ export function AuthForm({ mode }: AuthFormProps) {
             <span>I confirm that I am 18 years old or older.</span>
           </label>
           {!isAdultDeclared && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
-              <p>Under 18? Your parent or legal guardian can help you register through the guardian-assisted process.</p>
-              <Link className="mt-2 inline-flex font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900" href="/guardian-registration">
-                Guardian-assisted registration
-              </Link>
+            <div className="space-y-3 rounded-xl border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-gray-950">Parent or guardian details</h2>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Name
+                <input
+                  autoComplete="name"
+                  className="min-h-11 rounded-lg border px-3 py-2"
+                  value={guardianName}
+                  onChange={(event) => setGuardianName(event.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Date of birth
+                <input
+                  type="date"
+                  className="min-h-11 rounded-lg border px-3 py-2"
+                  value={guardianDateOfBirth}
+                  onChange={(event) => setGuardianDateOfBirth(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-medium">
+                Email
+                <input
+                  autoComplete="email"
+                  type="email"
+                  className="min-h-11 rounded-lg border px-3 py-2"
+                  value={guardianEmail}
+                  onChange={(event) => setGuardianEmail(event.target.value)}
+                  maxLength={254}
+                  required
+                />
+              </label>
+              <label className="flex items-start gap-3 text-sm leading-6 text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={guardianApproved}
+                  onChange={(event) => setGuardianApproved(event.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 accent-blue-700"
+                />
+                <span>I am the parent or legal guardian and approve this registration.</span>
+              </label>
             </div>
           )}
         </div>
@@ -538,7 +621,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         disabled={
           isSubmitting ||
           (mode === "signup" &&
-            (!isAdultDeclared || !agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim()))
+            (!agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim() ||
+              (!isAdultDeclared && (!guardianName.trim() || !guardianDateOfBirth || !guardianEmail.trim() || !guardianApproved))))
         }
       >
         {isSubmitting ? "Please wait..." : title}

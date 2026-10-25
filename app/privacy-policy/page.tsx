@@ -13,6 +13,7 @@ const sections: readonly PolicySection[] = [
     id:"what-we-collect", heading:"Personal information collected",
     paragraphs:[
       "Depending on features you use, we may collect registration details (email address and authentication/account identifiers); profile details (display name, username, photo, field, study or career level, biography, skills and experience); and mentorship details (offers, requests, objectives, communications, plans, milestones, reviews and completion feedback).",
+      "Where a parent or legal guardian approves registration for a member under 18, we also collect the adult's name, date of birth and email to record that approval. Those details are not displayed in the member's public profile.",
       "We may also process posts, reactions, comments, connections, uploaded files, notifications, support requests, moderation reports and appeal evidence, and transaction references if paid features are enabled. Some uploads or free-text fields may inadvertently include personal information about other people. Please share only information you are authorised to provide."
     ]
   },
