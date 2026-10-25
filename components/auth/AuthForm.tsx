@@ -10,6 +10,18 @@ type AuthMode = "login" | "signup" | "reset";
 type NetworkCategory = "student" | "professional" | "institution";
 const networkCategories: NetworkCategory[] = ["student", "professional", "institution"];
 
+function getGuardianContact(value: string): { email: string | null; phone: string | null } | null {
+  const contact = value.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) && contact.length <= 254) {
+    return { email: contact.toLowerCase(), phone: null };
+  }
+  const phone = contact.replace(/[\s().-]/g, "");
+  if (/^(?:\+[1-9]\d{6,14}|0\d{9})$/.test(phone)) {
+    return { email: null, phone };
+  }
+  return null;
+}
+
 function isAdultDateOfBirth(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return false;
@@ -52,7 +64,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [isAdultDeclared, setIsAdultDeclared] = useState(false);
   const [guardianName, setGuardianName] = useState("");
   const [guardianDateOfBirth, setGuardianDateOfBirth] = useState("");
-  const [guardianEmail, setGuardianEmail] = useState("");
+  const [guardianContact, setGuardianContact] = useState("");
   const [guardianApproved, setGuardianApproved] = useState(false);
 
   const title =
@@ -188,8 +200,8 @@ export function AuthForm({ mode }: AuthFormProps) {
           setMessage("Enter a valid adult date of birth.");
           return;
         }
-        if (!guardianEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim())) {
-          setMessage("Enter the parent or guardian's email.");
+        if (!getGuardianContact(guardianContact)) {
+          setMessage("Enter the parent or guardian's email or contact number.");
           return;
         }
         if (!guardianApproved) {
@@ -257,7 +269,8 @@ export function AuthForm({ mode }: AuthFormProps) {
               ...(!isAdultDeclared ? {
                 fc_guardian_name: guardianName.trim(),
                 fc_guardian_dob: guardianDateOfBirth,
-                fc_guardian_email: guardianEmail.trim().toLowerCase(),
+                fc_guardian_email: getGuardianContact(guardianContact)?.email,
+                fc_guardian_phone: getGuardianContact(guardianContact)?.phone,
                 fc_guardian_approved: guardianApproved,
               } : {}),
               fc_agreement_accepted: true,
@@ -427,13 +440,13 @@ export function AuthForm({ mode }: AuthFormProps) {
                 />
               </label>
               <label className="flex flex-col gap-2 text-sm font-medium">
-                Email
+                Email or contact number
                 <input
-                  autoComplete="email"
-                  type="email"
+                  type="text"
                   className="min-h-11 rounded-lg border px-3 py-2"
-                  value={guardianEmail}
-                  onChange={(event) => setGuardianEmail(event.target.value)}
+                  value={guardianContact}
+                  onChange={(event) => setGuardianContact(event.target.value)}
+                  placeholder="Email or mobile number"
                   maxLength={254}
                   required
                 />
@@ -622,7 +635,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           isSubmitting ||
           (mode === "signup" &&
             (!agreementAccepted || !displayName.trim() || !networkCategory || !fieldOfInterest.trim() ||
-              (!isAdultDeclared && (!guardianName.trim() || !guardianDateOfBirth || !guardianEmail.trim() || !guardianApproved))))
+              (!isAdultDeclared && (!guardianName.trim() || !guardianDateOfBirth || !guardianContact.trim() || !guardianApproved))))
         }
       >
         {isSubmitting ? "Please wait..." : title}
