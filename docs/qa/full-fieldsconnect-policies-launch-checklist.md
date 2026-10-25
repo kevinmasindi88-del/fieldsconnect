@@ -27,3 +27,12 @@
 ## Public-facing policy editorial rule
 - Internal compliance to-dos, unresolved administrative verification statements and wording about whether policies may be 'released to Production' belong in this internal checklist, not on public Terms or Privacy pages.
 - The business is already CIPC-registered; never imply otherwise. Exact published contact and registration details must come from confirmed records, not invented placeholders.
+
+## 25 October 2026 editorial review
+- Reviewed all public pages: Terms of Use, Privacy Policy and Community Guidelines, plus the shared policy page wrapper.
+- Removed release-stage jargon (Production, activation gates, draft price configuration), engineering internals (payment redirect, moderator authorisations/audit controls), and repetitive or self-undermining legal caveats.
+- Preserved disclosures on consumer rights, privacy, information sharing, restrictions on children's information, security and fraud; no blanket waivers or invented legal details.
+- Align the Privacy Policy's required registration data with the current sign-up form: Name, Email, Career/educational category, Field, Password.
+- Verify an externally accessible direct privacy/business contact and exact legal business particulars before public statutory disclosure; internal checklist language must never appear in user-facing copy. Refer to POPIA s18 and ECTA s43 for applicable duties.
+- Payment and moderation descriptions must match actual released features and notices. Do not claim Paystack/live payment is already active.
+- Treat these edits as editorial clarifications of v1. If a material obligation or consent mechanism changes, plan a new agreement version and renewed acceptance.

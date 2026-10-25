@@ -20,7 +20,7 @@ const sections: readonly PolicySection[] = [
     id:"automatically-collected", heading:"Technical and usage information",
     paragraphs:[
       "We and our infrastructure providers may process technical information needed to deliver, secure and diagnose the service, such as browser/device characteristics, IP-related network data, timestamps, sign-in events, application errors, session identifiers and platform usage records.",
-      "We use only the technical records and device permissions necessary for enabled functionality, security, analytics or support. Push notifications, where supported and permissioned, may use device notification subscription details. Specific third-party analytics or advertising tools will require corresponding disclosures if added."
+      "Technical data supports account access, platform security, service reliability and usage analysis. Optional push notifications, where available and enabled by a member, use notification subscription information. We explain any additional tracking or analytics uses where required."
     ]
   },
   {
@@ -41,21 +41,21 @@ const sections: readonly PolicySection[] = [
     id:"lawful-bases", heading:"Lawful grounds for processing",
     paragraphs:[
       "We assess processing against the applicable grounds in POPIA, including consent where required, steps necessary to enter or perform an agreement, compliance with legal duties, protection of legitimate interests of the data subject and pursuit of legitimate interests of FieldsConnect or recipients in the manner permitted by law.",
-      "A single signup agreement is evidence of accepting platform rules, not an all-purpose waiver of privacy rights, not blanket consent for unrelated marketing and not by itself adequate prior consent for a child where POPIA requires consent of a competent person."
+      "Acceptance of the platform Terms does not remove your privacy rights. Where separate consent is legally required, including for certain marketing or children's information, it is addressed under the applicable legal requirements."
     ]
   },
   {
     id:"required-optional", heading:"Required and optional information",
     paragraphs:[
-      "Email, authentication information and selected core profile details are ordinarily required to provide an identified account. Other profile fields, biography, avatar, skills, optional resources and many community interactions are voluntary. We indicate required input in the interface where practical.",
+      "A name, email address, career or educational category, field of interest and authentication information are required to register a FieldsConnect account. Other profile fields, biography, avatar, skills, optional resources and many community interactions are voluntary. We indicate required input in the interface where practical.",
       "Declining optional information can limit matching, discovery or certain features but does not automatically prevent access to unrelated functions. A failure to provide essential information or lawful authorisation may prevent us from opening an account or supplying the requested service."
     ]
   },
   {
     id:"children", heading:"Children and younger learners",
     paragraphs:[
-      "FieldsConnect aims to benefit learners at different educational levels, including talented young students. South Africa's POPIA places special restrictions on processing the personal information of children. Where a person is under 18, we must determine whether an applicable statutory authorisation exists, which may include prior consent from a legally competent person.",
-      "A learner's acceptance of Terms, email confirmation or self-declaration does not prove guardian consent. Where legally required authorisation or adequate safeguards are not available, we may pause onboarding, restrict personal information processing, disable certain interactions, seek appropriate verification or close the account.",
+      "FieldsConnect aims to benefit learners at different educational levels, including talented young students. South Africa's POPIA places special restrictions on processing the personal information of children. Processing children's information is subject to the lawful permissions and safeguards required in the circumstances, which may include consent from a legally competent parent or guardian.",
+      "Where parental or guardian permission is legally necessary, it must be obtained independently of ordinary account registration. FieldsConnect may limit account access or relevant interactions where additional lawful permissions or safety safeguards are required.",
       "Age-appropriate measures may include limits on profile visibility, direct contact or off-platform solicitation, as well as guardian or educational-institution involvement in certain mentorship activities. Access to features may be restricted when adequate safeguards or legally required permissions are not in place."
     ]
   },
@@ -70,7 +70,7 @@ const sections: readonly PolicySection[] = [
     id:"direct-messages", heading:"Messages and mentoring materials",
     paragraphs:[
       "Direct messages, mentorship workspaces, plans, evidence, shared documents and library items are processed to deliver interactions requested by participating users. Visibility depends on their feature-specific rules and selected sharing controls.",
-      "Authorised staff or moderators may need limited access to relevant evidence when a report, safety incident, dispute, technical fault or legal request requires it. Such access should be role-restricted, proportionate, logged where supported and subject to confidentiality requirements."
+      "Authorised FieldsConnect personnel may access information relevant to a reported safety concern, dispute, technical issue or lawful request. Access is limited to the purpose of the enquiry and governed by applicable privacy and confidentiality obligations."
     ]
   },
   {
@@ -83,8 +83,8 @@ const sections: readonly PolicySection[] = [
   {
     id:"payments", heading:"Payments and payouts",
     paragraphs:[
-      "If paid mentorship is enabled, we and our authorised payment provider, expected to include Paystack, may process prices, order identifiers, transaction references, outcome, settlement status, refund status, payout-account codes and related audit information. Bank-account entry and transaction collection should take place through designated secured provider workflows.",
-      "FieldsConnect should not require members to post full account numbers, card details or secret credentials in profile or message fields. Whether and how the payment provider processes account details is subject to the provider's privacy documents. Paid mentorship checkout remains unavailable until production activation and associated controls are approved."
+      "Where paid mentorship is offered, FieldsConnect and the identified payment provider may process order references, price, payment status, settlement details, refund information and related transaction records necessary to provide the service.",
+      "Members should not share card details, banking credentials or one-time security codes through posts, direct messages or profile fields. Payment providers process relevant financial data under their applicable privacy notices and service terms."
     ]
   },
   {
@@ -92,20 +92,20 @@ const sections: readonly PolicySection[] = [
     paragraphs:[
       "We share necessary information with other users according to your chosen visibility settings or actions, and with the people involved in your requested mentorship or transaction. We may use authorised providers for hosting, database and authentication services, content delivery, notifications, payment services and operational support.",
       "The current application is deployed using Vercel and Supabase infrastructure; Paystack is the intended processor for paid mentorships. Vendors may act as operators or independent responsible parties for their own purposes. We may disclose information when required by law, to respond to a lawful authority or to protect individuals from serious harm.",
-      "We do not treat a member's decision to connect with another member as permission to sell private profile, message or mentorship data to that person."
+      "Connecting with another member does not give that member permission to access or use your private messages, mentorship records or non-public profile information beyond the access made available through FieldsConnect."
     ]
   },
   {
     id:"cross-border", heading:"Storage and transfers outside South Africa",
     paragraphs:[
-      "Cloud and payment infrastructure can involve processing or storage outside South Africa. International disclosures and transfers are assessed under POPIA section 72 and relevant protections, including suitable recipient safeguards or other lawful transfer grounds.",
+      "Cloud and payment infrastructure can involve processing or storage outside South Africa. Transfers of personal information outside South Africa are subject to POPIA's cross-border transfer requirements, including applicable safeguards or other lawful grounds.",
       "We do not represent all information as being stored exclusively in South Africa. Processing by international service providers is subject to applicable safeguards and conditions under South African privacy law."
     ]
   },
   {
     id:"security", heading:"Security and access controls",
     paragraphs:[
-      "FieldsConnect seeks to use appropriate technical and organisational measures to protect personal information from loss, unauthorised access, disclosure and alteration. Measures may include authentication, access permissions, row-level database controls, role restrictions, secure transport, moderation safeguards, service monitoring and controlled deployments.",
+      "FieldsConnect uses account authentication, access permissions, secure data transmission and database access controls to help protect personal information. We review security measures as the service and associated risks evolve.",
       "No internet service is risk-free. Users should safeguard passwords, avoid suspicious links and promptly report suspected compromise. Do not email or post passwords, recovery tokens, card numbers or full payout credentials to other users."
     ]
   },
@@ -120,7 +120,7 @@ const sections: readonly PolicySection[] = [
     id:"retention", heading:"Retention and deletion",
     paragraphs:[
       "We retain personal information only as long as necessary for an identified lawful purpose, a legal retention duty, a legitimate dispute or fraud investigation, or another basis allowed by law. The specific period depends on the record: for example, a live account profile differs from a payment audit or moderation decision.",
-      "When continued retention is unnecessary or unlawful, information should be deleted, destroyed or de-identified in a manner appropriate to the record and applicable requirements. Deletion from a public view may not immediately remove lawfully retained audit or backup copies; access to those copies should remain restricted."
+      "Information is deleted or de-identified when it is no longer needed for a lawful purpose, subject to applicable retention obligations. Removing content from public view may not immediately remove records held for a valid legal, security or backup purpose."
     ]
   },
   {
@@ -140,7 +140,7 @@ const sections: readonly PolicySection[] = [
   {
     id:"marketing", heading:"Marketing and communications",
     paragraphs:[
-      "We may send essential service messages about account security, moderation, requested mentorships, transactions, legal updates and operational changes. We should not treat acceptance of platform Terms as consent to unrelated direct electronic marketing.",
+      "FieldsConnect may send essential service messages about account security, requested mentorships, transactions, community-safety decisions and operational updates. Registration does not automatically opt you into unrelated direct electronic marketing.",
       "Where direct marketing requires consent or another lawful ground, we will use the applicable mechanism and provide appropriate opt-out choices. Disabling optional notifications does not necessarily disable essential security notices."
     ]
   },
@@ -155,7 +155,7 @@ const sections: readonly PolicySection[] = [
     id:"automation", heading:"Automated processing and analytics",
     paragraphs:[
       "FieldsConnect may use software to rank or filter search results, surface notifications, enforce configuration rules, detect obvious misuse or calculate aggregated engagement measures. These functions do not amount to a promise of verified professional credentials or guaranteed mentorship outcomes.",
-      "If a decision with significant legal or comparable effects is made solely through automated processing, any applicable rights to notification, explanation, review or challenge are respected."
+      "Where legally significant decisions involve automated processing, the protections and review rights required by applicable law apply."
     ]
   },
   {
@@ -168,7 +168,7 @@ const sections: readonly PolicySection[] = [
   {
     id:"requests", heading:"Privacy questions, correction and complaints",
     paragraphs:[
-      "Signed-in users can submit a privacy or access request through the FieldsConnect Feedback centre and identify the request as intended for the Information Officer. Please do not include unnecessary identity-document scans or confidential data in an ordinary feedback request.",
+      "Privacy and personal-information requests can be submitted through FieldsConnect's Feedback and support facility, with a note that the enquiry concerns privacy. Avoid sharing passwords, unnecessary identification documents or confidential third-party information in general support messages.",
       "You may also contact the Information Regulator of South Africa for information about privacy rights and its complaints procedure at https://inforegulator.org.za/."
     ]
   },

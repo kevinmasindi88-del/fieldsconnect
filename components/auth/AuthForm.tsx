@@ -310,6 +310,23 @@ export function AuthForm({ mode }: AuthFormProps) {
         )}
       </div>
 
+      {mode === "signup" && (
+        <label className="flex flex-col gap-2 text-sm font-medium">
+            Name
+            <input
+              autoComplete="name"
+              className="min-h-11 rounded-lg border px-3 py-2"
+              type="text"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              maxLength={120}
+              minLength={2}
+              placeholder="Your name"
+              required
+            />
+        </label>
+      )}
+
       <label className="flex flex-col gap-2 text-sm font-medium">
         Email
         <input
@@ -324,21 +341,6 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       {mode === "signup" && (
         <>
-          <label className="flex flex-col gap-2 text-sm font-medium">
-            Name
-            <input
-              autoComplete="name"
-              className="min-h-11 rounded-lg border px-3 py-2"
-              type="text"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              maxLength={120}
-              minLength={2}
-              placeholder="Your name"
-              required
-            />
-          </label>
-
           <label className="flex flex-col gap-2 text-sm font-medium">
             Career or educational category
             <select

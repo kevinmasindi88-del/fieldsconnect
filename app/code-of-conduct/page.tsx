@@ -27,7 +27,7 @@ const sections: readonly PolicySection[] = [
     paragraphs:[
       "Any communication with a child must be appropriate to an educational or professional purpose, respectful of the child's age, and consistent with applicable guardian, institutional and platform rules. Adults must not exploit their position, solicit romantic or sexual engagement with minors, request intimate images, groom learners, or use mentorship to gain inappropriate personal control.",
       "Do not pressure children to share their school timetable, live location, home address, personal number, family details, identity documents, bank information or other unnecessary sensitive information. Do not persuade a young learner to bypass guardian or school involvement or move communications off-platform to avoid scrutiny.",
-      "Report suspected grooming, exploitation or unsafe contact promptly. FieldsConnect may restrict access, preserve relevant evidence and involve appropriate authorities where lawful or required. A policy checkbox does not by itself verify legal guardian permission."
+      "Report suspected grooming, exploitation or unsafe contact promptly. FieldsConnect may restrict access, preserve relevant evidence and involve appropriate authorities where lawful or required."
     ]
   },
   {
@@ -49,7 +49,7 @@ const sections: readonly PolicySection[] = [
     paragraphs:[
       "Do not request money, bank login credentials, PINs, OTPs or card details by private message or through profile posts. Do not claim that an unverified transfer will activate a FieldsConnect mentorship. Approved paid transactions must use the platform's official checkout when the payment system is live.",
       "Investment scams, fraudulent sponsorships, fabricated jobs, fake scholarships, deceptive referrals, fake payment confirmations, chargeback abuse and coercive fee demands are prohibited.",
-      "Paid mentorship is not live merely because a mentor has configured a draft price. Users must not solicit payments in circumvention of the platform's applicable arrangements."
+      "Paid mentorship transactions, where available, are arranged through the platform's designated payment process. Users must not solicit unofficial payments while presenting them as FieldsConnect transactions."
     ]
   },
   {
@@ -97,22 +97,22 @@ const sections: readonly PolicySection[] = [
   {
     id:"investigations", heading:"Fair moderation and evidence",
     paragraphs:[
-      "Moderators assess reports on their available evidence, severity, likelihood of harm, prior conduct and applicable law. A report alone does not prove misconduct. Relevant evidence should be viewed only by authorised personnel and handled confidentially.",
-      "Moderators must record material decisions, avoid conflicts of interest, protect reporters where feasible and offer proportionate appeal or escalation routes for consequential actions. Knowingly false, malicious or retaliatory reporting is itself prohibited."
+      "Moderators assess reports on their available evidence, severity, likelihood of harm, prior conduct and applicable law. A report alone does not prove misconduct. Relevant evidence is handled with regard to confidentiality, privacy and the rights of the people involved.",
+      "Reports are assessed based on relevant evidence, safety risks and the context of the interaction. Users may request further consideration through available support or appeal routes. Deliberately false or retaliatory reporting is prohibited."
     ]
   },
   {
     id:"outcomes", heading:"Possible moderation outcomes",
     paragraphs:[
-      "Outcomes may include no action, guidance, warnings, content removal, redaction, profile-image removal, feature restrictions, temporary suspensions or permanent account termination. The existing moderation workflow may use defined 12-day or 30-day suspensions and temporary protective restrictions pending review.",
+      "Outcomes may include no action, guidance, warnings, content removal, redaction, profile-image removal, feature restrictions, temporary suspensions or permanent account termination. Temporary restrictions or suspensions may be applied where appropriate, with their duration communicated to affected users.",
       "Serious cases involving exploitation, credible threats, fraud or repeated abuse can result in immediate restrictions, even while a review is pending. Where needed, FieldsConnect may retain relevant evidence for a lawful investigation or statutory duty."
     ]
   },
   {
     id:"appeals", heading:"Questions, appeals and accountability",
     paragraphs:[
-      "Affected users may ask for a moderation decision to be reviewed through available appeal or support channels. Reviews should be handled impartially and, where feasible, by someone other than the original decision-maker. Abuse of the appeals or reports process can also be moderated.",
-      "Moderation messages may be issued through a shared platform moderator identity while individual moderator actions remain internally attributable for audit where the system supports this."
+      "Affected users may ask for a moderation decision to be reviewed through available appeal or support channels. A request for review will be considered with regard to the available information and the seriousness of the decision. Abuse of the appeals or reports process can also be moderated.",
+      "Moderation notices may be communicated using an official FieldsConnect moderator account or the platform's notification channels."
     ]
   },
   {

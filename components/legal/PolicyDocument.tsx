@@ -23,7 +23,7 @@ export function PolicyDocument({ title, summary, version, sections, footer }: Pr
         <p className="text-xs font-bold uppercase tracking-widest text-blue-700">FieldsConnect · Governance and trust</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-700 sm:text-base">{summary}</p>
-        <p className="mt-4 text-xs text-gray-600">Version {version} · Last updated 24 October 2026 · Applies upon publication</p>
+        <p className="mt-4 text-xs text-gray-600">Version {version} · Updated 25 October 2026</p>
       </header>
       <div className="mt-6 grid min-w-0 gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
         <nav aria-label={`${title} sections`} className="rounded-2xl border bg-white p-4 md:sticky md:top-20">

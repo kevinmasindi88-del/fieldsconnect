@@ -4,30 +4,30 @@ const sections: readonly PolicySection[] = [
   {
     id:"scope", heading:"About FieldsConnect and these terms",
     paragraphs:[
-      "These Terms of Use govern access to and use of FieldsConnect, a platform for educational and professional connections, mentorship, community discussion, skills, shared resources and related services. References to “FieldsConnect”, “we”, “us” or “our” mean the South African business operating the platform. “User” includes visitors, account holders, mentors, mentees and institutional users.",
+      "These Terms of Use govern access to and use of FieldsConnect, a platform for educational and professional connections, mentorship, community discussion, skills, shared resources and related services. References to “FieldsConnect”, “we”, “us” or “our” mean the South African registered business operating the platform. “User” includes visitors, account holders, mentors, mentees and institutional users.",
       "The Terms, Privacy Policy and Community Guidelines operate together. Additional terms may apply to optional paid mentorship, sponsorship or other future services, and must be shown before the relevant transaction. If a mandatory consumer or privacy law gives you greater protection, that law prevails.",
     ]
   },
   {
     id:"acceptance", heading:"Acceptance, records and updates",
     paragraphs:[
-      "By selecting the registration agreement and creating an account, you indicate acceptance of the Terms of Use, Privacy Policy and Community Guidelines linked next to that agreement. FieldsConnect records the agreement version, date and related account as evidence of the acceptance event; it does not establish that someone has read every provision or that a user has authority to consent on behalf of another person.",
+      "By selecting the registration agreement and creating an account, you accept these Terms of Use and our Community Guidelines, and you can review our Privacy Policy through the same sign-up disclosure. FieldsConnect records the version and time of acceptance to maintain an accurate account history. Additional permissions required by law are handled separately.",
       "We may change these policies to reflect material changes in features, law or safeguards. Material changes will be communicated through a reasonable in-app or account notice and may require renewed acceptance. Changes do not retroactively remove statutory rights.",
     ]
   },
   {
     id:"eligibility", heading:"Eligibility, age and necessary consent",
     paragraphs:[
-      "FieldsConnect is intended to support learners, university students, mentors and professionals. Educational level and legal capacity are different: enrolment at university does not by itself prove adult status.",
+      "FieldsConnect is intended to support learners, university students, mentors and professionals. Participation is subject to applicable legal capacity, permissions and safeguarding requirements, which may vary by age.",
       "You must supply accurate information and have the legal authority and permissions necessary for your participation. For a person under 18, FieldsConnect may require prior consent from a legally competent parent or guardian, or another lawful basis permitted by applicable legislation, before the person's information may be processed or participation enabled. A minor's own tick-box acceptance does not replace legally required consent.",
-      "Until adequate safeguards and lawful consent arrangements are established, FieldsConnect may refuse, restrict or suspend access for users who require additional protection. Parents, guardians, schools and institutions do not gain access to private user information merely by claiming a relationship; requests are verified and assessed under applicable law."
+      "Where legal permission or additional protections are required, FieldsConnect may limit access to relevant features until those requirements are met. Parents, guardians, schools and institutions do not gain access to private user information merely by claiming a relationship; requests are verified and assessed under applicable law."
     ]
   },
   {
     id:"accounts", heading:"Registration and account security",
     paragraphs:[
       "Provide accurate registration and profile details and keep them reasonably current. You must not impersonate another person or institution, misstate qualifications, create deceptive identities or share access in ways that undermine account security.",
-      "Keep credentials confidential and notify FieldsConnect through in-app support if you suspect account compromise. We may ask for reasonable verification in connection with safety, suspected fraud, access restoration or statutory duties. An email confirmation proves control of the email address, not an individual's age or qualifications."
+      "Keep credentials confidential and notify FieldsConnect through in-app support if you suspect account compromise. We may ask for reasonable verification in connection with safety, suspected fraud, access restoration or statutory duties. Verification of an email address does not constitute verification of professional qualifications or institutional affiliation."
     ]
   },
   {
@@ -84,30 +84,30 @@ const sections: readonly PolicySection[] = [
     id:"content-moderation", heading:"Moderation, reporting and appeals",
     paragraphs:[
       "You may report profiles, posts, messages, reviews or shared resources through available platform reporting channels. A report is assessed; it is not proof of wrongdoing. Depending on the evidence and risk, we may dismiss it, issue guidance or warnings, redact or remove content, restrict features, temporarily suspend access or terminate an account.",
-      "Moderation decisions should be documented, proportionate and subject to impartial review where an appeal process is available. Users who report concerns in good faith should not face retaliation. FieldsConnect may preserve records reasonably needed for investigations, legal claims or statutory duties."
+      "Moderation decisions consider the circumstances and seriousness of a report. Users may raise concerns about a decision through the available support or review channels. Retaliation against people reporting in good faith is prohibited. FieldsConnect may preserve records reasonably needed for investigations, legal claims or statutory duties."
     ]
   },
   {
     id:"payment-availability", heading:"Free and paid services",
     paragraphs:[
-      "Features described in these Terms are not necessarily available at all times. Free mentorship remains subject to mentor capacity and agreed terms. Paid mentorship is available only after FieldsConnect expressly enables a live transaction workflow and discloses the applicable price, duration, fee arrangement and payment terms.",
-      "Until the live payment service is activated, configuring a paid mentorship price is a preparation step, not an invitation to make payment. Do not send money to a mentor or FieldsConnect outside the authorised checkout on the assumption that an in-app mentorship will automatically activate."
+      "Available mentorship features may vary. Free mentorship depends on mentor availability and the arrangements accepted by the participants. If paid mentorship is offered, applicable prices, duration and transaction terms are presented before payment.",
+      "Never send payment credentials or treat a payment request sent through a user message as an official FieldsConnect checkout. Any supported payment arrangement is presented through the platform's designated process."
     ]
   },
   {
     id:"fees", heading:"Payments, commissions and settlements",
     paragraphs:[
-      "Where paid mentorship is enabled, the price and currency will be shown before the mentee confirms payment. Under the current platform allocation model, FieldsConnect's platform commission is 15% of an eligible paid mentorship programme price and the mentor allocation is 85%, before applicable fees, taxes, adjustments or lawful refund obligations. Provider processing fees are currently allocated to FieldsConnect under the active payment policy, subject to review.",
-      "Paystack is the intended payment processor. Relevant bank or payout details are supplied through the designated secure integration and must not be posted in public profiles, messages or library resources. Provider onboarding, settlement verification, service availability and payout schedules are governed by disclosed payment terms and payment-provider rules. We do not describe the platform as an escrow provider.",
-      "A paid mentorship must not activate solely because a browser redirects from a checkout page; successful payment is subject to server-side confirmation and applicable fraud or reconciliation review."
+      "Where paid mentorship is enabled, the price and currency will be shown before the mentee confirms payment. Where applicable, paid mentorship follows the platform's 15% FieldsConnect / 85% mentor allocation model, subject to the transaction terms presented at the time, taxes, payment-provider fees, adjustments and lawful refunds. The mentor's applicable payout details are provided through the relevant payment arrangements.",
+      "Where payment services are available, FieldsConnect uses the payment provider identified in the transaction flow. Payments and payouts are subject to the disclosed provider terms and applicable settlement arrangements. Bank or payment credentials must not be posted in public profiles, messages or library resources.",
+      "A mentorship requiring payment becomes active only when the platform confirms that its payment requirements have been satisfied."
     ]
   },
   {
     id:"refunds", heading:"Cancellations, refunds and disputes",
     paragraphs:[
       "Any paid transaction will be subject to the cancellation and refund terms displayed before checkout, together with non-excludable consumer rights. Where the Electronic Communications and Transactions Act, Consumer Protection Act or other applicable law provides a cancellation, cooling-off or refund right, those rights prevail over conflicting platform rules.",
-      "FieldsConnect may evaluate the mentorship timeline, agreed terms, available evidence and responsibility of the parties before deciding a contractual refund or fee allocation. A moderator's assessment does not by itself authorise a financial transfer; financial decisions require appropriate approval and transaction records. Chargebacks or reversals may trigger investigation and corresponding balance adjustments.",
-      "Do not assume that a platform fee, administrative charge or mentor payout can be retained where doing so would conflict with a mandatory legal refund obligation. Specific amounts, processing, timelines and appeals must be disclosed in the separate transaction terms before live payments begin."
+      "FieldsConnect may evaluate the mentorship timeline, agreed terms, available evidence and responsibility of the parties before deciding a contractual refund or fee allocation. A moderation outcome may inform a dispute resolution but does not by itself determine statutory refund rights or the final financial settlement. Chargebacks or reversals may trigger investigation and corresponding balance adjustments.",
+      "Mandatory consumer cancellation and refund rights take precedence over conflicting contractual charges. Additional refund details and applicable timeframes are provided with a paid transaction where relevant."
     ]
   },
   {
@@ -135,7 +135,7 @@ const sections: readonly PolicySection[] = [
     id:"liability", heading:"Liability and consumer rights",
     paragraphs:[
       "To the extent permitted by applicable law, FieldsConnect is not liable for losses caused solely by inaccurate user-created material, unauthorised dealings outside the platform or circumstances outside its reasonable control. This does not exclude liability that cannot legally be limited, including responsibilities arising from unlawful processing of personal information, negligence where exclusion is prohibited, or other mandatory consumer protections.",
-      "Users remain responsible for their own unlawful conduct, including infringements of third-party intellectual-property rights or breaches of confidentiality. Any contractual indemnity must be interpreted reasonably and consistently with applicable law."
+      "Users are responsible for unlawful content or conduct attributable to them, including infringements of intellectual-property rights and breaches of confidentiality, subject to applicable law."
     ]
   },
   {
@@ -155,8 +155,7 @@ const sections: readonly PolicySection[] = [
   {
     id:"contact", heading:"Contact and legal notices",
     paragraphs:[
-      "Questions about account access, policy interpretation, mentorship disputes or platform conduct can be raised through FieldsConnect's in-app Feedback and support facility. Privacy enquiries should identify that they are for the Information Officer or privacy function.",
-      "FieldsConnect provides support for account, policy, privacy and dispute enquiries through its Feedback and support facility. Formal enquiries will be handled through the appropriate business or privacy contact."
+      "For account assistance, policy questions, mentorship disputes or community-safety concerns, use FieldsConnect's Feedback and support facility. Privacy requests may be directed to the privacy or Information Officer function through the same support channel."
     ]
   },
 ];
