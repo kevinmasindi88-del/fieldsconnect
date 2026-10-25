@@ -33,12 +33,12 @@ type CurrentProfile = {
   community_guidelines_accepted_at: string | null;
 };
 
-export function QuickOnboarding() {
+export function QuickOnboarding({ previewMode = false }: { previewMode?: boolean }) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!previewMode);
   const [isSaving, setIsSaving] = useState(false);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
-  const [agreementRecorded, setAgreementRecorded] = useState(false);
+  const [agreementRecorded, setAgreementRecorded] = useState(previewMode);
   const [legacyAgreementAccepted, setLegacyAgreementAccepted] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [roleType, setRoleType] = useState<RoleType | "">("");
@@ -46,6 +46,10 @@ export function QuickOnboarding() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Preview mode is deliberately offline: it does not read an account or
+    // any profile, and it never writes to Supabase.
+    if (previewMode) return;
+
     let active = true;
 
     async function loadProfile() {
@@ -118,7 +122,7 @@ export function QuickOnboarding() {
 
     void loadProfile();
     return () => { active = false; };
-  }, [router]);
+  }, [router, previewMode]);
 
   async function handleFinish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,6 +144,11 @@ export function QuickOnboarding() {
     }
     if (!agreementRecorded && !legacyAgreementAccepted) {
       setMessage("Please accept the FieldsConnect agreement to continue.");
+      return;
+    }
+
+    if (previewMode) {
+      setMessage("Preview complete! A new member would now enter the FieldsConnect timeline. No account details were changed.");
       return;
     }
 
@@ -205,6 +214,11 @@ export function QuickOnboarding() {
   return (
     <main className="min-h-screen w-full bg-gradient-to-b from-blue-50 via-slate-50 to-white px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto w-full max-w-xl">
+        {previewMode && (
+          <aside aria-label="Read-only onboarding preview" className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
+            <strong>Preview only.</strong> This is the same onboarding screen new members see. Try the fields and button; nothing is saved to your account.
+          </aside>
+        )}
         <div className="mb-6 text-center">
           <span className="inline-flex items-center rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700">
             ONE QUICK STEP
@@ -308,17 +322,17 @@ export function QuickOnboarding() {
               type="submit"
               disabled={isSaving || !roleType || (!agreementRecorded && !legacyAgreementAccepted)}
             >
-              {isSaving ? "Creating your profile…" : "Explore FieldsConnect"}
+              {isSaving ? "Creating your profile…" : previewMode ? "Preview the next step" : "Explore FieldsConnect"}
             </button>
             <p className="text-center text-xs leading-5 text-gray-500">
-              Your profile starts private. You can change visibility and add more details in{" "}
+              {previewMode ? "For new members, their profile starts private." : "Your profile starts private."} You can change visibility and add more details in{" "}
               <Link className="font-semibold text-blue-700 hover:underline" href="/profile">
                 Profile settings
               </Link>.
             </p>
           </div>
           {message && (
-            <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">{message}</p>
+            <p role="status" className={"rounded-xl border p-3 text-sm leading-6 " + (previewMode ? "border-blue-200 bg-blue-50 text-blue-900" : "border-amber-200 bg-amber-50 text-amber-900")}>{message}</p>
           )}
         </form>
       </div>
