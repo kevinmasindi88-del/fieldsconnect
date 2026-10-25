@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
@@ -31,7 +31,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? "Create your account"
         : "Reset your password";
 
-  async function routeAfterLogin(userId: string) {
+  const routeAfterLogin = useCallback(async (userId: string) => {
     const supabase = getSupabaseBrowserClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError) throw authError;
@@ -107,7 +107,23 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     router.push(hasAgreement ? "/timeline" : "/onboarding");
     router.refresh();
-  }
+  }, [router]);
+
+  // Verification links may establish a session automatically. If they do,
+  // take the confirmed member directly to the timeline instead of making
+  // them submit a second login form after email verification.
+  useEffect(() => {
+    if (mode !== "login" || !isSupabaseConfigured()) return;
+    let active = true;
+    const supabase = getSupabaseBrowserClient();
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!active || error || !data.session?.user?.email_confirmed_at) return;
+      void routeAfterLogin(data.session.user.id).catch((error: unknown) => {
+        if (active) setMessage(error instanceof Error ? error.message : "Unable to complete sign-in.");
+      });
+    });
+    return () => { active = false; };
+  }, [mode, routeAfterLogin]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

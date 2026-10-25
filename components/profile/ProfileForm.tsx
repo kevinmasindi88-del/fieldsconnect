@@ -84,7 +84,7 @@ type MentorSettingsState = {
 type ProfileFormState = {
   displayName: string;
   username: string;
-  roleType: RoleType;
+  roleType: RoleType | "";
   field: string;
   bio: string;
   profileVisibility: ProfileVisibility;
@@ -94,7 +94,7 @@ type ProfileFormState = {
 const initialState: ProfileFormState = {
   displayName: "",
   username: "",
-  roleType: "professional",
+  roleType: "",
   field: "",
   bio: "",
   profileVisibility: "public",
@@ -567,7 +567,7 @@ export function ProfileForm() {
           setForm({
             displayName: profileData.display_name ?? "",
             username: profileData.username ?? "",
-            roleType: profileData.role_type ?? "professional",
+            roleType: profileData.role_type ?? "",
             field: profileData.field ?? "",
             bio: profileData.bio ?? "",
             profileVisibility:
@@ -1164,6 +1164,11 @@ export function ProfileForm() {
       return;
     }
 
+    if (!form.roleType) {
+      setMessage("Choose your role before saving your profile.");
+      return;
+    }
+
     if (form.mentorAvailable) {
       const mentoringFields = parseMentoringFields(
         mentorSettings.mentoringFields
@@ -1603,6 +1608,7 @@ export function ProfileForm() {
               value={form.roleType}
               onChange={(event) => updateField("roleType", event.target.value as RoleType)}
             >
+              <option value="">Select your role</option>
               <option value="student">Student</option>
               <option value="professional">Professional</option>
               <option value="institution">Institution</option>
