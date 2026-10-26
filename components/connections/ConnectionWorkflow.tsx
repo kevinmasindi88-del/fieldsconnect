@@ -167,7 +167,7 @@ const PUBLIC_PAID_MENTORSHIPS_ENABLED =
 
 const PEOPLE_SEARCH_PAGE_SIZE = 20;
 
-export function ConnectionWorkflow() {
+export function ConnectionWorkflow({ view = "connections" }: { view?: "connections" | "mentorship" }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -179,7 +179,7 @@ export function ConnectionWorkflow() {
     useState<PaymentOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [mentorFilter, setMentorFilter] = useState("all");
+  const [mentorFilter, setMentorFilter] = useState(view === "mentorship" ? "mentors" : "all");
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
   const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
@@ -219,6 +219,14 @@ export function ConnectionWorkflow() {
     isMentorshipHistoryOpen,
     setIsMentorshipHistoryOpen,
   ] = useState(false);
+
+  // Support previously issued Paystack callback URLs.
+  useEffect(() => {
+    if (view !== "connections" || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("payment") === "return") {
+      window.location.replace(`/mentorships${window.location.search}`);
+    }
+  }, [view]);
 
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
@@ -787,7 +795,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -799,7 +807,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -815,7 +823,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -1302,7 +1310,7 @@ export function ConnectionWorkflow() {
         : {
             term: searchTerm.trim(),
             role: roleFilter,
-            mentor: mentorFilter,
+            mentor: view === "mentorship" ? "mentors" : mentorFilter,
           };
 
     const offset =
@@ -1413,9 +1421,11 @@ export function ConnectionWorkflow() {
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       {isLoading ? (
-        <p className="text-sm text-gray-600">Loading connections...</p>
+        <p className="text-sm text-gray-600">Loading {view === "mentorship" ? "mentorships" : "connections"}...</p>
       ) : (
         <>
+          {view === "mentorship" && (
+            <>
           <ConnectionSection
             title={`Active mentorships · ${activeMentorships.length}`}
           >
@@ -1982,6 +1992,10 @@ export function ConnectionWorkflow() {
             )}
           </section>
 
+            </>
+          )}
+          {view === "connections" && (
+            <>
           <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
@@ -2285,6 +2299,8 @@ export function ConnectionWorkflow() {
               </>
             )}
           </ConnectionSection>
+            </>
+          )}
         </>
       )}
     </section>
