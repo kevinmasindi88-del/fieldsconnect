@@ -52,9 +52,9 @@ const suspensionAllowedRoutes = new Set([
 const navItems = [
   { href: "/timeline", label: "Home" },
   { href: "/connections", label: "Connections" },
+  { href: "/mentorships", label: "Mentorship" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
-  { href: "/mentorships", label: "Mentorship" },
   { href: "/library", label: "Library" },
 ];
 
@@ -82,6 +82,11 @@ const mobileNavItems: Array<{
     icon: "connections",
   },
   {
+    href: "/mentorships",
+    label: "Mentorship",
+    icon: "mentorship",
+  },
+  {
     href: "/messages",
     label: "Messages",
     icon: "messages",
@@ -90,11 +95,6 @@ const mobileNavItems: Array<{
     href: "/notifications",
     label: "Alerts",
     icon: "notifications",
-  },
-  {
-    href: "/mentorships",
-    label: "Mentorship",
-    icon: "mentorship",
   },
   {
     href: "/library",

@@ -245,6 +245,49 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   }, [skills]);
 
 
+  // Only display mentor discovery results after the user selects Find mentors.
+  // search_people excludes existing connections, so include eligible connected mentors.
+  const mentorSearchProfiles = useMemo(() => {
+    if (view !== "mentorship" || !hasSearchedPeople || !peopleSearchCriteria) {
+      return [];
+    }
+    const term = peopleSearchCriteria.term.toLocaleLowerCase();
+    const relatedMentors = connections
+      .filter((connection) => connection.status === "accepted" || connection.status === "pending")
+      .map((connection) =>
+        profiles.find((profile) =>
+          profile.id === (connection.requester_id === currentUserId
+            ? connection.recipient_id : connection.requester_id)
+        )
+      )
+      .filter((profile): profile is Profile =>
+        Boolean(profile?.mentor_available && profile.id !== currentUserId)
+      )
+      .filter((profile) =>
+        peopleSearchCriteria.role === "all" ||
+        profile.role_type === peopleSearchCriteria.role
+      )
+      .filter((profile) =>
+        !term || [
+          profile.display_name,
+          profile.username ?? "",
+          profile.field ?? "",
+          ...(skillsByProfileId.get(profile.id) ?? []),
+        ].some((value) => value.toLocaleLowerCase().includes(term))
+      );
+
+    const unique = new Map<string, Profile>();
+    for (const profile of [...relatedMentors, ...peopleSearchResults]) {
+      unique.set(profile.id, profile);
+    }
+    return Array.from(unique.values()).sort((a, b) =>
+      a.display_name.localeCompare(b.display_name)
+    );
+  }, [
+    view, hasSearchedPeople, peopleSearchCriteria, connections,
+    profiles, currentUserId, peopleSearchResults, skillsByProfileId,
+  ]);
+
   const participantMentorships = mentorships.filter(
     (mentorship) =>
       mentorship.mentor_id === currentUserId ||
@@ -1449,6 +1492,8 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                       className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                       disabled={isSearchingPeople}
                       type="submit"
+                      aria-controls="mentor-search-results"
+                      aria-expanded={hasSearchedPeople}
                     >
                       {isSearchingPeople ? "Searching..." : "Find mentors"}
                     </button>
@@ -1458,54 +1503,47 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   )}
                 </form>
 
-                {connections
-                  .filter((connection) => connection.status === "accepted" || connection.status === "pending")
-                  .map((connection) => getOtherProfile(connection))
-                  .filter((profile): profile is Profile => Boolean(profile?.mentor_available))
-                  .map((profile) => (
-                    <ConnectionCard key={`connected-mentor-${profile.id}`} profile={profile}>
-                      <Link
-                        className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
-                        href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
-                      >
-                        Request mentorship
-                      </Link>
-                    </ConnectionCard>
-                  ))}
-
-                {!hasSearchedPeople ? (
-                  <EmptyState text="Search for mentors to request mentorship." />
-                ) : peopleSearchResults.length === 0 ? (
-                  <EmptyState text="No additional mentors match your search." />
-                ) : (
-                  <>
-                    {peopleSearchResults.map((profile) => (
-                      <ConnectionCard
-                        key={profile.id}
-                        profile={profile}
-                        showMentorRating
-                        mentorRating={mentorRatingsById[profile.id] ?? null}
-                      >
-                        <Link
-                          className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
-                          href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
+                <div id="mentor-search-results" className="grid gap-3" aria-live="polite" aria-busy={isSearchingPeople}>
+                  {!hasSearchedPeople ? (
+                    <EmptyState text="Select Find mentors to browse available mentors." />
+                  ) : isSearchingPeople && mentorSearchProfiles.length === 0 ? (
+                    <p className="text-sm text-gray-600">Searching mentors...</p>
+                  ) : peopleSearchError && mentorSearchProfiles.length === 0 ? null
+                  : mentorSearchProfiles.length === 0 ? (
+                    <EmptyState text="No mentors match your search." />
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        {mentorSearchProfiles.length} {mentorSearchProfiles.length === 1 ? "mentor" : "mentors"} found
+                      </p>
+                      {mentorSearchProfiles.map((profile) => (
+                        <ConnectionCard
+                          key={profile.id}
+                          profile={profile}
+                          showMentorRating
+                          mentorRating={mentorRatingsById[profile.id] ?? null}
                         >
-                          Request mentorship
-                        </Link>
-                      </ConnectionCard>
-                    ))}
-                    {hasMorePeople && (
-                      <button
-                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
-                        disabled={isSearchingPeople}
-                        onClick={() => void searchPeople(true)}
-                        type="button"
-                      >
-                        {isSearchingPeople ? "Loading..." : "Load more"}
-                      </button>
-                    )}
-                  </>
-                )}
+                          <Link
+                            className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
+                            href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
+                          >
+                            Request mentorship
+                          </Link>
+                        </ConnectionCard>
+                      ))}
+                      {hasMorePeople && (
+                        <button
+                          className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                          disabled={isSearchingPeople}
+                          onClick={() => void searchPeople(true)}
+                          type="button"
+                        >
+                          {isSearchingPeople ? "Loading..." : "Load more"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </ConnectionSection>
 
           <ConnectionSection
