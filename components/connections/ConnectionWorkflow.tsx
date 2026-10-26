@@ -1426,6 +1426,87 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         <>
           {view === "mentorship" && (
             <>
+              <ConnectionSection title="Find a mentor">
+                <form
+                  className="rounded-xl border bg-white p-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void searchPeople(false);
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium">
+                      Search available mentors
+                      <input
+                        className="min-h-10 rounded-lg border px-3 py-2 font-normal"
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Search by name, field or skill"
+                        type="search"
+                        value={searchTerm}
+                      />
+                    </label>
+                    <button
+                      className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={isSearchingPeople}
+                      type="submit"
+                    >
+                      {isSearchingPeople ? "Searching..." : "Find mentors"}
+                    </button>
+                  </div>
+                  {peopleSearchError && (
+                    <p className="mt-2 text-sm text-red-700">{peopleSearchError}</p>
+                  )}
+                </form>
+
+                {acceptedConnections
+                  .map((connection) => getOtherProfile(connection))
+                  .filter((profile): profile is Profile => Boolean(profile?.mentor_available))
+                  .map((profile) => (
+                    <ConnectionCard key={`connected-mentor-${profile.id}`} profile={profile}>
+                      <Link
+                        className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
+                        href={`/profile/${profile.id}#mentorship-request`}
+                      >
+                        Request mentorship
+                      </Link>
+                    </ConnectionCard>
+                  ))}
+
+                {!hasSearchedPeople ? (
+                  <EmptyState text="Search for mentors to request mentorship." />
+                ) : peopleSearchResults.length === 0 ? (
+                  <EmptyState text="No additional mentors match your search." />
+                ) : (
+                  <>
+                    {peopleSearchResults.map((profile) => (
+                      <ConnectionCard
+                        key={profile.id}
+                        profile={profile}
+                        showMentorRating
+                        mentorRating={mentorRatingsById[profile.id] ?? null}
+                      >
+                        <Link
+                          className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
+                          href={`/profile/${profile.id}#mentorship-request`}
+                        >
+                          Request mentorship
+                        </Link>
+                      </ConnectionCard>
+                    ))}
+                    {hasMorePeople && (
+                      <button
+                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        disabled={isSearchingPeople}
+                        onClick={() => void searchPeople(true)}
+                        type="button"
+                      >
+                        {isSearchingPeople ? "Loading..." : "Load more"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </ConnectionSection>
+
           <ConnectionSection
             title={`Active mentorships · ${activeMentorships.length}`}
           >
