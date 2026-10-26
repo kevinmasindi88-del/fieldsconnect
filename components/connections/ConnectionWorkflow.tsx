@@ -2412,11 +2412,26 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             {outgoingRequests.length === 0 ? (
               <EmptyState text="No outgoing requests pending." />
             ) : (
-              outgoingRequests.map((connection) => (
-                <ConnectionCard key={connection.id} profile={profileById.get(connection.recipient_id)}>
-                  <span className="text-sm font-medium text-gray-700">Pending</span>
-                </ConnectionCard>
-              ))
+              <div
+                aria-label="Outgoing connection requests"
+                className={`grid gap-3 ${
+                  outgoingRequests.length > 3
+                    ? "max-h-[23rem] overflow-y-auto overscroll-contain pr-2 md:max-h-[18rem]"
+                    : ""
+                }`}
+                tabIndex={outgoingRequests.length > 3 ? 0 : undefined}
+              >
+                {outgoingRequests.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    profile={profileById.get(connection.recipient_id)}
+                    showBio={false}
+                    showMentorAvailability={false}
+                  >
+                    <span className="text-sm font-medium text-gray-700">Pending</span>
+                  </ConnectionCard>
+                ))}
+              </div>
             )}
           </ConnectionSection>
 
