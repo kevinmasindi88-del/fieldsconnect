@@ -757,7 +757,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       </header>
 
       {profile.mentor_available && mentorProfile && (
-        <section className="flex flex-col gap-4 rounded-xl border p-4 sm:gap-5 sm:p-5">
+        <section id="mentorship-request" className="scroll-mt-24 flex flex-col gap-4 rounded-xl border p-4 sm:gap-5 sm:p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold sm:text-xl">
