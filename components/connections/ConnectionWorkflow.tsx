@@ -1458,14 +1458,15 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   )}
                 </form>
 
-                {acceptedConnections
+                {connections
+                  .filter((connection) => connection.status === "accepted" || connection.status === "pending")
                   .map((connection) => getOtherProfile(connection))
                   .filter((profile): profile is Profile => Boolean(profile?.mentor_available))
                   .map((profile) => (
                     <ConnectionCard key={`connected-mentor-${profile.id}`} profile={profile}>
                       <Link
                         className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
-                        href={`/profile/${profile.id}#mentorship-request`}
+                        href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
                       >
                         Request mentorship
                       </Link>
@@ -1487,7 +1488,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                       >
                         <Link
                           className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
-                          href={`/profile/${profile.id}#mentorship-request`}
+                          href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
                         >
                           Request mentorship
                         </Link>
