@@ -2077,6 +2077,154 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
           )}
           {view === "connections" && (
             <>
+          <ConnectionSection title="Find people">
+            <form
+              className="rounded-xl border bg-white p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void searchPeople(false);
+              }}
+            >
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Search people
+                  <input
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setSearchTerm(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Search by name, field, or skill..."
+                    type="search"
+                    value={searchTerm}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Role type
+                  <select
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setRoleFilter(
+                        event.target.value
+                      )
+                    }
+                    value={roleFilter}
+                  >
+                    <option value="all">
+                      All role types
+                    </option>
+                    <option value="student">
+                      Student
+                    </option>
+                    <option value="professional">
+                      Professional
+                    </option>
+                    <option value="institution">
+                      Institution
+                    </option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Mentor status
+                  <select
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setMentorFilter(
+                        event.target.value
+                      )
+                    }
+                    value={mentorFilter}
+                  >
+                    <option value="all">
+                      Everyone
+                    </option>
+                    <option value="mentors">
+                      Available mentors
+                    </option>
+                    <option value="non-mentors">
+                      Not mentoring
+                    </option>
+                  </select>
+                </label>
+
+                <button
+                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                  disabled={isSearchingPeople}
+                  type="submit"
+                >
+                  {isSearchingPeople
+                    ? "Searching..."
+                    : "Search"}
+                </button>
+              </div>
+
+              <p className="mt-3 text-xs text-gray-500">
+                {hasSearchedPeople
+                  ? `${peopleSearchResults.length} ${
+                      peopleSearchResults.length === 1
+                        ? "result"
+                        : "results"
+                    } loaded`
+                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
+              </p>
+
+              {peopleSearchError && (
+                <p className="mt-2 text-sm text-red-700">
+                  {peopleSearchError}
+                </p>
+              )}
+            </form>
+
+            {!hasSearchedPeople ? (
+              <EmptyState text="Search for people to view matching profiles." />
+            ) : peopleSearchResults.length === 0 ? (
+              <EmptyState text="No matching people found." />
+            ) : (
+              <>
+                {peopleSearchResults.map(
+                  (profile) => (
+                    <ConnectionCard
+                      key={profile.id}
+                      profile={profile}
+                      showMentorRating
+                      mentorRating={mentorRatingsById[profile.id] ?? null}
+                    >
+                      <button
+                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() =>
+                          sendRequest(
+                            profile.id
+                          )
+                        }
+                      >
+                        Connect
+                      </button>
+                    </ConnectionCard>
+                  )
+                )}
+
+                {hasMorePeople && (
+                  <button
+                    className="min-h-10 w-full rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-50 sm:w-fit"
+                    disabled={isSearchingPeople}
+                    onClick={() =>
+                      void searchPeople(true)
+                    }
+                    type="button"
+                  >
+                    {isSearchingPeople
+                      ? "Loading..."
+                      : "Load more"}
+                  </button>
+                )}
+              </>
+            )}
+          </ConnectionSection>
+
           <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
@@ -2233,153 +2381,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             )}
           </ConnectionSection>
 
-          <ConnectionSection title="Find people">
-            <form
-              className="rounded-xl border bg-white p-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void searchPeople(false);
-              }}
-            >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Search people
-                  <input
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setSearchTerm(
-                        event.target.value
-                      )
-                    }
-                    placeholder="Search by name, field, or skill..."
-                    type="search"
-                    value={searchTerm}
-                  />
-                </label>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Role type
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setRoleFilter(
-                        event.target.value
-                      )
-                    }
-                    value={roleFilter}
-                  >
-                    <option value="all">
-                      All role types
-                    </option>
-                    <option value="student">
-                      Student
-                    </option>
-                    <option value="professional">
-                      Professional
-                    </option>
-                    <option value="institution">
-                      Institution
-                    </option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Mentor status
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setMentorFilter(
-                        event.target.value
-                      )
-                    }
-                    value={mentorFilter}
-                  >
-                    <option value="all">
-                      Everyone
-                    </option>
-                    <option value="mentors">
-                      Available mentors
-                    </option>
-                    <option value="non-mentors">
-                      Not mentoring
-                    </option>
-                  </select>
-                </label>
-
-                <button
-                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
-                  disabled={isSearchingPeople}
-                  type="submit"
-                >
-                  {isSearchingPeople
-                    ? "Searching..."
-                    : "Search"}
-                </button>
-              </div>
-
-              <p className="mt-3 text-xs text-gray-500">
-                {hasSearchedPeople
-                  ? `${peopleSearchResults.length} ${
-                      peopleSearchResults.length === 1
-                        ? "result"
-                        : "results"
-                    } loaded`
-                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
-              </p>
-
-              {peopleSearchError && (
-                <p className="mt-2 text-sm text-red-700">
-                  {peopleSearchError}
-                </p>
-              )}
-            </form>
-
-            {!hasSearchedPeople ? (
-              <EmptyState text="Search for people to view matching profiles." />
-            ) : peopleSearchResults.length === 0 ? (
-              <EmptyState text="No matching people found." />
-            ) : (
-              <>
-                {peopleSearchResults.map(
-                  (profile) => (
-                    <ConnectionCard
-                      key={profile.id}
-                      profile={profile}
-                      showMentorRating
-                      mentorRating={mentorRatingsById[profile.id] ?? null}
-                    >
-                      <button
-                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                        disabled={isWorking}
-                        onClick={() =>
-                          sendRequest(
-                            profile.id
-                          )
-                        }
-                      >
-                        Connect
-                      </button>
-                    </ConnectionCard>
-                  )
-                )}
-
-                {hasMorePeople && (
-                  <button
-                    className="min-h-10 w-full rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-50 sm:w-fit"
-                    disabled={isSearchingPeople}
-                    onClick={() =>
-                      void searchPeople(true)
-                    }
-                    type="button"
-                  >
-                    {isSearchingPeople
-                      ? "Loading..."
-                      : "Load more"}
-                  </button>
-                )}
-              </>
-            )}
-          </ConnectionSection>
             </>
           )}
         </>
