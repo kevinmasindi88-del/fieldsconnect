@@ -112,6 +112,11 @@ const initialMentorshipRequestForm: MentorshipRequestForm = {
 };
 
 export function PublicProfileView({ profileId }: PublicProfileViewProps) {
+  const [fromMentorshipHub, setFromMentorshipHub] = useState(false);
+  useEffect(() => {
+    setFromMentorshipHub(new URLSearchParams(window.location.search).get("from") === "mentorships");
+  }, [profileId]);
+  const returnHref = fromMentorshipHub ? "/mentorships" : "/connections";
   const [profile, setProfile] = useState<Profile | null>(null);
   const [mentorProfile, setMentorProfile] =
     useState<MentorProfile | null>(null);
@@ -688,8 +693,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
           This profile is not available. It may be private, connection-only, or removed.
         </p>
-        <Link className="w-fit rounded-lg border px-4 py-2 text-sm font-medium" href="/connections">
-          Back to connections
+        <Link className="w-fit rounded-lg border px-4 py-2 text-sm font-medium" href={returnHref}>
+          {fromMentorshipHub ? "Back to mentorship" : "Back to connections"}
         </Link>
         {message && <p className="text-sm text-gray-700">{message}</p>}
       </section>
@@ -698,8 +703,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:p-8">
-      <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href="/connections">
-        ← Back to connections
+      <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href={returnHref}>
+        ← {fromMentorshipHub ? "Back to mentorship" : "Back to connections"}
       </Link>
 
       {message && (
@@ -879,7 +884,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             </p>
           ) : requestSubmitted ? (
             <p className="rounded-xl border p-4 text-sm font-medium">
-              Your mentorship request has been sent.
+              Your mentorship request has been sent.{" "}
+              <Link className="underline" href="/mentorships">View mentorship requests</Link>
             </p>
           ) : getAcceptedDurations().length === 0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
