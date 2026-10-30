@@ -13,7 +13,7 @@ export default function HomePage() {
   useEffect(() => {
     async function routeVisitor() {
       if (!isSupabaseConfigured()) {
-        router.replace("/signup");
+        router.replace("/login");
         return;
       }
 
@@ -22,7 +22,7 @@ export default function HomePage() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      router.replace(session ? "/timeline" : "/signup");
+      router.replace(session ? "/timeline" : "/login");
     }
 
     void routeVisitor();
