@@ -1412,21 +1412,70 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         offset + page.length
       );
 
-      const mentorIds = page
-        .filter((profile) => profile.mentor_available)
-        .map((profile) => profile.id);
+      // Include mentors already connected to the current user.
+      // The backend rating RPC still enforces profile visibility.
+      const relatedMentorIds = view === "mentorship"
+        ? connections
+            .filter((connection) =>
+              connection.status === "accepted" ||
+              connection.status === "pending"
+            )
+            .map((connection) =>
+              connection.requester_id === currentUserId
+                ? connection.recipient_id
+                : connection.requester_id
+            )
+            .map((id) => profileById.get(id))
+            .filter((profile): profile is Profile =>
+              Boolean(profile?.mentor_available && profile.id !== currentUserId)
+            )
+            .filter((profile) =>
+              criteria.role === "all" || profile.role_type === criteria.role
+            )
+            .filter((profile) => {
+              const term = criteria.term.toLocaleLowerCase();
+              return !term || [
+                profile.display_name,
+                profile.username ?? "",
+                profile.field ?? "",
+                ...(skillsByProfileId.get(profile.id) ?? []),
+              ].some((value) => value.toLocaleLowerCase().includes(term));
+            })
+            .map((profile) => profile.id)
+        : [];
+
+      const mentorIds = Array.from(new Set([
+        ...page
+          .filter((profile) => profile.mentor_available)
+          .map((profile) => profile.id),
+        ...relatedMentorIds,
+      ]));
       if (mentorIds.length > 0) {
-        const { data: ratingRows, error: ratingError } = await supabase.rpc(
-          "get_mentor_rating_summaries",
-          { target_mentor_ids: mentorIds }
-        );
-        if (ratingError) {
-          console.warn("Unable to load mentor ratings:", ratingError);
-        } else {
-          const nextRatings = Object.fromEntries(
-            ((ratingRows ?? []) as MentorRatingSummary[]).map((item) => [item.mentor_id, item])
+        const ratingRows: MentorRatingSummary[] = [];
+        let ratingsFailed = false;
+
+        for (let index = 0; index < mentorIds.length; index += 100) {
+          const { data, error: ratingError } = await supabase.rpc(
+            "get_mentor_rating_summaries",
+            { target_mentor_ids: mentorIds.slice(index, index + 100) }
           );
-          setMentorRatingsById((current) => append ? { ...current, ...nextRatings } : nextRatings);
+
+          if (ratingError) {
+            console.warn("Unable to load mentor ratings:", ratingError);
+            ratingsFailed = true;
+            break;
+          }
+
+          ratingRows.push(...((data ?? []) as MentorRatingSummary[]));
+        }
+
+        if (!ratingsFailed) {
+          const nextRatings = Object.fromEntries(
+            ratingRows.map((item) => [item.mentor_id, item])
+          );
+          setMentorRatingsById((current) =>
+            append ? { ...current, ...nextRatings } : nextRatings
+          );
         }
       }
 
