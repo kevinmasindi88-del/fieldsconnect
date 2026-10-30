@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
@@ -183,6 +183,9 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
   const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
+  const mentorResultsRef = useRef<HTMLDivElement | null>(null);
+  const [mentorResultsMaxHeight, setMentorResultsMaxHeight] =
+    useState<number | null>(null);
   const [peopleSearchCriteria, setPeopleSearchCriteria] =
     useState<PeopleSearchCriteria | null>(null);
   const [peopleSearchOffset, setPeopleSearchOffset] =
@@ -287,6 +290,51 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     view, hasSearchedPeople, peopleSearchCriteria, connections,
     profiles, currentUserId, peopleSearchResults, skillsByProfileId,
   ]);
+
+  useEffect(() => {
+    if (mentorSearchProfiles.length <= 3) {
+      setMentorResultsMaxHeight(null);
+      return;
+    }
+
+    const container = mentorResultsRef.current;
+    if (!container) return;
+
+    const firstThree = Array.from(container.children).slice(
+      0,
+      3
+    ) as HTMLElement[];
+
+    function measure() {
+      if (!container || firstThree.length !== 3) return;
+
+      const gap =
+        Number.parseFloat(getComputedStyle(container).rowGap) || 0;
+
+      const height =
+        firstThree.reduce(
+          (total, card) => total + card.getBoundingClientRect().height,
+          0
+        ) + gap * 2;
+
+      setMentorResultsMaxHeight(Math.ceil(height));
+    }
+
+    measure();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+
+    firstThree.forEach((card) => observer?.observe(card));
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [mentorSearchProfiles, mentorRatingsById]);
 
   const participantMentorships = mentorships.filter(
     (mentorship) =>
@@ -1565,7 +1613,22 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                       <p className="text-sm text-gray-600">
                         {mentorSearchProfiles.length} {mentorSearchProfiles.length === 1 ? "mentor" : "mentors"} found
                       </p>
-                      {mentorSearchProfiles.map((profile) => (
+                      <div
+                        ref={mentorResultsRef}
+                        aria-label="Mentor search results list"
+                        className={
+                          mentorSearchProfiles.length > 3
+                            ? "grid gap-3 overflow-y-auto overscroll-contain pr-2"
+                            : "grid gap-3"
+                        }
+                        style={
+                          mentorSearchProfiles.length > 3
+                            ? { maxHeight: mentorResultsMaxHeight ?? "36rem" }
+                            : undefined
+                        }
+                        tabIndex={mentorSearchProfiles.length > 3 ? 0 : undefined}
+                      >
+                        {mentorSearchProfiles.map((profile) => (
                         <ConnectionCard
                           key={profile.id}
                           profile={profile}
@@ -1579,7 +1642,8 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                             Request mentorship
                           </Link>
                         </ConnectionCard>
-                      ))}
+                        ))}
+                      </div>
                       {hasMorePeople && (
                         <button
                           className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
