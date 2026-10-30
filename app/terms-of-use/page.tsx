@@ -88,11 +88,8 @@ const sections: readonly PolicySection[] = [
     ]
   },
   {
-    id:"optional-paid-services", heading:"Optional paid services",
-    paragraphs:[
-      "FieldsConnect registration does not commit you to purchasing a paid service. Where an optional paid mentorship service becomes available, the applicable price, service details, cancellation and refund terms, and any separate payment agreement will be presented before you choose to pay.",
-      "Do not send payment credentials through user messages or treat unofficial payment requests as FieldsConnect checkout. Your mandatory consumer and privacy rights remain unaffected."
-    ]
+    id:"optional-paid-services", heading:"Paid mentorship option coming soon",
+    paragraphs:[]
   },
   {
     id:"third-parties", heading:"Third-party sites and services",
