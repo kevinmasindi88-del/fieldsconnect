@@ -7,6 +7,10 @@ import {
   useState,
 } from "react";
 import type { User } from "@supabase/supabase-js";
+import {
+  restoreDevicePushForSignedInUser,
+  waitForDevicePushRestore,
+} from "@/lib/push-preferences";
 import Link from "next/link";
 import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -242,6 +246,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    void restoreDevicePushForSignedInUser(user.id).catch((error) => {
+      console.warn("Unable to restore device notifications:", error);
+    });
+  }, [user?.id]);
 
   useEffect(() => {
     if (isLoadingAuth || user || isPublicRoute) return;
@@ -589,6 +601,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     const supabase = getSupabaseBrowserClient();
 
+    if (user?.id) {
+      await waitForDevicePushRestore(user.id);
+    }
+
     try {
       if (
         typeof window !== "undefined" &&
@@ -618,9 +634,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               "Unable to unregister push subscription during logout:",
               error
             );
+            // If server cleanup fails, disable the browser subscription.
+            await subscription.unsubscribe();
           }
-
-          await subscription.unsubscribe();
+          // Otherwise retain the inactive browser subscription for reuse.
         }
       }
     } catch (error) {
