@@ -88,26 +88,10 @@ const sections: readonly PolicySection[] = [
     ]
   },
   {
-    id:"payment-availability", heading:"Free and paid services",
+    id:"optional-paid-services", heading:"Optional paid services",
     paragraphs:[
-      "Available mentorship features may vary. Free mentorship depends on mentor availability and the arrangements accepted by the participants. If paid mentorship is offered, applicable prices, duration and transaction terms are presented before payment.",
-      "Never send payment credentials or treat a payment request sent through a user message as an official FieldsConnect checkout. Any supported payment arrangement is presented through the platform's designated process."
-    ]
-  },
-  {
-    id:"fees", heading:"Payments, commissions and settlements",
-    paragraphs:[
-      "Where paid mentorship is enabled, the price and currency will be shown before the mentee confirms payment. Where applicable, paid mentorship follows the platform's 15% FieldsConnect / 85% mentor allocation model, subject to the transaction terms presented at the time, taxes, payment-provider fees, adjustments and lawful refunds. The mentor's applicable payout details are provided through the relevant payment arrangements.",
-      "Where payment services are available, FieldsConnect uses the payment provider identified in the transaction flow. Payments and payouts are subject to the disclosed provider terms and applicable settlement arrangements. Bank or payment credentials must not be posted in public profiles, messages or library resources.",
-      "A mentorship requiring payment becomes active only when the platform confirms that its payment requirements have been satisfied."
-    ]
-  },
-  {
-    id:"refunds", heading:"Cancellations, refunds and disputes",
-    paragraphs:[
-      "Any paid transaction will be subject to the cancellation and refund terms displayed before checkout, together with non-excludable consumer rights. Where the Electronic Communications and Transactions Act, Consumer Protection Act or other applicable law provides a cancellation, cooling-off or refund right, those rights prevail over conflicting platform rules.",
-      "FieldsConnect may evaluate the mentorship timeline, agreed terms, available evidence and responsibility of the parties before deciding a contractual refund or fee allocation. A moderation outcome may inform a dispute resolution but does not by itself determine statutory refund rights or the final financial settlement. Chargebacks or reversals may trigger investigation and corresponding balance adjustments.",
-      "Mandatory consumer cancellation and refund rights take precedence over conflicting contractual charges. Additional refund details and applicable timeframes are provided with a paid transaction where relevant."
+      "FieldsConnect registration does not commit you to purchasing a paid service. Where an optional paid mentorship service becomes available, the applicable price, service details, cancellation and refund terms, and any separate payment agreement will be presented before you choose to pay.",
+      "Do not send payment credentials through user messages or treat unofficial payment requests as FieldsConnect checkout. Your mandatory consumer and privacy rights remain unaffected."
     ]
   },
   {
