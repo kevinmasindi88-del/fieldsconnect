@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
@@ -167,7 +167,7 @@ const PUBLIC_PAID_MENTORSHIPS_ENABLED =
 
 const PEOPLE_SEARCH_PAGE_SIZE = 20;
 
-export function ConnectionWorkflow() {
+export function ConnectionWorkflow({ view = "connections" }: { view?: "connections" | "mentorship" }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -179,10 +179,13 @@ export function ConnectionWorkflow() {
     useState<PaymentOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [mentorFilter, setMentorFilter] = useState("all");
+  const [mentorFilter, setMentorFilter] = useState(view === "mentorship" ? "mentors" : "all");
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
   const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
+  const mentorResultsRef = useRef<HTMLDivElement | null>(null);
+  const [mentorResultsMaxHeight, setMentorResultsMaxHeight] =
+    useState<number | null>(null);
   const [peopleSearchCriteria, setPeopleSearchCriteria] =
     useState<PeopleSearchCriteria | null>(null);
   const [peopleSearchOffset, setPeopleSearchOffset] =
@@ -220,6 +223,14 @@ export function ConnectionWorkflow() {
     setIsMentorshipHistoryOpen,
   ] = useState(false);
 
+  // Support previously issued Paystack callback URLs.
+  useEffect(() => {
+    if (view !== "connections" || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("payment") === "return") {
+      window.location.replace(`/mentorships${window.location.search}`);
+    }
+  }, [view]);
+
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
@@ -236,6 +247,94 @@ export function ConnectionWorkflow() {
     return skillMap;
   }, [skills]);
 
+
+  // Only display mentor discovery results after the user selects Find mentors.
+  // search_people excludes existing connections, so include eligible connected mentors.
+  const mentorSearchProfiles = useMemo(() => {
+    if (view !== "mentorship" || !hasSearchedPeople || !peopleSearchCriteria) {
+      return [];
+    }
+    const term = peopleSearchCriteria.term.toLocaleLowerCase();
+    const relatedMentors = connections
+      .filter((connection) => connection.status === "accepted" || connection.status === "pending")
+      .map((connection) =>
+        profiles.find((profile) =>
+          profile.id === (connection.requester_id === currentUserId
+            ? connection.recipient_id : connection.requester_id)
+        )
+      )
+      .filter((profile): profile is Profile =>
+        Boolean(profile?.mentor_available && profile.id !== currentUserId)
+      )
+      .filter((profile) =>
+        peopleSearchCriteria.role === "all" ||
+        profile.role_type === peopleSearchCriteria.role
+      )
+      .filter((profile) =>
+        !term || [
+          profile.display_name,
+          profile.username ?? "",
+          profile.field ?? "",
+          ...(skillsByProfileId.get(profile.id) ?? []),
+        ].some((value) => value.toLocaleLowerCase().includes(term))
+      );
+
+    const unique = new Map<string, Profile>();
+    for (const profile of [...relatedMentors, ...peopleSearchResults]) {
+      unique.set(profile.id, profile);
+    }
+    return Array.from(unique.values()).sort((a, b) =>
+      a.display_name.localeCompare(b.display_name)
+    );
+  }, [
+    view, hasSearchedPeople, peopleSearchCriteria, connections,
+    profiles, currentUserId, peopleSearchResults, skillsByProfileId,
+  ]);
+
+  useEffect(() => {
+    if (mentorSearchProfiles.length <= 3) {
+      setMentorResultsMaxHeight(null);
+      return;
+    }
+
+    const container = mentorResultsRef.current;
+    if (!container) return;
+
+    const firstThree = Array.from(container.children).slice(
+      0,
+      3
+    ) as HTMLElement[];
+
+    function measure() {
+      if (!container || firstThree.length !== 3) return;
+
+      const gap =
+        Number.parseFloat(getComputedStyle(container).rowGap) || 0;
+
+      const height =
+        firstThree.reduce(
+          (total, card) => total + card.getBoundingClientRect().height,
+          0
+        ) + gap * 2;
+
+      setMentorResultsMaxHeight(Math.ceil(height));
+    }
+
+    measure();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+
+    firstThree.forEach((card) => observer?.observe(card));
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [mentorSearchProfiles, mentorRatingsById]);
 
   const participantMentorships = mentorships.filter(
     (mentorship) =>
@@ -787,7 +886,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -799,7 +898,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -815,7 +914,7 @@ export function ConnectionWorkflow() {
         window.history.replaceState(
           {},
           "",
-          "/connections"
+          "/mentorships"
         );
         return;
       }
@@ -1302,7 +1401,7 @@ export function ConnectionWorkflow() {
         : {
             term: searchTerm.trim(),
             role: roleFilter,
-            mentor: mentorFilter,
+            mentor: view === "mentorship" ? "mentors" : mentorFilter,
           };
 
     const offset =
@@ -1361,21 +1460,70 @@ export function ConnectionWorkflow() {
         offset + page.length
       );
 
-      const mentorIds = page
-        .filter((profile) => profile.mentor_available)
-        .map((profile) => profile.id);
+      // Include mentors already connected to the current user.
+      // The backend rating RPC still enforces profile visibility.
+      const relatedMentorIds = view === "mentorship"
+        ? connections
+            .filter((connection) =>
+              connection.status === "accepted" ||
+              connection.status === "pending"
+            )
+            .map((connection) =>
+              connection.requester_id === currentUserId
+                ? connection.recipient_id
+                : connection.requester_id
+            )
+            .map((id) => profileById.get(id))
+            .filter((profile): profile is Profile =>
+              Boolean(profile?.mentor_available && profile.id !== currentUserId)
+            )
+            .filter((profile) =>
+              criteria.role === "all" || profile.role_type === criteria.role
+            )
+            .filter((profile) => {
+              const term = criteria.term.toLocaleLowerCase();
+              return !term || [
+                profile.display_name,
+                profile.username ?? "",
+                profile.field ?? "",
+                ...(skillsByProfileId.get(profile.id) ?? []),
+              ].some((value) => value.toLocaleLowerCase().includes(term));
+            })
+            .map((profile) => profile.id)
+        : [];
+
+      const mentorIds = Array.from(new Set([
+        ...page
+          .filter((profile) => profile.mentor_available)
+          .map((profile) => profile.id),
+        ...relatedMentorIds,
+      ]));
       if (mentorIds.length > 0) {
-        const { data: ratingRows, error: ratingError } = await supabase.rpc(
-          "get_mentor_rating_summaries",
-          { target_mentor_ids: mentorIds }
-        );
-        if (ratingError) {
-          console.warn("Unable to load mentor ratings:", ratingError);
-        } else {
-          const nextRatings = Object.fromEntries(
-            ((ratingRows ?? []) as MentorRatingSummary[]).map((item) => [item.mentor_id, item])
+        const ratingRows: MentorRatingSummary[] = [];
+        let ratingsFailed = false;
+
+        for (let index = 0; index < mentorIds.length; index += 100) {
+          const { data, error: ratingError } = await supabase.rpc(
+            "get_mentor_rating_summaries",
+            { target_mentor_ids: mentorIds.slice(index, index + 100) }
           );
-          setMentorRatingsById((current) => append ? { ...current, ...nextRatings } : nextRatings);
+
+          if (ratingError) {
+            console.warn("Unable to load mentor ratings:", ratingError);
+            ratingsFailed = true;
+            break;
+          }
+
+          ratingRows.push(...((data ?? []) as MentorRatingSummary[]));
+        }
+
+        if (!ratingsFailed) {
+          const nextRatings = Object.fromEntries(
+            ratingRows.map((item) => [item.mentor_id, item])
+          );
+          setMentorRatingsById((current) =>
+            append ? { ...current, ...nextRatings } : nextRatings
+          );
         }
       }
 
@@ -1413,9 +1561,104 @@ export function ConnectionWorkflow() {
       {message && <p className={getMessageAlertClass(message)}>{message}</p>}
 
       {isLoading ? (
-        <p className="text-sm text-gray-600">Loading connections...</p>
+        <p className="text-sm text-gray-600">Loading {view === "mentorship" ? "mentorships" : "connections"}...</p>
       ) : (
         <>
+          {view === "mentorship" && (
+            <>
+              <ConnectionSection title="Find a mentor">
+                <form
+                  className="rounded-xl border bg-white p-4"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void searchPeople(false);
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium">
+                      Search available mentors
+                      <input
+                        className="min-h-10 rounded-lg border px-3 py-2 font-normal"
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Search by name, field or skill"
+                        type="search"
+                        value={searchTerm}
+                      />
+                    </label>
+                    <button
+                      className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                      disabled={isSearchingPeople}
+                      type="submit"
+                      aria-controls="mentor-search-results"
+                      aria-expanded={hasSearchedPeople}
+                    >
+                      {isSearchingPeople ? "Searching..." : "Find mentors"}
+                    </button>
+                  </div>
+                  {peopleSearchError && (
+                    <p className="mt-2 text-sm text-red-700">{peopleSearchError}</p>
+                  )}
+                </form>
+
+                <div id="mentor-search-results" className="grid gap-3" aria-live="polite" aria-busy={isSearchingPeople}>
+                  {!hasSearchedPeople ? (
+                    <EmptyState text="Select Find mentors to browse available mentors." />
+                  ) : isSearchingPeople && mentorSearchProfiles.length === 0 ? (
+                    <p className="text-sm text-gray-600">Searching mentors...</p>
+                  ) : peopleSearchError && mentorSearchProfiles.length === 0 ? null
+                  : mentorSearchProfiles.length === 0 ? (
+                    <EmptyState text="No mentors match your search." />
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        {mentorSearchProfiles.length} {mentorSearchProfiles.length === 1 ? "mentor" : "mentors"} found
+                      </p>
+                      <div
+                        ref={mentorResultsRef}
+                        aria-label="Mentor search results list"
+                        className={
+                          mentorSearchProfiles.length > 3
+                            ? "grid gap-3 overflow-y-auto overscroll-contain pr-2"
+                            : "grid gap-3"
+                        }
+                        style={
+                          mentorSearchProfiles.length > 3
+                            ? { maxHeight: mentorResultsMaxHeight ?? "36rem" }
+                            : undefined
+                        }
+                        tabIndex={mentorSearchProfiles.length > 3 ? 0 : undefined}
+                      >
+                        {mentorSearchProfiles.map((profile) => (
+                        <ConnectionCard
+                          key={profile.id}
+                          profile={profile}
+                          showMentorRating
+                          mentorRating={mentorRatingsById[profile.id] ?? null}
+                        >
+                          <Link
+                            className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
+                            href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
+                          >
+                            Request mentorship
+                          </Link>
+                        </ConnectionCard>
+                        ))}
+                      </div>
+                      {hasMorePeople && (
+                        <button
+                          className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                          disabled={isSearchingPeople}
+                          onClick={() => void searchPeople(true)}
+                          type="button"
+                        >
+                          {isSearchingPeople ? "Loading..." : "Load more"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </ConnectionSection>
+
           <ConnectionSection
             title={`Active mentorships · ${activeMentorships.length}`}
           >
@@ -1982,6 +2225,158 @@ export function ConnectionWorkflow() {
             )}
           </section>
 
+            </>
+          )}
+          {view === "connections" && (
+            <>
+          <ConnectionSection title="Find people">
+            <form
+              className="rounded-xl border bg-white p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void searchPeople(false);
+              }}
+            >
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Search people
+                  <input
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setSearchTerm(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Search by name, field, or skill..."
+                    type="search"
+                    value={searchTerm}
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Role type
+                  <select
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setRoleFilter(
+                        event.target.value
+                      )
+                    }
+                    value={roleFilter}
+                  >
+                    <option value="all">
+                      All role types
+                    </option>
+                    <option value="student">
+                      Student
+                    </option>
+                    <option value="professional">
+                      Professional
+                    </option>
+                    <option value="institution">
+                      Institution
+                    </option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Mentor status
+                  <select
+                    className="rounded-lg border px-3 py-2 font-normal"
+                    onChange={(event) =>
+                      setMentorFilter(
+                        event.target.value
+                      )
+                    }
+                    value={mentorFilter}
+                  >
+                    <option value="all">
+                      Everyone
+                    </option>
+                    <option value="mentors">
+                      Available mentors
+                    </option>
+                    <option value="non-mentors">
+                      Not mentoring
+                    </option>
+                  </select>
+                </label>
+
+                <button
+                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                  disabled={isSearchingPeople}
+                  type="submit"
+                >
+                  {isSearchingPeople
+                    ? "Searching..."
+                    : "Search"}
+                </button>
+              </div>
+
+              <p className="mt-3 text-xs text-gray-500">
+                {hasSearchedPeople
+                  ? `${peopleSearchResults.length} ${
+                      peopleSearchResults.length === 1
+                        ? "result"
+                        : "results"
+                    } loaded`
+                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
+              </p>
+
+              {peopleSearchError && (
+                <p className="mt-2 text-sm text-red-700">
+                  {peopleSearchError}
+                </p>
+              )}
+            </form>
+
+            {!hasSearchedPeople ? (
+              <EmptyState text="Search for people to view matching profiles." />
+            ) : peopleSearchResults.length === 0 ? (
+              <EmptyState text="No matching people found." />
+            ) : (
+              <>
+                {peopleSearchResults.map(
+                  (profile) => (
+                    <ConnectionCard
+                      key={profile.id}
+                      profile={profile}
+                      showMentorRating
+                      mentorRating={mentorRatingsById[profile.id] ?? null}
+                    >
+                      <button
+                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                        disabled={isWorking}
+                        onClick={() =>
+                          sendRequest(
+                            profile.id
+                          )
+                        }
+                      >
+                        Connect
+                      </button>
+                    </ConnectionCard>
+                  )
+                )}
+
+                {hasMorePeople && (
+                  <button
+                    className="min-h-10 w-full rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-50 sm:w-fit"
+                    disabled={isSearchingPeople}
+                    onClick={() =>
+                      void searchPeople(true)
+                    }
+                    type="button"
+                  >
+                    {isSearchingPeople
+                      ? "Loading..."
+                      : "Load more"}
+                  </button>
+                )}
+              </>
+            )}
+          </ConnectionSection>
+
           <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
@@ -2130,161 +2525,32 @@ export function ConnectionWorkflow() {
             {outgoingRequests.length === 0 ? (
               <EmptyState text="No outgoing requests pending." />
             ) : (
-              outgoingRequests.map((connection) => (
-                <ConnectionCard key={connection.id} profile={profileById.get(connection.recipient_id)}>
-                  <span className="text-sm font-medium text-gray-700">Pending</span>
-                </ConnectionCard>
-              ))
-            )}
-          </ConnectionSection>
-
-          <ConnectionSection title="Find people">
-            <form
-              className="rounded-xl border bg-white p-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void searchPeople(false);
-              }}
-            >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Search people
-                  <input
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setSearchTerm(
-                        event.target.value
-                      )
-                    }
-                    placeholder="Search by name, field, or skill..."
-                    type="search"
-                    value={searchTerm}
-                  />
-                </label>
-
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Role type
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setRoleFilter(
-                        event.target.value
-                      )
-                    }
-                    value={roleFilter}
+              <div
+                aria-label="Outgoing connection requests"
+                className={`grid gap-3 ${
+                  outgoingRequests.length > 3
+                    ? "max-h-[23rem] overflow-y-auto overscroll-contain pr-2 md:max-h-[18rem]"
+                    : ""
+                }`}
+                tabIndex={outgoingRequests.length > 3 ? 0 : undefined}
+              >
+                {outgoingRequests.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    profile={profileById.get(connection.recipient_id)}
+                    showBio={false}
+                    showMentorAvailability={false}
                   >
-                    <option value="all">
-                      All role types
-                    </option>
-                    <option value="student">
-                      Student
-                    </option>
-                    <option value="professional">
-                      Professional
-                    </option>
-                    <option value="institution">
-                      Institution
-                    </option>
-                  </select>
-                </label>
-
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Mentor status
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setMentorFilter(
-                        event.target.value
-                      )
-                    }
-                    value={mentorFilter}
-                  >
-                    <option value="all">
-                      Everyone
-                    </option>
-                    <option value="mentors">
-                      Available mentors
-                    </option>
-                    <option value="non-mentors">
-                      Not mentoring
-                    </option>
-                  </select>
-                </label>
-
-                <button
-                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
-                  disabled={isSearchingPeople}
-                  type="submit"
-                >
-                  {isSearchingPeople
-                    ? "Searching..."
-                    : "Search"}
-                </button>
+                    <span className="text-sm font-medium text-gray-700">Pending</span>
+                  </ConnectionCard>
+                ))}
               </div>
-
-              <p className="mt-3 text-xs text-gray-500">
-                {hasSearchedPeople
-                  ? `${peopleSearchResults.length} ${
-                      peopleSearchResults.length === 1
-                        ? "result"
-                        : "results"
-                    } loaded`
-                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
-              </p>
-
-              {peopleSearchError && (
-                <p className="mt-2 text-sm text-red-700">
-                  {peopleSearchError}
-                </p>
-              )}
-            </form>
-
-            {!hasSearchedPeople ? (
-              <EmptyState text="Search for people to view matching profiles." />
-            ) : peopleSearchResults.length === 0 ? (
-              <EmptyState text="No matching people found." />
-            ) : (
-              <>
-                {peopleSearchResults.map(
-                  (profile) => (
-                    <ConnectionCard
-                      key={profile.id}
-                      profile={profile}
-                      showMentorRating
-                      mentorRating={mentorRatingsById[profile.id] ?? null}
-                    >
-                      <button
-                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                        disabled={isWorking}
-                        onClick={() =>
-                          sendRequest(
-                            profile.id
-                          )
-                        }
-                      >
-                        Connect
-                      </button>
-                    </ConnectionCard>
-                  )
-                )}
-
-                {hasMorePeople && (
-                  <button
-                    className="min-h-10 w-full rounded-xl border bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 disabled:opacity-50 sm:w-fit"
-                    disabled={isSearchingPeople}
-                    onClick={() =>
-                      void searchPeople(true)
-                    }
-                    type="button"
-                  >
-                    {isSearchingPeople
-                      ? "Loading..."
-                      : "Load more"}
-                  </button>
-                )}
-              </>
             )}
           </ConnectionSection>
+
+
+            </>
+          )}
         </>
       )}
     </section>

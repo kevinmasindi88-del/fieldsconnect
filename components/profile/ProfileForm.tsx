@@ -133,11 +133,11 @@ const initialMentorshipPricing: MentorshipPricingState = {
   },
 };
 
-// Restores private mentor pricing setup without enabling real transactions.
-// Only the separate public and server checkout flags authorize payment collection.
-const PAYMENT_SETUP_UI_ENABLED = true;
+// Keep pre-launch mentor payment setup hidden until paid mentorship is approved.
+// Existing private drafts remain stored; the backend checkout gate is unchanged.
 const PUBLIC_PAID_MENTORSHIPS_ENABLED =
   process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
+const PAYMENT_SETUP_UI_ENABLED = PUBLIC_PAID_MENTORSHIPS_ENABLED;
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
@@ -2208,16 +2208,8 @@ export function ProfileForm() {
                         )}
                     </div>
 
-                    {!PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
-                      <p className="mt-3 text-xs leading-5 text-gray-600">
-                        Save your profile to retain these prices privately as drafts.
-                        Mentees cannot select or pay for draft offers. The existing
-                        15% FieldsConnect / 85% mentor allocation applies after launch,
-                        subject to processing fees and approved payment terms.
-                      </p>
-                    ) : !(
-                      mentorPaymentAccount?.status ===
-                        "active" &&
+                    {!(
+                      mentorPaymentAccount?.status === "active" &&
                       mentorPaymentAccount.can_receive_payments
                     ) && (
                       <p className="mt-3 text-xs text-gray-500">

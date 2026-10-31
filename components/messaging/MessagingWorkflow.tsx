@@ -58,7 +58,91 @@ type SystemInboxMessage = {
 
 
 const MESSAGE_PAGE_SIZE = 10;
-const MOBILE_THREAD_PAGE_SIZE = 10;
+const MOBILE_THREAD_SCROLL_THRESHOLD = 8;
+const DESKTOP_THREAD_SCROLL_THRESHOLD = 15;
+
+function ScrollableConversationList({
+  children,
+  className,
+  itemCount,
+  threshold,
+}: {
+  children: React.ReactNode;
+  className: string;
+  itemCount: number;
+  threshold: number;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (itemCount <= threshold) {
+      setMaxHeight(null);
+      return;
+    }
+
+    const list = listRef.current;
+    if (!list) return;
+
+    const firstVisibleItems = Array.from(list.children).slice(
+      0,
+      threshold
+    ) as HTMLElement[];
+
+    if (firstVisibleItems.length !== threshold) return;
+
+    function measure() {
+      if (!list) return;
+
+      const gap =
+        Number.parseFloat(getComputedStyle(list).rowGap) || 0;
+      const height =
+        firstVisibleItems.reduce(
+          (total, item) => total + item.getBoundingClientRect().height,
+          0
+        ) + gap * (threshold - 1);
+
+      if (height > 0) {
+        setMaxHeight(Math.ceil(height));
+      }
+    }
+
+    measure();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+
+    firstVisibleItems.forEach((item) => observer?.observe(item));
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [children, itemCount, threshold]);
+
+  return (
+    <div
+      ref={listRef}
+      aria-label="Conversations"
+      className={`${className} ${
+        itemCount > threshold
+          ? "overflow-y-auto overscroll-contain pr-2"
+          : ""
+      }`}
+      style={
+        itemCount > threshold
+          ? { maxHeight: maxHeight ?? "38rem" }
+          : undefined
+      }
+      tabIndex={itemCount > threshold ? 0 : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function MessagingWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -82,8 +166,7 @@ export function MessagingWorkflow() {
     useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] =
     useState(false);
-  const [mobileThreadOffset, setMobileThreadOffset] =
-    useState(0);
+
   const [currentLocalDate, setCurrentLocalDate] =
     useState(() => new Date());
   const onlineUserIds =
@@ -116,20 +199,7 @@ export function MessagingWorkflow() {
     return connections;
   }, [connections]);
 
-  const visibleMobileChatConnections =
-    chatConnections.slice(
-      mobileThreadOffset,
-      mobileThreadOffset +
-        MOBILE_THREAD_PAGE_SIZE
-    );
 
-  const hasPreviousMobileChatConnections =
-    mobileThreadOffset > 0;
-
-  const hasMoreMobileChatConnections =
-    mobileThreadOffset +
-      MOBILE_THREAD_PAGE_SIZE <
-    chatConnections.length;
 
   const unreadMessagesBySender = useMemo(() => {
     const counts = new Map<string, number>();
@@ -856,7 +926,11 @@ export function MessagingWorkflow() {
           </p>
         ) : (
           <>
-            <div className="flex flex-col gap-2 lg:hidden">
+            <ScrollableConversationList
+              className="flex flex-col gap-2 lg:hidden"
+              itemCount={systemInboxMessages.length + chatConnections.length}
+              threshold={MOBILE_THREAD_SCROLL_THRESHOLD}
+            >
               {chatConnections.length === 0 &&
               systemInboxMessages.length === 0 ? (
                 <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
@@ -886,7 +960,7 @@ export function MessagingWorkflow() {
                     </button>
                   ))}
 
-                  {visibleMobileChatConnections.map(
+                  {chatConnections.map(
                     (connection) => {
                       const profile =
                         getOtherProfile(
@@ -971,52 +1045,15 @@ export function MessagingWorkflow() {
                     }
                   )}
 
-                  {(hasPreviousMobileChatConnections ||
-                    hasMoreMobileChatConnections) && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-40"
-                        disabled={
-                          !hasPreviousMobileChatConnections
-                        }
-                        onClick={() =>
-                          setMobileThreadOffset(
-                            (current) =>
-                              Math.max(
-                                0,
-                                current -
-                                  MOBILE_THREAD_PAGE_SIZE
-                              )
-                          )
-                        }
-                        type="button"
-                      >
-                        Previous
-                      </button>
-
-                      <button
-                        className="min-h-10 rounded-xl border bg-white px-4 py-2 text-sm font-medium disabled:opacity-40"
-                        disabled={
-                          !hasMoreMobileChatConnections
-                        }
-                        onClick={() =>
-                          setMobileThreadOffset(
-                            (current) =>
-                              current +
-                              MOBILE_THREAD_PAGE_SIZE
-                          )
-                        }
-                        type="button"
-                      >
-                        Load more
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
-            </div>
+            </ScrollableConversationList>
 
-            <div className="hidden flex-col gap-3 lg:flex">
+            <ScrollableConversationList
+              className="hidden flex-col gap-3 lg:flex"
+              itemCount={systemInboxMessages.length + connections.length}
+              threshold={DESKTOP_THREAD_SCROLL_THRESHOLD}
+            >
               {systemInboxMessages.map((item) => {
                 const isActive =
                   activeSystemMessageId === item.id;
@@ -1136,7 +1173,7 @@ export function MessagingWorkflow() {
                   );
                 }
               )}
-            </div>
+            </ScrollableConversationList>
           </>
         )}
       </aside>
