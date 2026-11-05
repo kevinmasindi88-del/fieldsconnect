@@ -67,6 +67,7 @@ export default function ContactPage() {
           <Link className="text-blue-700 hover:underline" href="/terms-of-use">Terms of Use</Link>
           <Link className="text-blue-700 hover:underline" href="/privacy-policy">Privacy Policy</Link>
           <Link className="text-blue-700 hover:underline" href="/code-of-conduct">Community Guidelines</Link>
+            <Link className="text-blue-700 hover:underline" href="/refund-policy">Cancellations & Refunds</Link>
         </nav>
       </div>
     </main>
