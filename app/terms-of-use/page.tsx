@@ -89,7 +89,10 @@ const sections: readonly PolicySection[] = [
   },
   {
     id:"optional-paid-services", heading:"Paid mentorship option coming soon",
-    paragraphs:[]
+    paragraphs:[
+      "Paid mentorship is not currently enabled on FieldsConnect. Before paid mentorship is introduced, the relevant price, scope, service-delivery terms and any applicable cancellation conditions will be presented before payment.",
+      "Our public Paid Mentorship: Cancellations & Refunds page explains the proposed customer request and refund process. Visit /refund-policy for details. Refund eligibility remains subject to applicable consumer law and the terms presented before a future transaction."
+    ]
   },
   {
     id:"third-parties", heading:"Third-party sites and services",
