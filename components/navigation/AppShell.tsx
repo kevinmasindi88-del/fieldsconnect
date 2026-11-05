@@ -47,6 +47,7 @@ const publicRoutes = new Set([
   "/terms-of-use",
   "/privacy-policy",
   "/contact",
+  "/refund-policy",
 ]);
 
 const suspensionAllowedRoutes = new Set([
@@ -696,7 +697,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  if (shouldHideNavigation || pathname === "/" || pathname === "/contact") {
+  if (shouldHideNavigation || pathname === "/" || pathname === "/contact" || pathname === "/refund-policy") {
     return <>{children}</>;
   }
 
