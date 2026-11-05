@@ -1650,9 +1650,9 @@ export function MentorshipWorkspace({
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-8 sm:px-6">
         <Link
           className="w-fit text-sm font-medium text-blue-700 underline"
-          href="/connections"
+          href="/mentorships"
         >
-          Back to connections
+          Back to mentorships
         </Link>
 
         <p className="rounded-xl border p-4 text-sm text-gray-700">
@@ -1668,9 +1668,9 @@ export function MentorshipWorkspace({
       <div>
         <Link
           className="text-sm font-medium text-blue-700 underline"
-          href="/connections"
+          href="/mentorships"
         >
-          Back to connections
+          Back to mentorships
         </Link>
 
         <div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
