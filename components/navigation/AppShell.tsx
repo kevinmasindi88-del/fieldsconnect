@@ -7,6 +7,10 @@ import {
   useState,
 } from "react";
 import type { User } from "@supabase/supabase-js";
+import {
+  restoreDevicePushForSignedInUser,
+  waitForDevicePushRestore,
+} from "@/lib/push-preferences";
 import Link from "next/link";
 import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -52,9 +56,9 @@ const suspensionAllowedRoutes = new Set([
 const navItems = [
   { href: "/timeline", label: "Home" },
   { href: "/connections", label: "Connections" },
+  { href: "/mentorships", label: "Mentorship" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
-  { href: "/skills", label: "Skills" },
   { href: "/library", label: "Library" },
 ];
 
@@ -63,7 +67,7 @@ type MobileNavIconName =
   | "connections"
   | "messages"
   | "notifications"
-  | "skills"
+  | "mentorship"
   | "library";
 
 const mobileNavItems: Array<{
@@ -82,6 +86,11 @@ const mobileNavItems: Array<{
     icon: "connections",
   },
   {
+    href: "/mentorships",
+    label: "Mentorship",
+    icon: "mentorship",
+  },
+  {
     href: "/messages",
     label: "Messages",
     icon: "messages",
@@ -90,11 +99,6 @@ const mobileNavItems: Array<{
     href: "/notifications",
     label: "Alerts",
     icon: "notifications",
-  },
-  {
-    href: "/skills",
-    label: "Skills",
-    icon: "skills",
   },
   {
     href: "/library",
@@ -158,10 +162,12 @@ function MobileNavIcon({
         </svg>
       );
 
-    case "skills":
+    case "mentorship":
       return (
         <svg {...commonProps}>
-          <path d="m12 3 2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.5 5-.7L12 3Z" />
+          <circle cx="8" cy="8" r="3" />
+          <path d="M2.5 19c.5-3.6 2.6-5.5 5.5-5.5s5 1.9 5.5 5.5" />
+          <path d="m15 11 2.5 2.5L22 8" />
         </svg>
       );
 
@@ -240,6 +246,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    void restoreDevicePushForSignedInUser(user.id).catch((error) => {
+      console.warn("Unable to restore device notifications:", error);
+    });
+  }, [user?.id]);
 
   useEffect(() => {
     if (isLoadingAuth || user || isPublicRoute) return;
@@ -587,6 +601,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     const supabase = getSupabaseBrowserClient();
 
+    if (user?.id) {
+      await waitForDevicePushRestore(user.id);
+    }
+
     try {
       if (
         typeof window !== "undefined" &&
@@ -616,9 +634,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               "Unable to unregister push subscription during logout:",
               error
             );
+            // If server cleanup fails, disable the browser subscription.
+            await subscription.unsubscribe();
           }
-
-          await subscription.unsubscribe();
+          // Otherwise retain the inactive browser subscription for reuse.
         }
       }
     } catch (error) {
@@ -806,6 +825,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       Profile
                     </Link>
 
+                    <Link
+                      className={[
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname === "/skills"
+                          ? "bg-gray-100 font-medium text-gray-950"
+                          : "text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                      href="/skills"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      Skills
+                    </Link>
+
                     <RoleAwareAccountLinks pathname={pathname} />
 
                     <button
@@ -842,7 +876,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Primary navigation"
           >
             {mobileNavItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href ||
+                (item.href === "/mentorships" && pathname.startsWith("/mentorships/"));
 
               const unreadCount =
                 item.href === "/messages"
@@ -937,6 +972,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       >
                         Profile
                       </Link>
+                      <Link
+                        className={[
+                          "block rounded-lg px-3 py-2 text-sm",
+                          pathname === "/skills"
+                            ? "bg-gray-100 font-medium text-gray-950"
+                            : "text-gray-700 hover:bg-gray-50",
+                        ].join(" ")}
+                        href="/skills"
+                        onClick={(event) => {
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                      >
+                        Skills
+                      </Link>
+
                       <RoleAwareAccountLinks pathname={pathname} />
                     </div>
                   </details>
@@ -971,7 +1021,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <nav className="flex gap-2 overflow-x-auto pb-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href ||
+                (item.href === "/mentorships" && pathname.startsWith("/mentorships/"));
 
               return (
                 <Link

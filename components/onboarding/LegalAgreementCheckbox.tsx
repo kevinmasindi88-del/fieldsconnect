@@ -41,7 +41,7 @@ export function LegalAgreementCheckbox({ checked, onChange, id }: Props) {
       {detailsOpen && (
         <div id={`${id}-details`} className="mt-3 border-t border-gray-200 pt-3 text-sm leading-6 text-gray-700">
           <p className="mb-2">
-            The Terms explain your account, mentorship, payments and responsibilities.
+            The Terms explain your account, mentorship and responsibilities.
             The Code of Conduct sets community safety standards. Our Privacy Policy
             explains how FieldsConnect uses and protects personal information.
           </p>

@@ -10,7 +10,8 @@ type ReportTargetType =
   | "message"
   | "skill"
   | "library_document"
-  | "profile_picture";
+  | "profile_picture"
+  | "mentorship";
 
 type ReportMenuProps = {
   targetType: ReportTargetType;
@@ -82,13 +83,20 @@ export function ReportMenu({
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase.rpc("submit_moderation_report", {
-        report_target_type: targetType,
-        report_target_id: targetId,
-        reported_user: reportedUserId,
-        report_reason: reason,
-        report_details: details.trim() || null,
-      });
+      const { data, error } = targetType === "mentorship"
+        ? await supabase.rpc("submit_mentorship_participant_report", {
+            p_mentorship_id: targetId,
+            p_reported_user_id: reportedUserId,
+            p_reason: reason,
+            p_details: details.trim() || null,
+          })
+        : await supabase.rpc("submit_moderation_report", {
+            report_target_type: targetType,
+            report_target_id: targetId,
+            reported_user: reportedUserId,
+            report_reason: reason,
+            report_details: details.trim() || null,
+          });
 
       if (error) throw error;
 
@@ -139,7 +147,9 @@ export function ReportMenu({
               <div>
                 <h2 className="text-lg font-semibold sm:text-xl">Report {label}</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  The exact item and account will be linked automatically to the moderation ticket.
+                  {targetType === "mentorship"
+                    ? "This report identifies the mentorship cycle and participant. A report does not automatically end the mentorship."
+                    : "The exact item and account will be linked automatically to the moderation ticket."}
                 </p>
               </div>
               <button
@@ -173,6 +183,7 @@ export function ReportMenu({
                 Additional details
                 <textarea
                   className="min-h-28 rounded-lg border px-3 py-2 disabled:bg-gray-100"
+                  maxLength={targetType === "mentorship" ? 4000 : undefined}
                   disabled={Boolean(submittedTicket)}
                   value={details}
                   onChange={(event) => setDetails(event.target.value)}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { useOnlinePresence } from "@/components/navigation/AppShell";
 
 type MetricRow = {
   metric_date: string;
@@ -1194,6 +1195,7 @@ function AnalystWorkflow() {
   );
 }
 export function DadDashboard() {
+  const onlineUserIds = useOnlinePresence();
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
   const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
   const [signupTrend, setSignupTrend] = useState<SignupTrendRow[]>([]);
@@ -1419,7 +1421,7 @@ export function DadDashboard() {
         </div>
       )}
 
-      <section className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 lg:grid-cols-4">
+      <section className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 lg:grid-cols-5">
         {overviewKeys.map((key) => (
           <MetricCard
             key={key}
@@ -1427,6 +1429,7 @@ export function DadDashboard() {
             value={metricMap.get(key) ?? 0}
           />
         ))}
+        <MetricCard label="Online now" value={onlineUserIds.size} />
       </section>
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">

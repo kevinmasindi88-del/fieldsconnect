@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
+  restoreDevicePushForSignedInUser,
+  setDevicePushOptIn,
+  waitForDevicePushRestore,
+} from "@/lib/push-preferences";
+import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/browser";
@@ -53,69 +58,37 @@ export function DevicePushNotifications() {
         !("PushManager" in window) ||
         !("Notification" in window)
       ) {
-        if (!cancelled) {
-          setPushState("unsupported");
-        }
+        if (!cancelled) setPushState("unsupported");
         return;
       }
 
       if (Notification.permission === "denied") {
-        if (!cancelled) {
-          setPushState("blocked");
-        }
+        if (!cancelled) setPushState("blocked");
+        return;
+      }
+
+      if (!isSupabaseConfigured()) {
+        if (!cancelled) setPushState("disabled");
         return;
       }
 
       try {
-        const registration =
-          await navigator.serviceWorker.register(
-            "/sw.js"
-          );
+        const supabase = getSupabaseBrowserClient();
+        const { data: { user }, error } =
+          await supabase.auth.getUser();
 
-        const subscription =
-          await registration.pushManager.getSubscription();
+        if (error) throw error;
 
-        if (
-          subscription &&
-          isSupabaseConfigured()
-        ) {
-          const subscriptionJson =
-            subscription.toJSON();
-
-          const p256dh =
-            subscriptionJson.keys?.p256dh;
-
-          const auth =
-            subscriptionJson.keys?.auth;
-
-          if (!p256dh || !auth) {
-            throw new Error(
-              "The existing push subscription is incomplete."
-            );
-          }
-
-          const supabase =
-            getSupabaseBrowserClient();
-
-          const { error } = await supabase.rpc(
-            "register_push_subscription",
-            {
-              subscription_endpoint:
-                subscription.endpoint,
-              subscription_p256dh: p256dh,
-              subscription_auth: auth,
-              subscription_user_agent:
-                navigator.userAgent,
-            }
-          );
-
-          if (error) throw error;
+        if (!user) {
+          if (!cancelled) setPushState("disabled");
+          return;
         }
 
+        const restored =
+          await restoreDevicePushForSignedInUser(user.id);
+
         if (!cancelled) {
-          setPushState(
-            subscription ? "enabled" : "disabled"
-          );
+          setPushState(restored ? "enabled" : "disabled");
         }
       } catch (error) {
         if (!cancelled) {
@@ -172,6 +145,17 @@ export function DevicePushNotifications() {
         return;
       }
 
+      const supabase = getSupabaseBrowserClient();
+      const { data: { user }, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) {
+        throw new Error("Sign in to enable device notifications.");
+      }
+
+      await waitForDevicePushRestore(user.id);
+
       const registration =
         await navigator.serviceWorker.register(
           "/sw.js"
@@ -206,8 +190,12 @@ export function DevicePushNotifications() {
         );
       }
 
-      const supabase =
-        getSupabaseBrowserClient();
+      const { data: { user: currentUser } } =
+        await supabase.auth.getUser();
+
+      if (currentUser?.id !== user.id) {
+        throw new Error("Account changed while enabling notifications.");
+      }
 
       const { error } = await supabase.rpc(
         "register_push_subscription",
@@ -223,6 +211,7 @@ export function DevicePushNotifications() {
 
       if (error) throw error;
 
+      setDevicePushOptIn(user.id, true, p256dh);
       setPushState("enabled");
       setMessage(
         "Device notifications are enabled."
@@ -243,6 +232,17 @@ export function DevicePushNotifications() {
     setIsWorking(true);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { user }, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) {
+        throw new Error("Sign in to disable device notifications.");
+      }
+
+      await waitForDevicePushRestore(user.id);
+
       const registration =
         await navigator.serviceWorker.getRegistration();
 
@@ -252,28 +252,25 @@ export function DevicePushNotifications() {
           : null;
 
       if (!subscription) {
+        setDevicePushOptIn(user.id, false);
         setPushState("disabled");
         return;
       }
 
       const endpoint = subscription.endpoint;
 
-      if (isSupabaseConfigured()) {
-        const supabase =
-          getSupabaseBrowserClient();
+      const { error } = await supabase.rpc(
+        "unregister_push_subscription",
+        {
+          subscription_endpoint: endpoint,
+        }
+      );
 
-        const { error } = await supabase.rpc(
-          "unregister_push_subscription",
-          {
-            subscription_endpoint: endpoint,
-          }
-        );
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       await subscription.unsubscribe();
 
+      setDevicePushOptIn(user.id, false);
       setPushState("disabled");
       setMessage(
         "Device notifications are disabled."

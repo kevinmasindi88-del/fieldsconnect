@@ -99,7 +99,7 @@ function getCallbackUrl(
       ? requestOrigin
       : configuredOrigin;
 
-  const url = new URL("/connections", callbackOrigin);
+  const url = new URL("/mentorships", callbackOrigin);
   url.searchParams.set("payment", "return");
   url.searchParams.set("order", orderId);
 
