@@ -2507,9 +2507,19 @@ function ParticipantCard({
 }) {
   return (
     <article className="min-w-0 max-w-full overflow-visible rounded-2xl border bg-white p-4 sm:p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {label}
+        </p>
+        {profile && currentUserId && profile.id !== currentUserId && (
+          <ReportMenu
+            targetType="mentorship"
+            targetId={mentorshipId}
+            reportedUserId={profile.id}
+            label={label.toLowerCase()}
+          />
+        )}
+      </div>
 
       <div className="mt-3 flex gap-3">
         <ProfileAvatar
@@ -2545,16 +2555,7 @@ function ParticipantCard({
         </div>
       </div>
 
-      {profile && currentUserId && profile.id !== currentUserId && (
-        <div className="mt-3 flex justify-end border-t pt-2">
-          <ReportMenu
-            targetType="mentorship"
-            targetId={mentorshipId}
-            reportedUserId={profile.id}
-            label={label.toLowerCase()}
-          />
-        </div>
-      )}
+
     </article>
   );
 }
