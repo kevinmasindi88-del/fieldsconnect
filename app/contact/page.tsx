@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContactForm } from "@/components/contact/ContactForm";
+import { ContactHeaderAction } from "@/components/contact/ContactHeaderAction";
 
 export const metadata = {
   title: "Contact Us | FieldsConnect",
@@ -14,7 +15,7 @@ export default function ContactPage() {
           <Link href="/" className="text-xl font-extrabold tracking-tight">
             <span className="text-blue-700">Fields</span>Connect
           </Link>
-          <Link href="/login" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-4 text-sm font-semibold hover:bg-slate-50">Log in</Link>
+          <ContactHeaderAction />
         </div>
       </header>
 
