@@ -52,16 +52,6 @@ export default function ContactPage() {
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="services">
-          <h2 id="services" className="text-xl font-bold">What we provide</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-600">
-            Members can build professional profiles, find other members, discover potential mentors,
-            request mentorship, and collaborate on learning goals through the FieldsConnect platform.
-            These are online services accessed through a member account; no physical goods are shipped.
-            Any optional paid offering must display its terms and applicable charges before payment.
-          </p>
-        </section>
-
 
         <nav className="flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200 pt-6 text-sm" aria-label="Policies">
           <Link className="text-blue-700 hover:underline" href="/terms-of-use">Terms of Use</Link>
