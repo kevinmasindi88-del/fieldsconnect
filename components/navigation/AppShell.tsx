@@ -250,6 +250,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
 
+    // Remember authenticated visitors on this device without storing
+    // account identifiers or other personal information.
+    try {
+      window.localStorage.setItem("fc-returning-member", "1");
+    } catch {
+      // Browsers may disable local storage; authentication still works.
+    }
+
     void restoreDevicePushForSignedInUser(user.id).catch((error) => {
       console.warn("Unable to restore device notifications:", error);
     });
