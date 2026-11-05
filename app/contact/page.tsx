@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { ContactForm } from "@/components/contact/ContactForm";
 
 export const metadata = {
-  title: "Business & Contact | FieldsConnect",
+  title: "Contact Us | FieldsConnect",
   description: "Business information and customer support contact details for FieldsConnect (Pty) Ltd.",
 };
 
@@ -19,14 +20,15 @@ export default function ContactPage() {
 
       <div className="mx-auto max-w-4xl space-y-7 px-5 py-12 sm:px-8 sm:py-16">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Business information</p>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Contact FieldsConnect</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Get in touch</p>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Contact Us</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            FieldsConnect is a South African digital platform for learning, professional networking
-            and mentorship. For customer support, service enquiries or concerns, contact us using
-            the details below.
+            Have a question or need help with FieldsConnect? Use the form below to prepare an email
+            to our support team, or find our business contact details further down.
           </p>
         </div>
+
+        <ContactForm />
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="business-details">
           <h2 id="business-details" className="text-xl font-bold">Business details</h2>
@@ -60,15 +62,6 @@ export default function ContactPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="support">
-          <h2 id="support" className="text-xl font-bold">Customer support and enquiries</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-600">
-            For account assistance, service concerns or payment-related questions, email
-            <a className="ml-1 font-semibold text-blue-700 underline underline-offset-2" href="mailto:support@fieldsconnect.app">support@fieldsconnect.app</a>.
-            Please include enough context for us to identify your enquiry. Do not send passwords or
-            full payment-card details by email.
-          </p>
-        </section>
 
         <nav className="flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-200 pt-6 text-sm" aria-label="Policies">
           <Link className="text-blue-700 hover:underline" href="/terms-of-use">Terms of Use</Link>
