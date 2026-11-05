@@ -179,6 +179,7 @@ export default function HomePage() {
           <Link href="/terms-of-use" className="hover:text-blue-700 hover:underline">Terms of Use</Link>
           <Link href="/privacy-policy" className="hover:text-blue-700 hover:underline">Privacy Policy</Link>
           <Link href="/code-of-conduct" className="hover:text-blue-700 hover:underline">Community Guidelines</Link>
+          <Link href="/contact" className="hover:text-blue-700 hover:underline">Business & Contact</Link>
         </nav>
       </footer>
     </main>
