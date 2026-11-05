@@ -46,6 +46,7 @@ const publicRoutes = new Set([
   "/code-of-conduct",
   "/terms-of-use",
   "/privacy-policy",
+  "/contact",
 ]);
 
 const suspensionAllowedRoutes = new Set([
