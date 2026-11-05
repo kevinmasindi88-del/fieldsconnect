@@ -175,12 +175,19 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-slate-100 bg-white">
-        <nav aria-label="Legal information" className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-6 gap-y-3 px-5 py-8 text-sm text-slate-700 sm:px-8">
-          <Link href="/terms-of-use" className="hover:text-blue-700 hover:underline">Terms of Use</Link>
-          <Link href="/privacy-policy" className="hover:text-blue-700 hover:underline">Privacy Policy</Link>
-          <Link href="/code-of-conduct" className="hover:text-blue-700 hover:underline">Community Guidelines</Link>
-          <Link href="/contact" className="hover:text-blue-700 hover:underline">Business & Contact</Link>
-        </nav>
+        <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8">
+          <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8">
+            <span className="font-semibold text-slate-900">FieldsConnect (Pty) Ltd</span>
+            <span>8 Beit Avenue, Farrar Park, Boksburg, 1459</span>
+            <a href="mailto:support@fieldsconnect.app" className="w-fit font-medium text-blue-700 underline underline-offset-2 hover:text-blue-800">support@fieldsconnect.app</a>
+          </div>
+          <nav aria-label="Legal information" className="mt-6 flex flex-wrap gap-x-6 gap-y-3 border-t border-slate-100 pt-6 text-sm text-slate-700">
+            <Link href="/terms-of-use" className="hover:text-blue-700 hover:underline">Terms of Use</Link>
+            <Link href="/privacy-policy" className="hover:text-blue-700 hover:underline">Privacy Policy</Link>
+            <Link href="/code-of-conduct" className="hover:text-blue-700 hover:underline">Community Guidelines</Link>
+            <Link href="/contact" className="hover:text-blue-700 hover:underline">Contact Us</Link>
+          </nav>
+        </div>
       </footer>
     </main>
   );
