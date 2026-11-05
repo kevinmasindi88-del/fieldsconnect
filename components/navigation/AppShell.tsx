@@ -687,7 +687,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  if (shouldHideNavigation) {
+  if (shouldHideNavigation || pathname === "/") {
     return <>{children}</>;
   }
 
