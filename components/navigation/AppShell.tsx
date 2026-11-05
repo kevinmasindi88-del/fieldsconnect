@@ -696,7 +696,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  if (shouldHideNavigation || pathname === "/") {
+  if (shouldHideNavigation || pathname === "/" || pathname === "/contact") {
     return <>{children}</>;
   }
 
@@ -851,6 +851,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                     <RoleAwareAccountLinks pathname={pathname} />
 
+                    <Link
+                      className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      href="/contact"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      Contact Us
+                    </Link>
+
                     <button
                       className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                       type="button"
@@ -997,16 +1007,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </Link>
 
                       <RoleAwareAccountLinks pathname={pathname} />
+
+                      <Link
+                        className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        href="/contact"
+                        onClick={(event) => {
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                      >
+                        Contact Us
+                      </Link>
+
+                      <button
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        type="button"
+                        onClick={handleLogout}
+                      >
+                        Logout
+                      </button>
                     </div>
                   </details>
-
-                  <button
-                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
-                    type="button"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </button>
                 </>
               ) : (
                 <>
