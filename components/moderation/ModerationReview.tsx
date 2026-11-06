@@ -83,6 +83,19 @@ type ModerationMessageContext = {
   is_reported_message: boolean;
 };
 
+type ModerationMentorshipContext = {
+  mentorship_id: string;
+  mentorship_field: string;
+  mentorship_status: string;
+  mentor_id: string;
+  mentor_name: string;
+  mentee_id: string;
+  mentee_name: string;
+  reported_user_id: string;
+  started_on: string;
+  expected_end_on: string | null;
+};
+
 type AuditEntry = {
   id: string;
   action: string;
@@ -138,6 +151,12 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
     useState(false);
   const [isMessageEvidenceUnavailable, setIsMessageEvidenceUnavailable] =
     useState(false);
+  const [mentorshipContext, setMentorshipContext] =
+    useState<ModerationMentorshipContext | null>(null);
+  const [isMentorshipContextLoading, setIsMentorshipContextLoading] =
+    useState(false);
+  const [mentorshipContextError, setMentorshipContextError] =
+    useState<string | null>(null);
   const [suspension, setSuspension] =
     useState<AccountSuspension | null>(null);
   const [isSuspensionLoading, setIsSuspensionLoading] = useState(false);
@@ -179,6 +198,32 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       setMessage(getErrorMessage(error));
     } finally {
       setIsMessageContextLoading(false);
+    }
+  }
+
+  async function loadMentorshipContext(reportId: string) {
+    setIsMentorshipContextLoading(true);
+    setMentorshipContext(null);
+    setMentorshipContextError(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } = await supabase.rpc(
+        "get_moderation_mentorship_context",
+        { p_report_id: reportId }
+      );
+      if (error) throw error;
+      const context = (data ?? [])[0] as ModerationMentorshipContext | undefined;
+      if (!context) {
+        setMentorshipContextError("Mentorship cycle context is unavailable.");
+      } else {
+        setMentorshipContext(context);
+      }
+    } catch (error) {
+      // An unassigned moderator must not receive protected cycle details.
+      setMentorshipContextError(getErrorMessage(error));
+    } finally {
+      setIsMentorshipContextLoading(false);
     }
   }
 
@@ -458,7 +503,9 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
               ? loadReportedLibraryDocument(loadedTicket.target_id)
               : loadedTicket.target_type === "message"
                 ? loadReportedMessageContext(ticketId)
-                : Promise.resolve(),
+                : loadedTicket.target_type === "mentorship"
+                  ? loadMentorshipContext(ticketId)
+                  : Promise.resolve(),
         ]);
       } catch (error) {
         setMessage(getErrorMessage(error));
@@ -914,7 +961,44 @@ export function ModerationReview({ ticketId }: { ticketId: string }) {
       <div className="border-t pt-6">
         <h2 className="mb-3 text-lg font-semibold sm:mb-4 sm:text-xl">Reported content</h2>
 
-        {ticket.target_type === "post" ? (
+        {ticket.target_type === "mentorship" ? (
+          <div className="rounded-xl border bg-white p-4 text-sm">
+            {isMentorshipContextLoading ? (
+              <p className="text-gray-600">Loading restricted mentorship context...</p>
+            ) : mentorshipContextError ? (
+              <p className="text-gray-600">{mentorshipContextError}</p>
+            ) : mentorshipContext ? (
+              <div className="space-y-3">
+                <p className="font-semibold">{mentorshipContext.mentorship_field}</p>
+                <p className="text-gray-600">Cycle status: {mentorshipContext.mentorship_status.replaceAll("_", " ")}</p>
+                <p>Mentor: {mentorshipContext.mentor_name}</p>
+                <p>Mentee: {mentorshipContext.mentee_name}</p>
+                <p>Reported participant: {
+                  mentorshipContext.reported_user_id === mentorshipContext.mentor_id
+                    ? mentorshipContext.mentor_name
+                    : mentorshipContext.mentee_name
+                }</p>
+                <p>Started: {mentorshipContext.started_on}</p>
+                {mentorshipContext.expected_end_on && (
+                  <p>Expected end: {mentorshipContext.expected_end_on}</p>
+                )}
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-100"
+                  href={`/moderation/review/${ticket.id}/mentorship`}
+                >
+                  Open mentorship cycle — Read only
+                </Link>
+                <p className="border-t pt-3 text-xs text-gray-500">
+                  Read-only cycle evidence is restricted to the assigned
+                  moderator or an authorised unassigned-ticket admin.
+                  Private inbox conversations and payment records are excluded.
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-600">Cycle context unavailable. Assign the ticket to view permitted evidence.</p>
+            )}
+          </div>
+        ) : ticket.target_type === "post" ? (
           <PostDetailWorkflow
             key={`${ticket.target_id}-${contentRevision}`}
             postId={ticket.target_id}
