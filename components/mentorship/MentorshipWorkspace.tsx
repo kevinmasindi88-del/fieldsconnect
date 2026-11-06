@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ReportMenu } from "@/components/moderation/ReportMenu";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -1649,9 +1650,9 @@ export function MentorshipWorkspace({
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-8 sm:px-6">
         <Link
           className="w-fit text-sm font-medium text-blue-700 underline"
-          href="/connections"
+          href="/mentorships"
         >
-          Back to connections
+          Back to mentorships
         </Link>
 
         <p className="rounded-xl border p-4 text-sm text-gray-700">
@@ -1667,9 +1668,9 @@ export function MentorshipWorkspace({
       <div>
         <Link
           className="text-sm font-medium text-blue-700 underline"
-          href="/connections"
+          href="/mentorships"
         >
-          Back to connections
+          Back to mentorships
         </Link>
 
         <div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -1712,16 +1713,21 @@ export function MentorshipWorkspace({
           mentee?.display_name ?? "Mentee"
         }`}
         title="Participants"
+        allowOverflow
       >
         <div className="grid gap-4 md:grid-cols-2">
           <ParticipantCard
             label="Mentor"
             profile={mentor}
+            currentUserId={currentUserId}
+            mentorshipId={mentorship.id}
           />
 
           <ParticipantCard
             label="Mentee"
             profile={mentee}
+            currentUserId={currentUserId}
+            mentorshipId={mentorship.id}
           />
         </div>
       </MobileWorkspaceSection>
@@ -2417,6 +2423,7 @@ function MobileWorkspaceSection({
   isOpen,
   onToggle,
   contentClassName = "",
+  allowOverflow = false,
   children,
 }: {
   title: string;
@@ -2424,10 +2431,11 @@ function MobileWorkspaceSection({
   isOpen: boolean;
   onToggle: () => void;
   contentClassName?: string;
+  allowOverflow?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-2xl border bg-white">
+    <section className={`min-w-0 rounded-2xl border bg-white ${allowOverflow ? "overflow-visible" : "overflow-hidden"}`}>
       <button
         aria-expanded={isOpen}
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left sm:hidden"
@@ -2489,15 +2497,29 @@ function MobileWorkspaceSection({
 function ParticipantCard({
   label,
   profile,
+  currentUserId,
+  mentorshipId,
 }: {
   label: string;
   profile?: Profile;
+  currentUserId: string | null;
+  mentorshipId: string;
 }) {
   return (
-    <article className="min-w-0 max-w-full overflow-hidden rounded-2xl border bg-white p-4 sm:p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
+    <article className="min-w-0 max-w-full overflow-visible rounded-2xl border bg-white p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {label}
+        </p>
+        {profile && currentUserId && profile.id !== currentUserId && (
+          <ReportMenu
+            targetType="mentorship"
+            targetId={mentorshipId}
+            reportedUserId={profile.id}
+            label={label.toLowerCase()}
+          />
+        )}
+      </div>
 
       <div className="mt-3 flex gap-3">
         <ProfileAvatar
@@ -2532,6 +2554,8 @@ function ParticipantCard({
           )}
         </div>
       </div>
+
+
     </article>
   );
 }
