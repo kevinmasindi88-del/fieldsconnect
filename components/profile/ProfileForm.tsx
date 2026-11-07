@@ -1635,18 +1635,31 @@ export function ProfileForm() {
             />
           </label>
 
-          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
-            Profile visibility
-            <select
-              className="w-full min-w-0 rounded-lg border px-3 py-2"
-              value={form.profileVisibility}
-              onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
-            >
-              <option value="public">Public</option>
-              <option value="connections">Connections only</option>
-              <option value="private">Private</option>
-            </select>
-          </label>
+          <div className="flex min-w-0 flex-col gap-2">
+            <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+              Profile visibility
+              <select
+                className="w-full min-w-0 rounded-lg border px-3 py-2"
+                value={form.profileVisibility}
+                aria-describedby={form.profileVisibility === "private" ? "private-profile-visibility-help" : undefined}
+                onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
+              >
+                <option value="public">Public</option>
+                <option value="connections">Connections only</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+            {form.profileVisibility === "private" && (
+              <p
+                id="private-profile-visibility-help"
+                role="status"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
+              >
+                Your profile will not be visible to other members or appear in people searches.
+                You can still search for and discover other members. Changes take effect after you save your profile.
+              </p>
+            )}
+          </div>
 
           <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
             <div>
