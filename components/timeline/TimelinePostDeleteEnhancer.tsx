@@ -106,6 +106,8 @@ export function TimelinePostDeleteEnhancer() {
       button.textContent = "Deleting...";
 
       const supabase = getSupabaseBrowserClient();
+      const { data: attachment } = await supabase.from("posts")
+        .select("image_path").eq("id", postId).maybeSingle();
       const { data, error } = await supabase.rpc("soft_delete_own_post", {
         target_post_id: postId,
       });
@@ -122,6 +124,14 @@ export function TimelinePostDeleteEnhancer() {
         button.disabled = false;
         button.textContent = "Delete";
         return;
+      }
+
+      // Remove the media object too so deleting a post doesn't accumulate
+      // unnecessary files in the private timeline bucket.
+      if (attachment?.image_path) {
+        const { error: storageError } = await supabase.storage
+          .from("timeline-images").remove([attachment.image_path]);
+        if (storageError) console.error("Unable to clean up post image:", storageError);
       }
 
       window.location.reload();
