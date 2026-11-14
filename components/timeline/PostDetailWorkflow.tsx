@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
+import { PostRichContent } from "@/components/timeline/PostRichContent";
 
 type Profile = {
   id: string;
@@ -21,6 +22,8 @@ type Post = {
   visibility: "public" | "connections";
   created_at: string;
   edited_at: string | null;
+  image_path: string | null;
+  link_url: string | null;
 };
 
 type FcNewsPublication = {
@@ -84,7 +87,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         ] = await Promise.all([
           supabase
             .from("posts")
-            .select("id, author_id, body, visibility, created_at, edited_at")
+            .select("id, author_id, body, visibility, created_at, edited_at, image_path, link_url")
             .eq("id", postId)
             .is("deleted_at", null)
             .maybeSingle(),
@@ -213,25 +216,14 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
               {fcNewsPublication.title}
             </h1>
           )}
-          <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">
-            {post.body}
-            {mentionedProfiles.length > 0 && (
-              <>
-                {" "}
-                {mentionedProfiles.map((profile, index) => (
-                  <span key={profile.id}>
-                    {index > 0 && " "}
-                    <Link
-                      className="font-medium text-blue-700 hover:underline"
-                      href={`/profile/${profile.id}`}
-                    >
-                      @{profile.display_name}
-                    </Link>
-                  </span>
-                ))}
-              </>
-            )}
-          </p>
+          <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} />
+          {mentionedProfiles.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {mentionedProfiles.map((profile) => (
+                <Link className="text-sm font-medium text-blue-700 hover:underline" key={profile.id} href={`/profile/${profile.id}`}>@{profile.display_name}</Link>
+              ))}
+            </div>
+          )}
           {!fcNewsPublication && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
         </div>
 
