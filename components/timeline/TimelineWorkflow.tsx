@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
+import { PostRichContent, extractFirstPostUrl, compressTimelineImage } from "@/components/timeline/PostRichContent";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -26,6 +27,8 @@ type Post = {
   visibility: "public" | "connections";
   created_at: string;
   edited_at: string | null;
+  image_path: string | null;
+  link_url: string | null;
 };
 
 type FcNewsPublication = {
@@ -96,6 +99,8 @@ export function TimelineWorkflow() {
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [postMentions, setPostMentions] = useState<PostMention[]>([]);
   const [postBody, setPostBody] = useState("");
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isMentionPickerOpen, setIsMentionPickerOpen] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
@@ -136,7 +141,7 @@ export function TimelineWorkflow() {
       await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, body, visibility, created_at, edited_at")
+          .select("id, author_id, body, visibility, created_at, edited_at, image_path, link_url")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }),
         supabase
@@ -283,7 +288,7 @@ export function TimelineWorkflow() {
           .is("deleted_at", null),
         supabase
           .from("posts")
-          .select("id, author_id, body, visibility, created_at, edited_at")
+          .select("id, author_id, body, visibility, created_at, edited_at, image_path, link_url")
           .is("deleted_at", null)
           .order("created_at", { ascending: false }),
         supabase
@@ -511,26 +516,35 @@ export function TimelineWorkflow() {
   async function createPost(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!currentUserId || !postBody.trim() || !isSupabaseConfigured()) return;
-
     setIsWorking(true);
     setMessage(null);
-
+    const supabase = getSupabaseBrowserClient();
+    let uploadedPath: string | null = null;
+    let postCreated = false;
     try {
-      const supabase = getSupabaseBrowserClient();
-
-      const { error } = await supabase.rpc(
-        "create_post_with_mentions",
-        {
-          post_body: postBody.trim(),
-          post_visibility: visibility,
-          mentioned_profile_ids: selectedMentions.map(
-            (mention) => mention.profile_id
-          ),
-        }
-      );
-
+      if (pendingImage) {
+        const compressed = await compressTimelineImage(pendingImage);
+        uploadedPath = `${currentUserId}/${crypto.randomUUID()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from("timeline-images")
+          .upload(uploadedPath, compressed, { contentType: "image/jpeg", upsert: false });
+        if (uploadError) throw uploadError;
+      }
+      const { data: createdPostId, error } = await supabase.rpc("create_post_with_mentions", {
+        post_body: postBody.trim(),
+        post_visibility: visibility,
+        mentioned_profile_ids: selectedMentions.map((mention) => mention.profile_id),
+      });
       if (error) throw error;
-
+      postCreated = true;
+      const url = extractFirstPostUrl(postBody);
+      if (uploadedPath || url) {
+        const { error: mediaError } = await supabase.from("posts")
+          .update({ image_path: uploadedPath, link_url: url }).eq("id", createdPostId);
+        if (mediaError) throw mediaError;
+      }
+      if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
+      setPendingImage(null);
+      setPendingImagePreview(null);
       setPostBody("");
       setVisibility("public");
       setSelectedMentions([]);
@@ -538,12 +552,42 @@ export function TimelineWorkflow() {
       setMentionResults([]);
       setIsMentionPickerOpen(false);
       setIsEmojiPickerOpen(false);
-
       await loadData();
     } catch (error) {
-      setMessage(getActionErrorMessage(error, "create post"));
-    } finally {
-      setIsWorking(false);
+      if (uploadedPath && !postCreated) {
+        await supabase.storage.from("timeline-images").remove([uploadedPath]);
+      }
+      setMessage(postCreated ? "Post published, but its media could not be attached." : getActionErrorMessage(error, "create post"));
+      if (postCreated) await loadData();
+    } finally { setIsWorking(false); }
+  }
+
+  function selectPostImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
+    setPendingImagePreview(null);
+    setPendingImage(null);
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024) {
+      setMessage("Choose a JPEG, PNG or WebP under 12 MB.");
+      return;
+    }
+    setMessage(null);
+    setPendingImage(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+  }
+
+  async function sharePost(post: Post) {
+    const url = `${window.location.origin}/post/${post.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "FieldsConnect post", url });
+      else {
+        await navigator.clipboard.writeText(url);
+        setMessage("Post link copied. Connections-only content remains restricted.");
+      }
+    } catch (error) {
+      if ((error as Error)?.name !== "AbortError") setMessage("Couldn't share this post.");
     }
   }
 
@@ -894,6 +938,25 @@ export function TimelineWorkflow() {
           </div>
         )}
 
+        <div className="flex flex-col gap-2">
+          <label className="inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50">
+            Add image
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
+          </label>
+          {pendingImagePreview && (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pendingImagePreview} alt="Image preview" className="h-24 w-28 rounded-lg border object-contain" />
+              <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => {
+                URL.revokeObjectURL(pendingImagePreview);
+                setPendingImagePreview(null);
+                setPendingImage(null);
+              }}>Remove image</button>
+            </div>
+          )}
+          {extractFirstPostUrl(postBody) && <p className="break-all text-xs text-blue-700">Link detected — preview will appear where available.</p>}
+          <p className="text-xs text-gray-500">One compressed still image. No GIFs, audio or video.</p>
+        </div>
         <div className="flex items-end justify-between gap-3">
           <div className="relative flex items-center gap-2">
             <button
@@ -1235,25 +1298,16 @@ export function TimelineWorkflow() {
                         {fcNewsPublication.title}
                       </h3>
                     )}
-                    <p className={`${fcNewsPublication ? "mt-2" : "mt-4"} whitespace-pre-wrap text-sm leading-snug text-gray-800`}>
-                      {post.body}
+                    <div className={fcNewsPublication ? "mt-2" : "mt-4"}>
+                      <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} />
                       {mentionedProfiles.length > 0 && (
-                        <>
-                          {" "}
-                          {mentionedProfiles.map((profile, index) => (
-                            <span key={profile.id}>
-                              {index > 0 && " "}
-                              <Link
-                                className="font-medium text-blue-700 hover:underline"
-                                href={`/profile/${profile.id}`}
-                              >
-                                @{profile.display_name}
-                              </Link>
-                            </span>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {mentionedProfiles.map((profile) => (
+                            <Link key={profile.id} className="text-sm font-medium text-blue-700 hover:underline" href={`/profile/${profile.id}`}>@{profile.display_name}</Link>
                           ))}
-                        </>
+                        </div>
                       )}
-                    </p>
+                    </div>
 
                   </>
                 )}
@@ -1292,6 +1346,7 @@ export function TimelineWorkflow() {
                   <span>{getPostLikeCount(post.id)}</span>
                 </button>
                 <span className="text-xs text-gray-600 sm:text-sm">{postComments.length} comments</span>
+                <button type="button" onClick={() => void sharePost(post)} className="ml-auto min-h-10 rounded-xl border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Share</button>
               </div>
 
               <div className="flex flex-col gap-3 border-t pt-4">
