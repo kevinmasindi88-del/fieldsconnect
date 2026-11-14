@@ -841,7 +841,7 @@ export function TimelineWorkflow() {
       const supabase = getSupabaseBrowserClient();
       const { error } = await supabase
         .from("posts")
-        .update({ body: editingPostBody.trim(), edited_at: new Date().toISOString() })
+        .update({ body: editingPostBody.trim(), link_url: extractFirstPostUrl(editingPostBody), edited_at: new Date().toISOString() })
         .eq("id", postId)
         .eq("author_id", currentUserId);
       if (error) throw error;
