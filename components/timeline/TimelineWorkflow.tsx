@@ -94,6 +94,7 @@ export function TimelineWorkflow() {
   const [fcNewsPublications, setFcNewsPublications] =
     useState<FcNewsPublication[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [commentReactions, setCommentReactions] = useState<CommentReaction[]>([]);
   const [postMentions, setPostMentions] = useState<PostMention[]>([]);
@@ -1197,9 +1198,11 @@ export function TimelineWorkflow() {
                 </button>
                 <button
                   type="button"
-                  aria-label={`Comment on post, ${postComments.length} comments`}
-                  title="Comment"
-                  onClick={() => document.getElementById(`timeline-comment-form-${post.id}`)?.querySelector("input")?.focus()}
+                  aria-label={`${expandedComments[post.id] ? "Hide" : "Show"} comments on post (${postComments.length})`}
+                  aria-expanded={Boolean(expandedComments[post.id])}
+                  aria-controls={`timeline-comments-${post.id}`}
+                  title={expandedComments[post.id] ? "Hide comments" : "Show comments"}
+                  onClick={() => setExpandedComments((current) => ({ ...current, [post.id]: !current[post.id] }))}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                 >
                   <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1221,7 +1224,8 @@ export function TimelineWorkflow() {
                 </button>
               </div>
 
-              <div className="flex flex-col gap-3 border-t pt-4">
+              {expandedComments[post.id] && (
+              <div id={`timeline-comments-${post.id}`} className="flex flex-col gap-3 border-t pt-4">
                 {postComments.map((comment) => {
                   const commenter = profileById.get(comment.author_id);
                   const commentLiked = hasLikedComment(comment.id);
@@ -1368,6 +1372,7 @@ export function TimelineWorkflow() {
                   </button>
                 </form>
               </div>
+              )}
             </article>
           );
         })
