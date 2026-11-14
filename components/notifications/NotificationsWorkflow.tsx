@@ -221,6 +221,54 @@ export function NotificationsWorkflow() {
     }
   }
 
+  async function openMessageNotification(notification: Notification) {
+    if (isWorking) return;
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      if (!notification.actor_id) {
+        throw new Error("The sender is no longer available.");
+      }
+
+      const supabase = getSupabaseBrowserClient();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Please log in to open your messages.");
+
+      // Only accepted connections belonging to this signed-in member can
+      // be opened. Never trust a connection ID supplied by notification text.
+      const { data: connectionData, error: connectionError } = await supabase
+        .from("connections")
+        .select("id, requester_id, recipient_id")
+        .eq("status", "accepted")
+        .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`);
+      if (connectionError) throw connectionError;
+
+      const match = (connectionData ?? []).find((connection) =>
+        (connection.requester_id === userId &&
+          connection.recipient_id === notification.actor_id) ||
+        (connection.recipient_id === userId &&
+          connection.requester_id === notification.actor_id)
+      );
+
+      if (!match) {
+        throw new Error("This conversation is no longer available. Check your Connections.");
+      }
+
+      await openNotificationPath(
+        notification,
+        `/messages?connection=${encodeURIComponent(match.id)}`
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to open this conversation."
+      );
+      setIsWorking(false);
+    }
+  }
+
   async function markAllAsRead() {
     setIsWorking(true);
     setMessage(null);
@@ -557,6 +605,48 @@ export function NotificationsWorkflow() {
             const actor = notification.actor_id ? profileById.get(notification.actor_id) : null;
             const isUnread = !notification.read_at;
             const postId = getNotificationPostId(notification);
+
+            if (notification.notification_type === "new_message") {
+              return (
+                <button
+                  key={notification.id}
+                  aria-label={`Open conversation: ${getNotificationTitle(notification)}`}
+                  className={`flex w-full min-w-0 gap-2.5 rounded-xl border p-3 text-left transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : "bg-white"}`}
+                  disabled={isWorking}
+                  onClick={() => void openMessageNotification(notification)}
+                  type="button"
+                >
+                  <ProfileAvatar
+                    avatarPath={actor?.avatar_url}
+                    displayName={actor?.display_name ?? notification.title}
+                    size={40}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <span className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">
+                        {getNotificationTitle(notification)}
+                      </span>
+                      {isUnread && (
+                        <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:py-1 sm:text-xs">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    {notification.body && (
+                      <span className="text-sm leading-snug text-gray-700">
+                        {notification.body}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-500">
+                      {formatDate(notification.created_at)}
+                    </span>
+                    <span className="text-xs font-semibold text-blue-700">
+                      Open conversation
+                    </span>
+                  </div>
+                </button>
+              );
+            }
 
             return (
               <article
