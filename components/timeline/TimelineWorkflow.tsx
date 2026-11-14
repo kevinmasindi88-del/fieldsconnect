@@ -714,6 +714,30 @@ export function TimelineWorkflow() {
     }
   }
 
+  async function deleteOwnComment(commentId: string) {
+    if (!currentUserId || !isSupabaseConfigured() || isWorking) return;
+    if (!comments.some((comment) => comment.id === commentId && comment.author_id === currentUserId)) return;
+    if (!window.confirm("Delete your comment?")) return;
+    setIsWorking(true);
+    setMessage(null);
+    try {
+      const { error } = await getSupabaseBrowserClient()
+        .from("comments")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", commentId)
+        .eq("author_id", currentUserId)
+        .is("deleted_at", null);
+      if (error) throw error;
+      setComments((current) => current.filter((comment) => comment.id !== commentId));
+      setCommentMentions((current) => current.filter((mention) => mention.comment_id !== commentId));
+      setCommentReactions((current) => current.filter((reaction) => reaction.comment_id !== commentId));
+    } catch (error) {
+      setMessage(getActionErrorMessage(error, "delete comment"));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
   async function addComment(event: React.FormEvent<HTMLFormElement>, postId: string) {
     event.preventDefault();
     const body = commentDrafts[postId]?.trim();
@@ -863,7 +887,7 @@ export function TimelineWorkflow() {
             mentionCount={selectedMentions.length}
             selectedMentions={selectedMentions}
             disabled={isWorking}
-            placeholder="Share an update... Type @ to mention a connection"
+            placeholder="Share an update..."
           />
         </label>
 
@@ -1222,7 +1246,17 @@ export function TimelineWorkflow() {
                               </p>
                             )}
                           </div>
-                          {!isOwnComment && currentUserId && (
+                          {isOwnComment ? (
+                            <button
+                              type="button"
+                              className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              disabled={isWorking}
+                              onClick={() => void deleteOwnComment(comment.id)}
+                              aria-label="Delete your comment"
+                            >
+                              Delete
+                            </button>
+                          ) : currentUserId && (
                             <ReportMenu
                               targetType="comment"
                               targetId={comment.id}
@@ -1299,7 +1333,7 @@ export function TimelineWorkflow() {
                     mentionCount={(commentMentionSelections[post.id] ?? []).length}
                     selectedMentions={commentMentionSelections[post.id] ?? []}
                     disabled={isWorking}
-                    placeholder="Write a comment... Use @ to mention a connection"
+                    placeholder="Write a comment..."
                   />
                   <button
                     className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
