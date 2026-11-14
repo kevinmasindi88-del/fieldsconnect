@@ -1169,10 +1169,10 @@ export function TimelineWorkflow() {
                   aria-label={liked ? "Unlike post" : "Like post"}
                   aria-pressed={liked}
                   className={[
-                    "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50",
+                    "inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50",
                     liked
-                      ? "border-blue-200 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700",
+                      ? "text-blue-700 hover:bg-blue-50"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-blue-700",
                   ].join(" ")}
                   disabled={reactingPostId === post.id}
                   onClick={() => toggleLike(post.id)}
@@ -1193,11 +1193,32 @@ export function TimelineWorkflow() {
                       strokeWidth="1.8"
                     />
                   </svg>
-
                   <span>{getPostLikeCount(post.id)}</span>
                 </button>
-                <span className="text-xs text-gray-600 sm:text-sm">{postComments.length} comments</span>
-                <button type="button" onClick={() => void sharePost(post)} className="ml-auto min-h-10 rounded-xl border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Share</button>
+                <button
+                  type="button"
+                  aria-label={`Comment on post, ${postComments.length} comments`}
+                  title="Comment"
+                  onClick={() => document.getElementById(`timeline-comment-form-${post.id}`)?.querySelector("input")?.focus()}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                >
+                  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5 9.2 9.2 0 0 1-3.8-.8L3 21l1.8-5.2A8.5 8.5 0 1 1 20.5 11.5Z" />
+                  </svg>
+                  <span>{postComments.length}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Share post"
+                  title="Share post"
+                  onClick={() => void sharePost(post)}
+                  className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                >
+                  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 16V3m0 0-4.5 4.5M12 3l4.5 4.5" />
+                    <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                  </svg>
+                </button>
               </div>
 
               <div className="flex flex-col gap-3 border-t pt-4">
@@ -1319,7 +1340,7 @@ export function TimelineWorkflow() {
                   );
                 })}
 
-                <form onSubmit={(event) => addComment(event, post.id)} className="flex flex-col gap-3 sm:flex-row">
+                <form id={`timeline-comment-form-${post.id}`} onSubmit={(event) => addComment(event, post.id)} className="flex flex-col gap-3 sm:flex-row">
                   <MentionEditor
                     multiline={false}
                     className="w-full rounded-lg border px-3 py-2 text-sm"
