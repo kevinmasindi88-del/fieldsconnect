@@ -19,6 +19,7 @@ type Profile = {
   bio: string | null;
   mentor_available: boolean;
   avatar_url: string | null;
+  profile_visibility?: "public" | "connections" | "private";
 };
 
 type Connection = {
@@ -681,6 +682,19 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
 
         profilesData =
           (relatedProfilesData ?? []) as Profile[];
+
+        // Resolve minimal identities for private members involved in requests.
+        const missingIds = Array.from(relatedProfileIds).filter(
+          (id) => !profilesData.some((profile) => profile.id === id)
+        );
+        for (let index = 0; index < missingIds.length; index += 100) {
+          const { data: privateCards, error: cardsError } = await supabase.rpc(
+            "get_discoverable_member_cards",
+            { target_ids: missingIds.slice(index, index + 100) }
+          );
+          if (cardsError) throw cardsError;
+          profilesData = [...profilesData, ...((privateCards ?? []) as Profile[])];
+        }
       }
 
       const acceptedProfileIds =
@@ -1427,7 +1441,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         data,
         error,
       } = await supabase.rpc(
-        "search_people",
+        "search_people_discoverable",
         {
           search_term: criteria.term,
           role_filter: criteria.role,
@@ -2591,21 +2605,23 @@ function ConnectionCard({
           {profile?.display_name ?? "Unknown profile"}
         </h3>
         <p className="text-xs leading-snug text-gray-600 sm:text-sm">
-          {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
+          {profile?.profile_visibility === "private"
+            ? "Private profile"
+            : [profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "No field added yet"}
         </p>
-        {showBio && profile?.bio && (
+        {showBio && profile?.profile_visibility !== "private" && profile?.bio && (
           <p className="mt-2 line-clamp-3 max-w-2xl text-sm leading-snug text-gray-700">
             {profile.bio}
           </p>
         )}
 
-        {skills.length > 0 && (
+        {profile?.profile_visibility !== "private" && skills.length > 0 && (
           <p className="mt-2 text-xs text-gray-500">
             {skills.slice(0, 4).join(" · ")}
           </p>
         )}
 
-        {showMentorAvailability && profile?.mentor_available && (
+        {showMentorAvailability && profile?.profile_visibility !== "private" && profile?.mentor_available && (
           <p className="mt-2 text-xs font-medium sm:text-sm">
             Available as mentor
           </p>
@@ -2617,14 +2633,14 @@ function ConnectionCard({
   return (
     <article className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center">
       <div className="min-w-0 flex-1">
-        {profile ? (
+        {profile && profile.profile_visibility !== "private" ? (
           <Link className="flex min-w-0 gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${profile.id}`}>
             {identity}
           </Link>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row">{identity}</div>
         )}
-        {showMentorRating && profile?.mentor_available && (
+        {showMentorRating && profile?.profile_visibility !== "private" && profile?.mentor_available && (
           <div className="ml-[52px] mt-1 text-xs sm:text-sm">
             <MentorRating
               summary={mentorRating}
