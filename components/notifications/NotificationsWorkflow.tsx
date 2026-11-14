@@ -139,8 +139,33 @@ export function NotificationsWorkflow() {
       if (profileError) throw profileError;
       if (commentError) throw commentError;
 
-      setNotifications((notificationData ?? []) as Notification[]);
-      setProfiles((profileData ?? []) as Profile[]);
+      const currentNotifications = (notificationData ?? []) as Notification[];
+      const readableProfiles = (profileData ?? []) as Profile[];
+      const knownProfileIds = new Set(readableProfiles.map((profile) => profile.id));
+      const missingActorIds = Array.from(new Set(
+        currentNotifications
+          .map((notification) => notification.actor_id)
+          .filter((id): id is string => Boolean(id && !knownProfileIds.has(id)))
+      ));
+
+      // Private profiles aren't directly readable through the profiles table.
+      // Resolve only the identity allowed for discovery (name, not private content).
+      // Keep normal notifications working even when an actor has been removed.
+      const resolvedActorProfiles: Profile[] = [];
+      for (let index = 0; index < missingActorIds.length; index += 100) {
+        const { data: actorCards, error: actorCardsError } = await supabase.rpc(
+          "get_discoverable_member_cards",
+          { target_ids: missingActorIds.slice(index, index + 100) }
+        );
+        if (actorCardsError) {
+          console.warn("Unable to resolve notification actor names:", actorCardsError);
+          break;
+        }
+        resolvedActorProfiles.push(...((actorCards ?? []) as Profile[]));
+      }
+
+      setNotifications(currentNotifications);
+      setProfiles([...readableProfiles, ...resolvedActorProfiles]);
       setCommentReferences((commentData ?? []) as CommentReference[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load notifications.");
