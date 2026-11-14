@@ -146,9 +146,6 @@ export function TimelineWorkflow() {
         supabase
           .from("post_mentions")
           .select("post_id, mentioned_profile_id"),
-        supabase
-          .from("comment_mentions")
-          .select("comment_id, mentioned_profile_id"),
       ]);
 
     if (postResult.error) {
@@ -304,6 +301,9 @@ export function TimelineWorkflow() {
         supabase
           .from("post_mentions")
           .select("post_id, mentioned_profile_id"),
+        supabase
+          .from("comment_mentions")
+          .select("comment_id, mentioned_profile_id"),
       ]);
 
       if (profileError) throw profileError;
