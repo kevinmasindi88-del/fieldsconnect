@@ -16,8 +16,17 @@ export function extractFirstPostUrl(body: string): string | null {
   } catch { return null; }
 }
 
-function LinkedText({ body }: { body: string }) {
-  const pieces = body.split(/(https?:\/\/[^\s<>"']+)/gi);
+function LinkedText({ body, hidePreviewUrl }: { body: string; hidePreviewUrl?: string | null }) {
+  // Only the URL represented by a successful card is hidden. All other links
+  // and the surrounding message remain visible and clickable.
+  const displayBody = hidePreviewUrl
+    ? body.replace(/https?:\/\/[^\s<>"']+/gi, (candidate) =>
+        extractFirstPostUrl(candidate) === hidePreviewUrl
+          ? (candidate.match(/[),.;!?]+$/)?.[0] ?? "")
+          : candidate
+      ).trim()
+    : body;
+  const pieces = displayBody.split(/(https?:\/\/[^\s<>"']+)/gi);
   return (
     <span className="whitespace-pre-wrap break-words">
       {pieces.map((piece, i) => {
@@ -76,7 +85,7 @@ export function PostRichContent({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="text-sm leading-relaxed text-gray-800">
-        <LinkedText body={body} />
+        <LinkedText body={body} hidePreviewUrl={preview ? targetLink : null} />
       </div>
       {imageUrl && (
         <>
