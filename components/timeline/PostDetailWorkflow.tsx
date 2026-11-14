@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
-import { PostRichContent } from "@/components/timeline/PostRichContent";
+import { PostRichContent, MentionedText } from "@/components/timeline/PostRichContent";
 
 type Profile = {
   id: string;
@@ -46,6 +46,11 @@ type PostMention = {
   mentioned_profile_id: string;
 };
 
+type CommentMention = {
+  comment_id: string;
+  mentioned_profile_id: string;
+};
+
 export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [post, setPost] = useState<Post | null>(null);
   const [fcNewsPublication, setFcNewsPublication] =
@@ -53,6 +58,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [postMentions, setPostMentions] = useState<PostMention[]>([]);
+  const [commentMentions, setCommentMentions] = useState<CommentMention[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -112,6 +118,17 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         if (profileError) throw profileError;
         if (postMentionError) throw postMentionError;
 
+        const commentIds = (commentData ?? []).map((comment) => comment.id);
+        let mentionData: CommentMention[] = [];
+        if (commentIds.length > 0) {
+          const { data, error } = await supabase.from("comment_mentions")
+            .select("comment_id, mentioned_profile_id")
+            .in("comment_id", commentIds);
+          if (error) throw error;
+          mentionData = (data ?? []) as CommentMention[];
+        }
+        setCommentMentions(mentionData);
+
         const publicationResult = await supabase
           .from("fc_news_publications")
           .select("post_id, fc_news_id, title, published_at")
@@ -141,6 +158,12 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
     void loadPost();
   }, [postId]);
+
+  useEffect(() => {
+    if (isLoading || !post || !window.location.hash.startsWith("#comment-")) return;
+    const anchor = decodeURIComponent(window.location.hash.slice(1));
+    window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [isLoading, post, comments.length]);
 
   if (isLoading) {
     return <main className="mx-auto w-full max-w-4xl px-4 py-6 text-sm text-gray-600 sm:p-8">Loading post...</main>;
@@ -216,10 +239,10 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
               {fcNewsPublication.title}
             </h1>
           )}
-          <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} />
-          {mentionedProfiles.length > 0 && (
+          <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} mentionedProfiles={mentionedProfiles.map((person) => ({ id: person.id, display_name: person.display_name }))} />
+          {mentionedProfiles.some((person) => !post.body.includes(`@${person.display_name}`)) && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {mentionedProfiles.map((profile) => (
+              {mentionedProfiles.filter((person) => !post.body.includes(`@${person.display_name}`)).map((profile) => (
                 <Link className="text-sm font-medium text-blue-700 hover:underline" key={profile.id} href={`/profile/${profile.id}`}>@{profile.display_name}</Link>
               ))}
             </div>
@@ -232,7 +255,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
           {comments.map((comment) => {
             const commenter = profileById.get(comment.author_id);
             return (
-              <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
+              <div key={comment.id} id={`comment-${comment.id}`} className="flex scroll-mt-24 gap-3 rounded-lg border p-3">
                 <ProfileAvatar
                   avatarPath={commenter?.avatar_url ?? null}
                   displayName={commenter?.display_name ?? null}
@@ -240,7 +263,16 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
                 />
                 <div>
                   <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.body}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                    <MentionedText
+                      text={comment.body}
+                      mentions={commentMentions
+                        .filter((mention) => mention.comment_id === comment.id)
+                        .map((mention) => profileById.get(mention.mentioned_profile_id))
+                        .filter((person): person is Profile => Boolean(person))
+                        .map((person) => ({ id: person.id, display_name: person.display_name }))}
+                    />
+                  </p>
                 </div>
               </div>
             );
