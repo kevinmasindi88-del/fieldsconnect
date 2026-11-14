@@ -1435,7 +1435,7 @@ export function LibraryWorkflow() {
                             {owner?.field ? ` - ${owner.field}` : ""}
                             {owner?.role_type ? ` - ${formatRole(owner.role_type)}` : ""}
                           </span>
-                          <span className="mt-1 block text-xs text-gray-500">
+                          <span className="mt-1 block max-w-full text-xs text-gray-500 [overflow-wrap:anywhere]">
                             {document.file_name ?? "Uploaded file"} -{" "}
                             {document.file_size_bytes !== null
                               ? formatBytes(document.file_size_bytes)
@@ -1507,7 +1507,7 @@ function DocumentCard({
         isSelected ? "border-black" : ""
       }`}
     >
-      <div>
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold leading-snug sm:text-base">
             {document.title}
@@ -1564,7 +1564,7 @@ function DocumentCard({
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 max-w-full text-xs text-gray-500 [overflow-wrap:anywhere]">
             {document.file_name ?? "Uploaded file"} -{" "}
             {document.file_size_bytes !== null
               ? formatBytes(document.file_size_bytes)
