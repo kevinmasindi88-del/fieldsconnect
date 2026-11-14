@@ -269,6 +269,24 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         if (skillError) throw skillError;
         if (documentError) throw documentError;
 
+        if (!profileData) {
+          // Private profiles have no directly readable detail row. Only resolve
+          // the name and privacy status for a clear, non-disclosing notice.
+          const { data: cards, error: cardsError } = await supabase.rpc(
+            "get_discoverable_member_cards",
+            { target_ids: [profileId] }
+          );
+          if (cardsError) throw cardsError;
+          const card = (cards ?? [])[0];
+          if (card?.profile_visibility === "private") {
+            setProfile(card as Profile);
+            setMentorProfile(null);
+            setPaymentOffers([]);
+            setSkills([]);
+            setDocuments([]);
+            return;
+          }
+        }
         setProfile((profileData ?? null) as Profile | null);
         setMentorProfile(
           (mentorData ?? null) as MentorProfile | null
@@ -697,6 +715,24 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           {fromMentorshipHub ? "Back to mentorship" : "Back to connections"}
         </Link>
         {message && <p className="text-sm text-gray-700">{message}</p>}
+      </section>
+    );
+  }
+
+  if (profile.profile_visibility === "private" && profile.id !== currentUserId) {
+    return (
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:p-8">
+        <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href={returnHref}>
+          ← {fromMentorshipHub ? "Back to mentorship" : "Back to connections"}
+        </Link>
+        <div className="rounded-xl border bg-white p-5">
+          <h1 className="text-xl font-semibold">{profile.display_name}</h1>
+          <p className="mt-2 text-sm font-medium text-gray-700">Private profile</p>
+          <p className="mt-2 text-sm text-gray-600">
+            This member's profile, skills and library are not available to view.
+            You can find and request a connection through Find People.
+          </p>
+        </div>
       </section>
     );
   }
