@@ -53,6 +53,8 @@ type CommentMention = {
 
 export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [post, setPost] = useState<Post | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isDeletingCommentId, setIsDeletingCommentId] = useState<string | null>(null);
   const [fcNewsPublication, setFcNewsPublication] =
     useState<FcNewsPublication | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -84,6 +86,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
           setMessage("Please log in before viewing this post.");
           return;
         }
+        setCurrentUserId(sessionData.session.user.id);
 
         const [
           { data: postData, error: postError },
@@ -164,6 +167,29 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
     const anchor = decodeURIComponent(window.location.hash.slice(1));
     window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }));
   }, [isLoading, post, comments.length]);
+
+  async function deleteOwnComment(commentId: string) {
+    if (!currentUserId || isDeletingCommentId || !isSupabaseConfigured()) return;
+    if (!comments.some((comment) => comment.id === commentId && comment.author_id === currentUserId)) return;
+    if (!window.confirm("Delete your comment?")) return;
+    setIsDeletingCommentId(commentId);
+    setMessage(null);
+    try {
+      const { error } = await getSupabaseBrowserClient()
+        .from("comments")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", commentId)
+        .eq("author_id", currentUserId)
+        .is("deleted_at", null);
+      if (error) throw error;
+      setComments((current) => current.filter((comment) => comment.id !== commentId));
+      setCommentMentions((current) => current.filter((mention) => mention.comment_id !== commentId));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not delete your comment.");
+    } finally {
+      setIsDeletingCommentId(null);
+    }
+  }
 
   if (isLoading) {
     return <main className="mx-auto w-full max-w-4xl px-4 py-6 text-sm text-gray-600 sm:p-8">Loading post...</main>;
@@ -262,7 +288,20 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
                   size={28}
                 />
                 <div>
-                  <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">{commenter?.display_name ?? "Unknown profile"}</p>
+                    {comment.author_id === currentUserId && (
+                      <button
+                        type="button"
+                        className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        disabled={Boolean(isDeletingCommentId)}
+                        onClick={() => void deleteOwnComment(comment.id)}
+                        aria-label="Delete your comment"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
                     <MentionedText
                       text={comment.body}
