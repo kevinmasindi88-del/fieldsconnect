@@ -1084,7 +1084,7 @@ export function TimelineWorkflow() {
                         <button
                           aria-label="Edit post"
                           title="Edit post"
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-950 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 disabled:opacity-50"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-950 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 disabled:opacity-50"
                           disabled={isWorking}
                           onClick={() => startEditingPost(post)}
                           type="button"
@@ -1094,7 +1094,7 @@ export function TimelineWorkflow() {
                         <button
                           aria-label="Delete post"
                           title="Delete post"
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                           data-delete-post-button="true"
                           data-post-id={post.id}
                           type="button"
@@ -1276,7 +1276,7 @@ export function TimelineWorkflow() {
                           {isOwnComment ? (
                             <button
                               type="button"
-                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                               disabled={isWorking}
                               onClick={() => void deleteOwnComment(comment.id)}
                               aria-label="Delete your comment"
