@@ -146,6 +146,9 @@ export function TimelineWorkflow() {
         supabase
           .from("post_mentions")
           .select("post_id, mentioned_profile_id"),
+        supabase
+          .from("comment_mentions")
+          .select("comment_id, mentioned_profile_id"),
       ]);
 
     if (postResult.error) {
@@ -277,6 +280,7 @@ export function TimelineWorkflow() {
         { data: commentReactionData, error: commentReactionError },
         { data: publicationData, error: publicationError },
         { data: postMentionData, error: postMentionError },
+        { data: commentMentionData, error: commentMentionError },
       ] = await Promise.all([
         supabase
           .from("profiles")
@@ -309,8 +313,10 @@ export function TimelineWorkflow() {
       if (commentReactionError) throw commentReactionError;
       if (publicationError) throw publicationError;
       if (postMentionError) throw postMentionError;
+      if (commentMentionError) throw commentMentionError;
 
       setProfiles((profileData ?? []) as Profile[]);
+      setCommentMentions((commentMentionData ?? []) as CommentMention[]);
       setPostMentions(
         (postMentionData ?? []) as PostMention[]
       );
@@ -725,6 +731,24 @@ export function TimelineWorkflow() {
         .single();
       if (error) throw error;
 
+      const mentions = (commentMentionSelections[postId] ?? [])
+        .filter((person) => body.includes(`@${person.display_name}`))
+        .slice(0, 10);
+      let mentionWarning = false;
+      if (mentions.length > 0) {
+        const { error: mentionError } = await supabase
+          .from("comment_mentions")
+          .insert(mentions.map((person) => ({
+            comment_id: createdComment.id,
+            mentioned_profile_id: person.profile_id,
+            mentioned_by: currentUserId,
+          })));
+        if (mentionError) {
+          mentionWarning = true;
+          console.error("Unable to persist comment mentions:", mentionError);
+        }
+      }
+
       const post = posts.find((item) => item.id === postId);
       if (post && post.author_id !== currentUserId) {
         const actor = profileById.get(currentUserId);
@@ -741,7 +765,9 @@ export function TimelineWorkflow() {
       }
 
       setCommentDrafts((current) => ({ ...current, [postId]: "" }));
+      setCommentMentionSelections((current) => ({ ...current, [postId]: [] }));
       await loadData();
+      if (mentionWarning) setMessage("Your comment was posted, but some mentions could not be saved.");
     } catch (error) {
       setMessage(getActionErrorMessage(error, "add comment"));
     } finally {
@@ -1248,13 +1274,22 @@ export function TimelineWorkflow() {
                 })}
 
                 <form onSubmit={(event) => addComment(event, post.id)} className="flex flex-col gap-3 sm:flex-row">
-                  <input
-                    className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+                  <MentionEditor
+                    multiline={false}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
                     value={commentDrafts[post.id] ?? ""}
-                    onChange={(event) =>
-                      setCommentDrafts((current) => ({ ...current, [post.id]: event.target.value }))
-                    }
-                    placeholder="Write a comment..."
+                    onChange={(next) => updateCommentText(post.id, next)}
+                    onSelect={(person, next) => {
+                      setCommentDrafts((current) => ({ ...current, [post.id]: next }));
+                      setCommentMentionSelections((current) => ({
+                        ...current,
+                        [post.id]: (current[post.id] ?? []).some((p) => p.profile_id === person.profile_id)
+                          ? current[post.id] : [...(current[post.id] ?? []), person],
+                      }));
+                    }}
+                    mentionCount={(commentMentionSelections[post.id] ?? []).length}
+                    disabled={isWorking}
+                    placeholder="Write a comment... Use @ to mention a connection"
                   />
                   <button
                     className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
