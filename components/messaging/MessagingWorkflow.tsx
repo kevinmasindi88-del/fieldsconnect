@@ -520,8 +520,33 @@ export function MessagingWorkflow() {
       if (systemInboxError) throw systemInboxError;
 
       const acceptedConnections = (connectionData ?? []) as Connection[];
+      const visibleProfiles = (profileData ?? []) as Profile[];
+      const visibleProfileIds = new Set(visibleProfiles.map((profile) => profile.id));
+      const missingContactIds = Array.from(new Set(
+        acceptedConnections.map((connection) =>
+          connection.requester_id === userId
+            ? connection.recipient_id
+            : connection.requester_id
+        )
+      )).filter((id) => !visibleProfileIds.has(id));
+
+      // A private profile still has a discoverable name, but no readable
+      // profile details. Use only the restricted member-card identity.
+      const privateContacts: Profile[] = [];
+      for (let i = 0; i < missingContactIds.length; i += 100) {
+        const { data: cards, error: cardsError } = await supabase.rpc(
+          "get_discoverable_member_cards",
+          { target_ids: missingContactIds.slice(i, i + 100) }
+        );
+        if (cardsError) {
+          console.warn("Unable to resolve private contact names:", cardsError);
+          break;
+        }
+        privateContacts.push(...((cards ?? []) as Profile[]));
+      }
+
       setConnections(acceptedConnections);
-      setProfiles((profileData ?? []) as Profile[]);
+      setProfiles([...visibleProfiles, ...privateContacts]);
       setSystemInboxMessages(
         (systemInboxData ?? []) as SystemInboxMessage[]
       );
