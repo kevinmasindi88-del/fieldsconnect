@@ -909,7 +909,6 @@ export function TimelineWorkflow() {
               ].join(" ")}
               onClick={() => {
                 setIsEmojiPickerOpen((current) => !current);
-                setIsMentionPickerOpen(false);
               }}
               title="Add emoji"
               type="button"
