@@ -4,7 +4,7 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" {...props}>
       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z" />
-      <path d="M5 18c5.2 1.3 10.2 2 16 2" />
+      <path d="M5 20h14" />
     </svg>
   );
 }
