@@ -175,13 +175,10 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
     setIsDeletingCommentId(commentId);
     setMessage(null);
     try {
-      const { error } = await getSupabaseBrowserClient()
-        .from("comments")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", commentId)
-        .eq("author_id", currentUserId)
-        .is("deleted_at", null);
+      const { data: deleted, error } = await getSupabaseBrowserClient()
+        .rpc("soft_delete_own_comment", { target_comment_id: commentId });
       if (error) throw error;
+      if (!deleted) throw new Error("The comment was not deleted. It may have already been removed.");
       setComments((current) => current.filter((comment) => comment.id !== commentId));
       setCommentMentions((current) => current.filter((mention) => mention.comment_id !== commentId));
     } catch (error) {
