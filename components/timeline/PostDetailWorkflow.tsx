@@ -291,7 +291,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
                     {comment.author_id === currentUserId && (
                       <button
                         type="button"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                         disabled={Boolean(isDeletingCommentId)}
                         onClick={() => void deleteOwnComment(comment.id)}
                         aria-label="Delete your comment"
