@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
 type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string };
@@ -16,7 +17,44 @@ export function extractFirstPostUrl(body: string): string | null {
   } catch { return null; }
 }
 
-function LinkedText({ body, hidePreviewUrl }: { body: string; hidePreviewUrl?: string | null }) {
+export type MentionIdentity = { id: string; display_name: string };
+
+export function MentionedText({ text, mentions = [] }: { text: string; mentions?: MentionIdentity[] }) {
+  const names = mentions.filter((person) => person.display_name.trim());
+  if (!names.length) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let position = 0;
+  while (position < text.length) {
+    let first = text.length;
+    let matched: MentionIdentity | null = null;
+    for (const person of names) {
+      const label = "@" + person.display_name;
+      let location = text.indexOf(label, position);
+      while (location !== -1) {
+        const preceding = location === 0 ? "" : text[location - 1];
+        const following = text[location + label.length] ?? "";
+        if ((!preceding || /[^\p{L}\p{N}_]/u.test(preceding)) &&
+            (!following || /[^\p{L}\p{N}_]/u.test(following))) break;
+        location = text.indexOf(label, location + label.length);
+      }
+      if (location !== -1 && location < first) {
+        first = location;
+        matched = person;
+      }
+    }
+    if (!matched) {
+      parts.push(text.slice(position));
+      break;
+    }
+    if (first > position) parts.push(text.slice(position, first));
+    const label = "@" + matched.display_name;
+    parts.push(<Link key={parts.length} className="font-medium text-blue-700 hover:underline" href={`/profile/${matched.id}`}>{label}</Link>);
+    position = first + label.length;
+  }
+  return <>{parts}</>;
+}
+
+function LinkedText({ body, hidePreviewUrl, mentionedProfiles = [] }: { body: string; hidePreviewUrl?: string | null; mentionedProfiles?: MentionIdentity[] }) {
   // Only the URL represented by a successful card is hidden. All other links
   // and the surrounding message remain visible and clickable.
   const displayBody = hidePreviewUrl
@@ -31,7 +69,7 @@ function LinkedText({ body, hidePreviewUrl }: { body: string; hidePreviewUrl?: s
     <span className="whitespace-pre-wrap break-words">
       {pieces.map((piece, i) => {
         const url = extractFirstPostUrl(piece);
-        if (!url || !/^https?:\/\//i.test(piece)) return <span key={i}>{piece}</span>;
+        if (!url || !/^https?:\/\//i.test(piece)) return <span key={i}><MentionedText text={piece} mentions={mentionedProfiles} /></span>;
         const trailing = piece.match(/[),.;!?]+$/)?.[0] ?? "";
         return (
           <span key={i}>
@@ -45,8 +83,8 @@ function LinkedText({ body, hidePreviewUrl }: { body: string; hidePreviewUrl?: s
 }
 
 export function PostRichContent({
-  body, imagePath, linkUrl,
-}: { body: string; imagePath?: string | null; linkUrl?: string | null }) {
+  body, imagePath, linkUrl, mentionedProfiles = [],
+}: { body: string; imagePath?: string | null; linkUrl?: string | null; mentionedProfiles?: MentionIdentity[] }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -85,7 +123,7 @@ export function PostRichContent({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="text-sm leading-relaxed text-gray-800">
-        <LinkedText body={body} hidePreviewUrl={preview ? targetLink : null} />
+        <LinkedText body={body} hidePreviewUrl={preview ? targetLink : null} mentionedProfiles={mentionedProfiles} />
       </div>
       {imageUrl && (
         <>
