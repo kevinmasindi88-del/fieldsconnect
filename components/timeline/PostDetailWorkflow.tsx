@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { PostRichContent, MentionedText } from "@/components/timeline/PostRichContent";
+import { TrashIcon } from "@/components/timeline/ActionIcons";
 
 type Profile = {
   id: string;
@@ -290,12 +291,13 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
                     {comment.author_id === currentUserId && (
                       <button
                         type="button"
-                        className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                         disabled={Boolean(isDeletingCommentId)}
                         onClick={() => void deleteOwnComment(comment.id)}
                         aria-label="Delete your comment"
+                        title="Delete comment"
                       >
-                        Delete
+                        <TrashIcon className="h-4 w-4" />
                       </button>
                     )}
                   </div>
