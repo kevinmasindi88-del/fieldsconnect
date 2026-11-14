@@ -97,6 +97,7 @@ export function MentionEditor({
   const shown = active && mentionCount < maxMentions ? results : [];
   const inputProps = {
     value, placeholder, disabled, className,
+    onBlur: () => window.setTimeout(() => setActive(null), 150),
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       onChange(event.target.value);
       updateQuery(event.target.value, event.target.selectionStart ?? event.target.value.length);
@@ -127,7 +128,7 @@ export function MentionEditor({
         ? <textarea {...inputProps} ref={ref as React.Ref<HTMLTextAreaElement>} />
         : <input {...inputProps} ref={ref as React.Ref<HTMLInputElement>} />}
       {active && mentionCount < maxMentions && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl" role="listbox" aria-label="Mention a connection">
+        <div className={`absolute left-0 right-0 z-30 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl ${multiline ? "top-full mt-1" : "bottom-full mb-1"}`} role="listbox" aria-label="Mention a connection">
           {searching ? (
             <p className="px-3 py-2 text-sm text-gray-500">Finding connections...</p>
           ) : shown.length === 0 ? (
