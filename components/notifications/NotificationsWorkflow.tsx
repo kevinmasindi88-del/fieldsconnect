@@ -17,6 +17,7 @@ type Notification = {
     | "post_liked"
     | "post_commented"
     | "post_mentioned"
+    | "comment_mentioned"
     | "mentioned_post_edited"
     | "comment_liked"
     | "moderation_warning"
@@ -317,6 +318,8 @@ export function NotificationsWorkflow() {
         return `${actorName} commented on your post`;
       case "post_mentioned":
         return `${actorName} mentioned you in a post`;
+      case "comment_mentioned":
+        return `${actorName} mentioned you in a comment`;
       case "mentioned_post_edited":
         return `${actorName} edited a post you were mentioned in`;
       case "comment_liked":
@@ -478,6 +481,26 @@ export function NotificationsWorkflow() {
 
     if (!postId) {
       return notification.body;
+    }
+
+    if (notification.notification_type === "comment_mentioned") {
+      return (
+        <>
+          {actorName} mentioned you in a{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(
+              notification,
+              `/post/${postId}#comment-${notification.entity_id}`
+            )}
+            type="button"
+          >
+            comment
+          </button>
+          .
+        </>
+      );
     }
 
     if (notification.notification_type === "post_mentioned") {
