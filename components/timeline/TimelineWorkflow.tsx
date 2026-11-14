@@ -955,7 +955,6 @@ export function TimelineWorkflow() {
             </div>
           )}
           {extractFirstPostUrl(postBody) && <p className="break-all text-xs text-blue-700">Link detected — preview will appear where available.</p>}
-          <p className="text-xs text-gray-500">One compressed still image. No GIFs, audio or video.</p>
         </div>
         <div className="flex items-end justify-between gap-3">
           <div className="relative flex items-center gap-2">
