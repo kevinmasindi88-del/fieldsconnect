@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ContactForm } from "@/components/contact/ContactForm";
+
 import { ContactHeaderAction } from "@/components/contact/ContactHeaderAction";
 
 export const metadata = {
@@ -24,12 +24,13 @@ export default function ContactPage() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Get in touch</p>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Contact Us</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            Have a question or need help with FieldsConnect? Use the form below to prepare an email
-            to our support team, or find our business contact details further down.
+            Have a question or need help with FieldsConnect? Email our support team at{" "}
+            <a href="mailto:support@fieldsconnect.app" className="font-semibold text-blue-700 underline underline-offset-2">
+              support@fieldsconnect.app
+            </a>.
+            Find our business contact details below.
           </p>
         </div>
-
-        <ContactForm />
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="business-details">
           <h2 id="business-details" className="text-xl font-bold">Business details</h2>
