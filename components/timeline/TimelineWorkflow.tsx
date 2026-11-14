@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
-import { PostRichContent, extractFirstPostUrl, compressTimelineImage } from "@/components/timeline/PostRichContent";
+import { PostRichContent, MentionedText, extractFirstPostUrl, compressTimelineImage } from "@/components/timeline/PostRichContent";
 import { MentionEditor, type MentionCandidate } from "@/components/timeline/MentionEditor";
 import {
   getActionErrorMessage,
@@ -1123,10 +1123,10 @@ export function TimelineWorkflow() {
                       </h3>
                     )}
                     <div className={fcNewsPublication ? "mt-2" : "mt-4"}>
-                      <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} />
-                      {mentionedProfiles.length > 0 && (
+                      <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} mentionedProfiles={mentionedProfiles.map((person) => ({ id: person.id, display_name: person.display_name }))} />
+                      {mentionedProfiles.some((person) => !post.body.includes(`@${person.display_name}`)) && (
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {mentionedProfiles.map((profile) => (
+                          {mentionedProfiles.filter((person) => !post.body.includes(`@${person.display_name}`)).map((profile) => (
                             <Link key={profile.id} className="text-sm font-medium text-blue-700 hover:underline" href={`/profile/${profile.id}`}>@{profile.display_name}</Link>
                           ))}
                         </div>
@@ -1180,7 +1180,7 @@ export function TimelineWorkflow() {
                   const isOwnComment = comment.author_id === currentUserId;
 
                   return (
-                    <div key={comment.id} className="flex gap-3 rounded-lg border p-3">
+                    <div key={comment.id} id={`comment-${comment.id}`} className="flex scroll-mt-24 gap-3 rounded-lg border p-3">
                       {commenter ? (
                         <Link className="shrink-0 rounded-full" href={`/profile/${commenter.id}`}>
                           <ProfileAvatar avatarPath={commenter.avatar_url} displayName={commenter.display_name} size={28} />
@@ -1231,7 +1231,16 @@ export function TimelineWorkflow() {
                             />
                           )}
                         </div>
-                        <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">{comment.body}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-gray-700">
+                          <MentionedText
+                            text={comment.body}
+                            mentions={commentMentions
+                              .filter((tag) => tag.comment_id === comment.id)
+                              .map((tag) => profileById.get(tag.mentioned_profile_id))
+                              .filter((person): person is Profile => Boolean(person))
+                              .map((person) => ({ id: person.id, display_name: person.display_name }))}
+                          />
+                        </p>
                         <button
                           aria-label={
                             commentLiked
