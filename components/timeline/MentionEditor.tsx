@@ -27,7 +27,7 @@ function mentionAtCaret(value: string, caret: number): ActiveMention | null {
 
 export function MentionEditor({
   value, onChange, onSelect, placeholder, disabled, multiline = true, className = "",
-  mentionCount = 0, maxMentions = 10,
+  mentionCount = 0, maxMentions = 10, selectedMentions = [],
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -38,6 +38,7 @@ export function MentionEditor({
   className?: string;
   mentionCount?: number;
   maxMentions?: number;
+  selectedMentions?: MentionCandidate[];
 }) {
   const ref = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const [active, setActive] = useState<ActiveMention | null>(null);
@@ -72,7 +73,10 @@ export function MentionEditor({
 
   function updateQuery(next: string, caret: number) {
     const match = mentionAtCaret(next, caret);
-    setActive(match);
+    const alreadySelected = match && selectedMentions.some((person) =>
+      match.query === person.display_name || match.query.startsWith(person.display_name + " ")
+    );
+    setActive(alreadySelected ? null : match);
     setSelectedIndex(0);
   }
 
