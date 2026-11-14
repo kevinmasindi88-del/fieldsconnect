@@ -59,7 +59,7 @@ type SystemInboxMessage = {
 
 const MESSAGE_PAGE_SIZE = 10;
 const MOBILE_THREAD_SCROLL_THRESHOLD = 8;
-const DESKTOP_THREAD_SCROLL_THRESHOLD = 15;
+const DESKTOP_THREAD_SCROLL_THRESHOLD = 8;
 
 function ScrollableConversationList({
   children,
@@ -149,6 +149,7 @@ export function MessagingWorkflow() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [channelActivity, setChannelActivity] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemInboxMessages, setSystemInboxMessages] =
     useState<SystemInboxMessage[]>([]);
@@ -200,6 +201,44 @@ export function MessagingWorkflow() {
   }, [connections]);
 
 
+
+  const orderedChannels = useMemo(() => {
+    const items = [
+      ...systemInboxMessages.map((item) => ({ kind: "system" as const, id: item.id, activityAt: item.created_at, item })),
+      ...chatConnections.map((connection) => ({
+        kind: "chat" as const, id: connection.id,
+        activityAt: channelActivity[conversationByConnectionId.get(connection.id)?.id ?? ""] ?? null,
+        connection,
+      })),
+    ];
+    return items.sort((a, b) => {
+      const delta = (b.activityAt ? Date.parse(b.activityAt) : 0) -
+        (a.activityAt ? Date.parse(a.activityAt) : 0);
+      return delta || a.id.localeCompare(b.id);
+    });
+  }, [systemInboxMessages, chatConnections, channelActivity, conversationByConnectionId]);
+
+  async function refreshChannelActivity(ids: string[]) {
+    if (!isSupabaseConfigured() || ids.length === 0) return;
+    const supabase = getSupabaseBrowserClient();
+    const latest: Record<string, string> = {};
+    for (let index = 0; index < ids.length; index += 100) {
+      const { data, error } = await supabase.from("conversations")
+        .select("id, messages(created_at)")
+        .in("id", ids.slice(index, index + 100))
+        .order("created_at", { ascending: false, referencedTable: "messages" })
+        .limit(1, { referencedTable: "messages" });
+      if (error) {
+        console.error("Unable to refresh message channel activity:", error);
+        return;
+      }
+      for (const row of data ?? []) {
+        const latestMessage = Array.isArray(row.messages) ? row.messages[0] : null;
+        if (latestMessage?.created_at) latest[row.id] = latestMessage.created_at;
+      }
+    }
+    setChannelActivity((current) => ({ ...current, ...latest }));
+  }
 
   const unreadMessagesBySender = useMemo(() => {
     const counts = new Map<string, number>();
@@ -558,6 +597,7 @@ export function MessagingWorkflow() {
 
       if (connectionIds.length === 0) {
         setConversations([]);
+        setChannelActivity({});
         setMessages([]);
         setIsLoading(false);
         return;
@@ -572,6 +612,7 @@ export function MessagingWorkflow() {
 
       const visibleConversations = (conversationData ?? []) as Conversation[];
       setConversations(visibleConversations);
+      await refreshChannelActivity(visibleConversations.map((item) => item.id));
 
       setMessages([]);
       setHasOlderMessages(false);
@@ -666,6 +707,7 @@ export function MessagingWorkflow() {
         },
         () => {
           void loadUnreadMessageNotifications(currentUserId);
+          void refreshChannelActivity(conversations.map((item) => item.id));
         }
       )
       .subscribe();
@@ -673,7 +715,7 @@ export function MessagingWorkflow() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentUserId, conversations]);
 
   useEffect(() => {
     if (!activeConversationId || !isSupabaseConfigured()) return;
@@ -706,6 +748,7 @@ export function MessagingWorkflow() {
             true,
             isNearBottom
           );
+          void refreshChannelActivity([activeConversationId]);
         }
       )
       .subscribe();
@@ -905,6 +948,7 @@ export function MessagingWorkflow() {
           [createdMessage as Message]
         )
       );
+      setChannelActivity((current) => ({ ...current, [activeConversationId]: createdMessage.created_at }));
 
       setDraftMessage("");
       scrollMessagesToBottom();
@@ -913,6 +957,55 @@ export function MessagingWorkflow() {
     } finally {
       setIsWorking(false);
     }
+  }
+
+  function renderChannelItem(channel: (typeof orderedChannels)[number], mobile: boolean) {
+    if (channel.kind === "system") {
+      const item = channel.item;
+      return (
+        <button key={`system-${item.id}`}
+          className={`w-full rounded-xl border p-3 text-left ${activeSystemMessageId === item.id ? "bg-gray-100" : ""}`}
+          onClick={() => openSystemMessage(item)} type="button">
+          <span className="flex min-w-0 items-center gap-3">
+            <FcLogoAvatar size={mobile ? 36 : 32} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold leading-snug">{item.sender_label}</span>
+              <span className="mt-0.5 block truncate text-xs text-gray-600">{item.title}</span>
+            </span>
+          </span>
+        </button>
+      );
+    }
+    const connection = channel.connection;
+    const profile = getOtherProfile(connection);
+    const otherUserId = connection.requester_id === currentUserId
+      ? connection.recipient_id : connection.requester_id;
+    const unreadCount = unreadMessagesBySender.get(otherUserId) ?? 0;
+    return (
+      <button key={`chat-${connection.id}`}
+        className={`w-full rounded-xl border p-3 text-left ${activeConnectionId === connection.id ? "bg-gray-100" : ""}`}
+        disabled={isWorking} onClick={() => openConversation(connection)} type="button">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="relative shrink-0">
+            <ProfileAvatar avatarPath={profile?.avatar_url} displayName={profile?.display_name} size={mobile ? 36 : 32} />
+            {onlineUserIds.has(otherUserId) && (
+              <span aria-label="Online" className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" title="Online" />
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold leading-snug">{profile?.display_name ?? "Unknown profile"}</span>
+            <span className="mt-0.5 block truncate text-xs text-gray-600">
+              {[profile?.role_type, profile?.field].filter(Boolean).join(" - ") || "Connection"}
+            </span>
+          </span>
+          {unreadCount > 0 && (
+            <span className="ml-auto inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </span>
+      </button>
+    );
   }
 
   const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
@@ -953,251 +1046,17 @@ export function MessagingWorkflow() {
           <>
             <ScrollableConversationList
               className="flex flex-col gap-2 lg:hidden"
-              itemCount={systemInboxMessages.length + chatConnections.length}
+              itemCount={orderedChannels.length}
               threshold={MOBILE_THREAD_SCROLL_THRESHOLD}
             >
-              {chatConnections.length === 0 &&
-              systemInboxMessages.length === 0 ? (
-                <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-                  No conversations yet.
-                </p>
-              ) : (
-                <>
-                  {systemInboxMessages.map((item) => (
-                    <button
-                      key={item.id}
-                      className="w-full rounded-xl border p-3 text-left"
-                      onClick={() => openSystemMessage(item)}
-                      type="button"
-                    >
-                      <span className="flex min-w-0 items-center gap-3">
-                        <FcLogoAvatar size={36} />
-
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold leading-snug">
-                            {item.sender_label}
-                          </span>
-                          <span className="mt-0.5 block truncate text-xs text-gray-600">
-                            {item.title}
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-
-                  {chatConnections.map(
-                    (connection) => {
-                      const profile =
-                        getOtherProfile(
-                          connection
-                        );
-
-                      const otherUserId =
-                        connection.requester_id ===
-                        currentUserId
-                          ? connection.recipient_id
-                          : connection.requester_id;
-
-                      const unreadCount =
-                        unreadMessagesBySender.get(
-                          otherUserId
-                        ) ?? 0;
-
-                      return (
-                        <button
-                          key={
-                            connection.id
-                          }
-                          className="w-full rounded-xl border p-3 text-left"
-                          disabled={isWorking}
-                          onClick={() =>
-                            openConversation(
-                              connection
-                            )
-                          }
-                          type="button"
-                        >
-                          <span className="flex min-w-0 items-center gap-3">
-                            <span className="relative shrink-0">
-                              <ProfileAvatar
-                                avatarPath={
-                                  profile?.avatar_url
-                                }
-                                displayName={
-                                  profile?.display_name
-                                }
-                                size={36}
-                              />
-
-                              {onlineUserIds.has(
-                                otherUserId
-                              ) && (
-                                <span
-                                  aria-label="Online"
-                                  className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
-                                  title="Online"
-                                />
-                              )}
-                            </span>
-
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold leading-snug">
-                                {profile?.display_name ??
-                                  "Unknown profile"}
-                              </span>
-
-                              <span className="mt-0.5 block truncate text-xs text-gray-600">
-                                {[
-                                  profile?.role_type,
-                                  profile?.field,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" - ") ||
-                                  "Connection"}
-                              </span>
-                            </span>
-
-                            {unreadCount > 0 && (
-                              <span className="ml-auto inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
-                                {unreadCount > 99
-                                  ? "99+"
-                                  : unreadCount}
-                              </span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    }
-                  )}
-
-                </>
-              )}
+              {orderedChannels.map((channel) => renderChannelItem(channel, true))}
             </ScrollableConversationList>
-
             <ScrollableConversationList
               className="hidden flex-col gap-3 lg:flex"
-              itemCount={systemInboxMessages.length + connections.length}
+              itemCount={orderedChannels.length}
               threshold={DESKTOP_THREAD_SCROLL_THRESHOLD}
             >
-              {systemInboxMessages.map((item) => {
-                const isActive =
-                  activeSystemMessageId === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    className={`rounded-xl border p-3 text-left text-sm ${
-                      isActive ? "bg-gray-100" : ""
-                    }`}
-                    onClick={() => openSystemMessage(item)}
-                    type="button"
-                  >
-                    <span className="flex w-full items-center gap-3">
-                      <FcLogoAvatar size={32} />
-
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">
-                          {item.sender_label}
-                        </span>
-                        <span className="block truncate text-gray-600">
-                          {item.title}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-
-              {connections.map(
-                (connection) => {
-                  const profile =
-                    getOtherProfile(
-                      connection
-                    );
-
-                  const isActive =
-                    activeConnectionId ===
-                    connection.id;
-
-                  const otherUserId =
-                    connection.requester_id ===
-                    currentUserId
-                      ? connection.recipient_id
-                      : connection.requester_id;
-
-                  const unreadCount =
-                    unreadMessagesBySender.get(
-                      otherUserId
-                    ) ?? 0;
-
-                  return (
-                    <button
-                      key={connection.id}
-                      className={`rounded-xl border p-3 text-left text-sm ${
-                        isActive
-                          ? "bg-gray-100"
-                          : ""
-                      }`}
-                      disabled={isWorking}
-                      onClick={() =>
-                        openConversation(
-                          connection
-                        )
-                      }
-                      type="button"
-                    >
-                      <span className="flex w-full items-center gap-3">
-                        <span className="relative shrink-0">
-                          <ProfileAvatar
-                            avatarPath={
-                              profile?.avatar_url
-                            }
-                            displayName={
-                              profile?.display_name
-                            }
-                            size={32}
-                          />
-
-                          {onlineUserIds.has(
-                            otherUserId
-                          ) && (
-                            <span
-                              aria-label="Online"
-                              className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500"
-                              title="Online"
-                            />
-                          )}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">
-                            {profile?.display_name ??
-                              "Unknown profile"}
-                          </span>
-
-                          <span className="block truncate text-gray-600">
-                            {[
-                              profile?.role_type,
-                              profile?.field,
-                            ]
-                              .filter(Boolean)
-                              .join(" - ") ||
-                              "Accepted connection"}
-                          </span>
-                        </span>
-
-                        {unreadCount > 0 && (
-                          <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-blue-700 px-2 py-1 text-xs font-semibold text-white">
-                            {unreadCount > 99
-                              ? "99+"
-                              : unreadCount}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                }
-              )}
+              {orderedChannels.map((channel) => renderChannelItem(channel, false))}
             </ScrollableConversationList>
           </>
         )}
