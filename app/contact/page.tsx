@@ -24,8 +24,8 @@ export default function ContactPage() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Get in touch</p>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Contact Us</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-            Have a question or need help with FieldsConnect? Use the form below to prepare an email
-            to our support team, or find our business contact details further down.
+            Have a question or need help with FieldsConnect? Send a message to our support
+            team using the form below, or find our business contact details further down.
           </p>
         </div>
 
