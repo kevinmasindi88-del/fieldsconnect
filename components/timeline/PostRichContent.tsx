@@ -59,8 +59,15 @@ export function PostRichContent({
     let cancelled = false;
     setPreview(null);
     if (!targetLink || !targetLink.startsWith("https://")) return;
-    void fetch(`/api/link-preview?url=${encodeURIComponent(targetLink)}`)
-      .then((response) => response.ok ? response.json() : null)
+    if (!isSupabaseConfigured()) return;
+    const supabase = getSupabaseBrowserClient();
+    void supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token || cancelled) return null;
+      return fetch(`/api/link-preview?url=${encodeURIComponent(targetLink)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }).then((response) => response?.ok ? response.json() : null)
       .then((data: LinkPreview | null) => { if (!cancelled) setPreview(data); })
       .catch(() => {});
     return () => { cancelled = true; };
