@@ -861,6 +861,7 @@ export function TimelineWorkflow() {
               );
             }}
             mentionCount={selectedMentions.length}
+            selectedMentions={selectedMentions}
             disabled={isWorking}
             placeholder="Share an update... Type @ to mention a connection"
           />
@@ -1296,6 +1297,7 @@ export function TimelineWorkflow() {
                       }));
                     }}
                     mentionCount={(commentMentionSelections[post.id] ?? []).length}
+                    selectedMentions={commentMentionSelections[post.id] ?? []}
                     disabled={isWorking}
                     placeholder="Write a comment... Use @ to mention a connection"
                   />
