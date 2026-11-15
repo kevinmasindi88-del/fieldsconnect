@@ -129,7 +129,7 @@ export function ReportMenu({
       </button>
 
       {menuOpen && (
-        <div className={`absolute top-10 z-20 min-w-44 max-w-[calc(100vw-2rem)] rounded-xl border bg-white p-2 shadow-lg ${menuAlign === "left" ? "left-0 sm:left-auto sm:right-0" : "right-0"}`}>
+        <div className={`absolute top-10 z-20 min-w-44 max-w-[calc(100vw-2rem)] rounded-xl border bg-white p-2 shadow-lg ${menuAlign === "left" ? "right-0 sm:left-0 sm:right-auto" : "right-0"}`}>
           <button
             className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50"
             onClick={openDialog}
@@ -141,8 +141,8 @@ export function ReportMenu({
       )}
 
       {dialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl sm:p-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-4">
+          <div className="my-auto max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:max-h-[calc(100dvh-2rem)] sm:p-5">
             <div className="flex items-start justify-between gap-3 sm:gap-4">
               <div>
                 <h2 className="text-lg font-semibold sm:text-xl">Report {label}</h2>
@@ -166,7 +166,7 @@ export function ReportMenu({
               <label className="grid gap-2 text-sm font-medium">
                 Why are you reporting this?
                 <select
-                  className="rounded-lg border px-3 py-2 disabled:bg-gray-100"
+                  className="min-w-0 w-full rounded-lg border px-3 py-2 disabled:bg-gray-100"
                   disabled={Boolean(submittedTicket)}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
