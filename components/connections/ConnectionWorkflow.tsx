@@ -180,7 +180,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     useState<PaymentOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [mentorFilter, setMentorFilter] = useState(view === "mentorship" ? "mentors" : "all");
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
   const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
@@ -1415,7 +1414,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         : {
             term: searchTerm.trim(),
             role: roleFilter,
-            mentor: view === "mentorship" ? "mentors" : mentorFilter,
+            mentor: view === "mentorship" ? "mentors" : "all",
           };
 
     const offset =
@@ -2251,7 +2250,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 void searchPeople(false);
               }}
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Search people
                   <input
@@ -2293,29 +2292,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Mentor status
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setMentorFilter(
-                        event.target.value
-                      )
-                    }
-                    value={mentorFilter}
-                  >
-                    <option value="all">
-                      Everyone
-                    </option>
-                    <option value="mentors">
-                      Available mentors
-                    </option>
-                    <option value="non-mentors">
-                      Not mentoring
-                    </option>
-                  </select>
-                </label>
-
                 <button
                   className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
                   disabled={isSearchingPeople}
@@ -2327,16 +2303,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 </button>
               </div>
 
-              <p className="mt-3 text-xs text-gray-500">
-                {hasSearchedPeople
-                  ? `${peopleSearchResults.length} ${
-                      peopleSearchResults.length === 1
-                        ? "result"
-                        : "results"
-                    } loaded`
-                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
-              </p>
-
               {peopleSearchError && (
                 <p className="mt-2 text-sm text-red-700">
                   {peopleSearchError}
@@ -2344,9 +2310,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               )}
             </form>
 
-            {!hasSearchedPeople ? (
-              <EmptyState text="Search for people to view matching profiles." />
-            ) : peopleSearchResults.length === 0 ? (
+            {!hasSearchedPeople ? null : peopleSearchResults.length === 0 ? (
               <EmptyState text="No matching people found." />
             ) : (
               <>
