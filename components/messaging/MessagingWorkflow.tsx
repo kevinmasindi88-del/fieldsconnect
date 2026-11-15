@@ -58,8 +58,8 @@ type SystemInboxMessage = {
 
 
 const MESSAGE_PAGE_SIZE = 10;
-const MOBILE_THREAD_SCROLL_THRESHOLD = 8;
-const DESKTOP_THREAD_SCROLL_THRESHOLD = 8;
+const MOBILE_THREAD_SCROLL_THRESHOLD = 3;
+const DESKTOP_THREAD_SCROLL_THRESHOLD = 3;
 
 function ScrollableConversationList({
   children,
@@ -129,7 +129,7 @@ function ScrollableConversationList({
       aria-label="Conversations"
       className={`${className} ${
         itemCount > threshold
-          ? "overflow-y-auto overscroll-contain pr-2"
+          ? "overflow-y-auto overscroll-auto pr-2"
           : ""
       }`}
       style={
@@ -1142,7 +1142,7 @@ export function MessagingWorkflow() {
 
         <div
           ref={messageScrollRef}
-          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-auto p-3 sm:p-4"
           onScroll={handleMessageScroll}
         >
           {activeSystemMessage ? (
