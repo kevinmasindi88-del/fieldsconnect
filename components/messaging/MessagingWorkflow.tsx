@@ -1063,6 +1063,7 @@ export function MessagingWorkflow() {
       </aside>
 
       <main
+        data-message-report-boundary
         className={`h-[78dvh] min-h-[500px] min-w-0 flex-col overflow-hidden rounded-xl border bg-white sm:h-[72vh] sm:min-h-[520px] lg:flex ${
           hasActiveThread
             ? "flex"
@@ -1302,6 +1303,8 @@ export function MessagingWorkflow() {
                           {!isOwn && (
                             <ReportMenu
                               targetType="message"
+                              constrainToMessagePanel
+                              menuAlign="left"
                               targetId={item.id}
                               reportedUserId={
                                 item.sender_id
