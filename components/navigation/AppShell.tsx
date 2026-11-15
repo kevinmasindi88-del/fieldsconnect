@@ -915,10 +915,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   className={[
-                    "relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-0.5 py-2 text-[clamp(9px,2.65vw,12px)] font-medium leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                    "relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[clamp(9px,2.65vw,12px)] font-medium leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
                     isActive
-                      ? "border-black bg-black text-white"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+                      ? "bg-black text-white"
+                      : "bg-transparent text-gray-700 hover:bg-gray-100",
                   ].join(" ")}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
