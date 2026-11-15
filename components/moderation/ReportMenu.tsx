@@ -146,11 +146,11 @@ export function ReportMenu({
             <div className="flex items-start justify-between gap-3 sm:gap-4">
               <div>
                 <h2 className="text-lg font-semibold sm:text-xl">Report {label}</h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  {targetType === "mentorship"
-                    ? "This report identifies the mentorship cycle and participant. A report does not automatically end the mentorship."
-                    : "The exact item and account will be linked automatically to the moderation ticket."}
-                </p>
+                {targetType === "mentorship" && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    This report identifies the mentorship cycle and participant. A report does not automatically end the mentorship.
+                  </p>
+                )}
               </div>
               <button
                 aria-label="Close report dialog"
