@@ -890,18 +890,6 @@ export function TimelineWorkflow() {
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          Visibility
-          <select
-            className="w-full rounded-lg border px-3 py-2 sm:w-fit"
-            value={visibility}
-            onChange={(event) => setVisibility(event.target.value as "public" | "connections")}
-          >
-            <option value="public">Public</option>
-            <option value="connections">Connections only</option>
-          </select>
-        </label>
-
         <div className="flex flex-col gap-2">
           {pendingImagePreview && (
             <div className="flex items-center gap-3">
@@ -916,18 +904,13 @@ export function TimelineWorkflow() {
           )}
           {extractFirstPostUrl(postBody) && <p className="break-all text-xs text-blue-700">Link detected — preview will appear where available.</p>}
         </div>
-        <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-600">
-              Add image
-              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
-            </label>
-            <div className="relative">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <div className="relative shrink-0">
             <button
               aria-expanded={isEmojiPickerOpen}
               aria-label="Add emoji"
               className={[
-                "inline-flex h-10 w-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                "inline-flex h-9 w-9 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
                 isEmojiPickerOpen
                   ? "border-gray-950 bg-gray-950 text-white"
                   : "border-gray-300 bg-white text-gray-950 hover:border-gray-500 hover:bg-gray-50",
@@ -963,7 +946,7 @@ export function TimelineWorkflow() {
             </button>
 
             {isEmojiPickerOpen && (
-              <div className="absolute left-0 top-full z-20 mt-2 grid w-max grid-cols-[repeat(6,2.5rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg sm:left-full sm:top-1/2 sm:ml-2 sm:mt-0 sm:-translate-y-1/2">
+              <div className="absolute left-0 top-full z-20 mt-2 grid w-max max-w-[calc(100vw-3rem)] grid-cols-[repeat(6,2.25rem)] gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg sm:left-full sm:top-1/2 sm:ml-2 sm:mt-0 sm:-translate-y-1/2">
                 {postEmojis.map((emoji) => (
                   <button
                     aria-label={`Add ${emoji}`}
@@ -980,11 +963,32 @@ export function TimelineWorkflow() {
                 ))}
               </div>
             )}
-            </div>
           </div>
-
+          <label
+            aria-label="Add image"
+            title="Add image"
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-600"
+          >
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m3 16 5-5 4 4 3-3 6 6" />
+            </svg>
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
+          </label>
+          <select
+            aria-label="Post visibility"
+            title="Post visibility"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-1.5 text-xs text-gray-800 sm:max-w-44 sm:px-3 sm:text-sm"
+            value={visibility}
+            onChange={(event) => setVisibility(event.target.value as "public" | "connections")}
+            disabled={isWorking}
+          >
+            <option value="public">Public</option>
+            <option value="connections">Connections only</option>
+          </select>
           <button
-            className="min-h-10 rounded-xl bg-gray-950 px-5 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="ml-auto h-9 shrink-0 rounded-lg bg-gray-950 px-3 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 sm:px-5"
             disabled={!postBody.trim() || isWorking}
             type="submit"
           >
