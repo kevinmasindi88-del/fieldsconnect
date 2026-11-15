@@ -58,8 +58,8 @@ type SystemInboxMessage = {
 
 
 const MESSAGE_PAGE_SIZE = 10;
-const MOBILE_THREAD_SCROLL_THRESHOLD = 3;
-const DESKTOP_THREAD_SCROLL_THRESHOLD = 3;
+const MOBILE_THREAD_SCROLL_THRESHOLD = 8;
+const DESKTOP_THREAD_SCROLL_THRESHOLD = 8;
 
 function ScrollableConversationList({
   children,
