@@ -180,7 +180,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     useState<PaymentOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [mentorFilter, setMentorFilter] = useState(view === "mentorship" ? "mentors" : "all");
   const [peopleSearchResults, setPeopleSearchResults] =
     useState<Profile[]>([]);
   const [mentorRatingsById, setMentorRatingsById] = useState<Record<string, MentorRatingSummary>>({});
@@ -1121,6 +1120,16 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   async function sendRequest(profileId: string) {
     if (!currentUserId || !isSupabaseConfigured()) return;
 
+    // Avoid duplicate invitations when an existing relationship is still active.
+    if (connections.some(
+      (connection) =>
+        (connection.status === "pending" || connection.status === "accepted") &&
+        ((connection.requester_id === currentUserId && connection.recipient_id === profileId) ||
+          (connection.recipient_id === currentUserId && connection.requester_id === profileId))
+    )) {
+      return;
+    }
+
     setIsWorking(true);
     setMessage(null);
 
@@ -1186,17 +1195,20 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
       }
 
       setMessage("Connection request sent.");
-      setPeopleSearchResults(
-        (currentResults) =>
-          currentResults.filter(
-            (profile) =>
-              profile.id !== profileId
-          )
-      );
-      setPeopleSearchOffset(
-        (currentOffset) =>
-          Math.max(0, currentOffset - 1)
-      );
+      // Keep the searched profile visible: its action changes to "Request pending".
+      setConnections((currentConnections) => {
+        const nextConnection: Connection = {
+          id: connectionId,
+          requester_id: currentUserId,
+          recipient_id: profileId,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        };
+        return [
+          nextConnection,
+          ...currentConnections.filter((connection) => connection.id !== connectionId),
+        ];
+      });
       await loadData();
     } catch (error) {
       setMessage(getActionErrorMessage(error, "send connection request"));
@@ -1415,7 +1427,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         : {
             term: searchTerm.trim(),
             role: roleFilter,
-            mentor: view === "mentorship" ? "mentors" : mentorFilter,
+            mentor: view === "mentorship" ? "mentors" : "all",
           };
 
     const offset =
@@ -2251,7 +2263,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 void searchPeople(false);
               }}
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px_auto] md:items-end">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Search people
                   <input
@@ -2293,29 +2305,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Mentor status
-                  <select
-                    className="rounded-lg border px-3 py-2 font-normal"
-                    onChange={(event) =>
-                      setMentorFilter(
-                        event.target.value
-                      )
-                    }
-                    value={mentorFilter}
-                  >
-                    <option value="all">
-                      Everyone
-                    </option>
-                    <option value="mentors">
-                      Available mentors
-                    </option>
-                    <option value="non-mentors">
-                      Not mentoring
-                    </option>
-                  </select>
-                </label>
-
                 <button
                   className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
                   disabled={isSearchingPeople}
@@ -2327,16 +2316,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 </button>
               </div>
 
-              <p className="mt-3 text-xs text-gray-500">
-                {hasSearchedPeople
-                  ? `${peopleSearchResults.length} ${
-                      peopleSearchResults.length === 1
-                        ? "result"
-                        : "results"
-                    } loaded`
-                  : "Search FieldsConnect by name, field, skill, role type, or mentor availability."}
-              </p>
-
               {peopleSearchError && (
                 <p className="mt-2 text-sm text-red-700">
                   {peopleSearchError}
@@ -2344,34 +2323,64 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               )}
             </form>
 
-            {!hasSearchedPeople ? (
-              <EmptyState text="Search for people to view matching profiles." />
-            ) : peopleSearchResults.length === 0 ? (
+            {!hasSearchedPeople ? null : peopleSearchResults.length === 0 ? (
               <EmptyState text="No matching people found." />
             ) : (
               <>
-                {peopleSearchResults.map(
-                  (profile) => (
+                {peopleSearchResults.map((profile) => {
+                  const activeConnection = connections.find(
+                    (connection) =>
+                      connection.status === "accepted" &&
+                      ((connection.requester_id === currentUserId && connection.recipient_id === profile.id) ||
+                        (connection.recipient_id === currentUserId && connection.requester_id === profile.id))
+                  ) ?? connections.find(
+                    (connection) =>
+                      connection.status === "pending" &&
+                      ((connection.requester_id === currentUserId && connection.recipient_id === profile.id) ||
+                        (connection.recipient_id === currentUserId && connection.requester_id === profile.id))
+                  );
+
+                  return (
                     <ConnectionCard
                       key={profile.id}
                       profile={profile}
                       showMentorRating
                       mentorRating={mentorRatingsById[profile.id] ?? null}
                     >
-                      <button
-                        className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                        disabled={isWorking}
-                        onClick={() =>
-                          sendRequest(
-                            profile.id
-                          )
-                        }
-                      >
-                        Connect
-                      </button>
+                      {activeConnection?.status === "accepted" ? (
+                        <span className="inline-flex min-h-10 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
+                          Connected
+                        </span>
+                      ) : activeConnection?.status === "pending" ? (
+                        activeConnection.requester_id === currentUserId ? (
+                          <button
+                            className="min-h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600"
+                            disabled
+                            type="button"
+                          >
+                            Request pending
+                          </button>
+                        ) : (
+                          <a
+                            className="inline-flex min-h-10 items-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                            href="#incoming-connection-requests"
+                          >
+                            Respond to request
+                          </a>
+                        )
+                      ) : (
+                        <button
+                          className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() => sendRequest(profile.id)}
+                          type="button"
+                        >
+                          Connect
+                        </button>
+                      )}
                     </ConnectionCard>
-                  )
-                )}
+                  );
+                })}
 
                 {hasMorePeople && (
                   <button
@@ -2391,7 +2400,8 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             )}
           </ConnectionSection>
 
-          <ConnectionSection title="Incoming requests">
+          <div id="incoming-connection-requests" className="scroll-mt-32">
+            <ConnectionSection title="Incoming requests">
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
             ) : (
@@ -2420,6 +2430,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               })
             )}
           </ConnectionSection>
+          </div>
 
           <ConnectionSection
             title={`Your connections · ${acceptedConnections.length}`}
