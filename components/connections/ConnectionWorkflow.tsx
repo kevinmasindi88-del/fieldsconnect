@@ -2685,7 +2685,7 @@ function ConnectionCard({
             {identity}
           </Link>
         ) : (
-          <div className="flex flex-col gap-3 sm:flex-row">{identity}</div>
+          <div className="flex min-w-0 items-start gap-3">{identity}</div>
         )}
         {showMentorRating && profile?.profile_visibility !== "private" && profile?.mentor_available && (
           <div className="ml-[52px] mt-1 text-xs sm:text-sm">
