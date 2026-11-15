@@ -1850,7 +1850,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                         aria-label="Mentor search results list"
                         className={
                           mentorSearchProfiles.length > 3
-                            ? "grid gap-3 overflow-y-auto overscroll-contain pr-2"
+                            ? "grid gap-3 overflow-y-auto overscroll-auto pr-2"
                             : "grid gap-3"
                         }
                         style={
