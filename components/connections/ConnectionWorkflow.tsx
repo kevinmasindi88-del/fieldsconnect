@@ -200,8 +200,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     useState<string | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [connectionSearch, setConnectionSearch] = useState("");
-  const [connectionSort, setConnectionSort] =
-    useState<"newest" | "oldest">("newest");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -362,6 +360,45 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
       ].includes(mentorship.status)
   );
 
+  // Paid orders without an existing mentorship cycle still need checkout/review visibility.
+  // Once a cycle is created, render it only once using the normal mentorship card.
+  const standalonePaidOrders = paymentOrders.filter(
+    (order) => !participantMentorships.some(
+      (mentorship) =>
+        mentorship.id === order.mentorship_id ||
+        mentorship.request_id === order.request_id
+    )
+  );
+
+  const openPaidOrders = standalonePaidOrders.filter(
+    (order) => ["awaiting_payment", "review_required", "paid"].includes(order.status)
+  );
+  const historicalPaidOrders = standalonePaidOrders.filter(
+    (order) => !["awaiting_payment", "review_required", "paid"].includes(order.status)
+  );
+
+  type CycleListItem =
+    | { kind: "mentorship"; mentorship: Mentorship; date: string }
+    | { kind: "payment"; order: PaymentOrder; date: string };
+
+  const activeCycleItems: CycleListItem[] = [
+    ...activeMentorships.map((mentorship) => ({
+      kind: "mentorship" as const, mentorship, date: mentorship.created_at
+    })),
+    ...openPaidOrders.map((order) => ({
+      kind: "payment" as const, order, date: order.created_at
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const historicalCycleItems: CycleListItem[] = [
+    ...historicalMentorships.map((mentorship) => ({
+      kind: "mentorship" as const, mentorship, date: mentorship.created_at
+    })),
+    ...historicalPaidOrders.map((order) => ({
+      kind: "payment" as const, order, date: order.created_at
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   const incomingMentorshipRequests =
     mentorshipRequests.filter(
       (request) =>
@@ -425,14 +462,11 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         const leftDate = new Date(left.created_at).getTime();
         const rightDate = new Date(right.created_at).getTime();
 
-        return connectionSort === "newest"
-          ? rightDate - leftDate
-          : leftDate - rightDate;
+        return rightDate - leftDate;
       });
   }, [
     acceptedConnections,
     connectionSearch,
-    connectionSort,
     currentUserId,
     profileById,
     skillsByProfileId,
@@ -1317,6 +1351,17 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
       mentorship.status === "cancelled" ||
       mentorship.status === "ended_early";
 
+    const mentorshipRequest = mentorshipRequests.find(
+      (request) => request.id === mentorship.request_id
+    );
+    const isPaidMentorship =
+      paymentOrders.some(
+        (order) => order.mentorship_id === mentorship.id ||
+          order.request_id === mentorship.request_id
+      ) ||
+      (mentorshipRequest?.proposed_payment_mode ??
+        mentorshipRequest?.requested_payment_mode) === "paid";
+
     return (
       <article
         key={mentorship.id}
@@ -1352,9 +1397,16 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             </div>
           </div>
 
-          <span className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize sm:px-3 sm:text-xs">
-            {mentorship.status.replace("_", " ")}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+            {isPaidMentorship && (
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800 sm:text-xs">
+                Paid mentorship
+              </span>
+            )}
+            <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize sm:px-3 sm:text-xs">
+              {mentorship.status.replace("_", " ")}
+            </span>
+          </div>
         </div>
 
         <div className="rounded-lg bg-gray-50 px-3 py-2 sm:bg-transparent sm:px-0 sm:py-0">
@@ -1408,6 +1460,162 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         </Link>
       </article>
     );
+  }
+
+  function renderPaidOrderCard(order: PaymentOrder) {
+                const isMentee =
+                  order.mentee_id === currentUserId;
+                const otherProfileId = isMentee
+                  ? order.mentor_id
+                  : order.mentee_id;
+                const otherProfile =
+                  profileById.get(otherProfileId);
+
+                return (
+                  <article
+                    key={`payment-${order.id}`}
+                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <ProfileAvatar
+                          avatarPath={otherProfile?.avatar_url}
+                          displayName={otherProfile?.display_name}
+                          size={40}
+                        />
+
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold hover:underline"
+                            href={`/profile/${otherProfileId}`}
+                          >
+                            {otherProfile?.display_name ??
+                              "Unknown profile"}
+                          </Link>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            {order.mentorship_field}
+                          </p>
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            {isMentee
+                              ? "You are the mentee"
+                              : "You are the mentor"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800 sm:text-xs">
+                          Paid mentorship
+                        </span>
+                      <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium capitalize">
+                        {order.status.replaceAll(
+                          "_",
+                          " "
+                        )}
+                      </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border px-3 py-1 font-semibold">
+                        {formatPaymentAmount(
+                          order.gross_amount_minor,
+                          order.currency
+                        )}
+                      </span>
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipDuration(
+                          order.agreed_duration
+                        )}
+                      </span>
+                      <span className="rounded-full border px-3 py-1">
+                        {formatMentorshipFrequency(
+                          order.agreed_frequency
+                        )}
+                      </span>
+                    </div>
+
+                    {order.status ===
+                      "awaiting_payment" && (
+                      <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700">
+                        <p>
+                          {PUBLIC_PAID_MENTORSHIPS_ENABLED
+                            ? "Payment is required before this mentorship becomes active."
+                            : "Payments are temporarily unavailable until FieldsConnect completes its payment launch approval. This existing order may expire without payment."}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Payment window ends{" "}
+                          {new Intl.DateTimeFormat(
+                            undefined,
+                            {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }
+                          ).format(
+                            new Date(
+                              order.payment_expires_at
+                            )
+                          )}
+                          .
+                        </p>
+                      </div>
+                    )}
+
+                    {order.status ===
+                      "review_required" && (
+                      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                        Payment was received but requires
+                        review before mentorship activation.
+                      </p>
+                    )}
+
+                    {order.status === "paid" &&
+                      order.mentorship_id && (
+                        <Link
+                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+                          href={`/mentorships/${order.mentorship_id}`}
+                        >
+                          Open mentorship
+                        </Link>
+                      )}
+
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                      order.status ===
+                      "awaiting_payment" &&
+                      isMentee && (
+                        <button
+                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
+                          disabled={isWorking}
+                          onClick={() =>
+                            void startMentorshipPayment(
+                              order
+                            )
+                          }
+                          type="button"
+                        >
+                          {isWorking
+                            ? "Opening secure checkout..."
+                            : `Pay ${formatPaymentAmount(
+                                order.gross_amount_minor,
+                                order.currency
+                              )}`}
+                        </button>
+                      )}
+
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                      order.status ===
+                      "awaiting_payment" &&
+                      !isMentee && (
+                        <p className="text-sm text-gray-600">
+                          Waiting for the mentee to complete
+                          payment. The mentorship will only
+                          activate after server verification.
+                        </p>
+                      )}
+                  </article>
+                );
   }
 
   async function searchPeople(
@@ -1627,9 +1835,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 </form>
 
                 <div id="mentor-search-results" className="grid gap-3" aria-live="polite" aria-busy={isSearchingPeople}>
-                  {!hasSearchedPeople ? (
-                    <EmptyState text="Select Find mentors to browse available mentors." />
-                  ) : isSearchingPeople && mentorSearchProfiles.length === 0 ? (
+                  {!hasSearchedPeople ? null : isSearchingPeople && mentorSearchProfiles.length === 0 ? (
                     <p className="text-sm text-gray-600">Searching mentors...</p>
                   ) : peopleSearchError && mentorSearchProfiles.length === 0 ? null
                   : mentorSearchProfiles.length === 0 ? (
@@ -1686,13 +1892,15 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               </ConnectionSection>
 
           <ConnectionSection
-            title={`Active mentorships · ${activeMentorships.length}`}
+            title={`Mentorship cycles · ${activeCycleItems.length}`}
           >
-            {activeMentorships.length === 0 ? (
-              <EmptyState text="No active mentorships yet." />
+            {activeCycleItems.length === 0 ? (
+              <EmptyState text="No active or pending mentorship cycles yet." />
             ) : (
-              activeMentorships.map(
-                renderMentorshipCard
+              activeCycleItems.map((item) =>
+                item.kind === "mentorship"
+                  ? renderMentorshipCard(item.mentorship)
+                  : renderPaidOrderCard(item.order)
               )
             )}
           </ConnectionSection>
@@ -1937,165 +2145,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             )}
           </ConnectionSection>
 
-          <ConnectionSection
-            title={`Mentorship payments · ${paymentOrders.length}`}
-          >
-            {paymentOrders.length === 0 ? (
-              <EmptyState text="No mentorship payments yet." />
-            ) : (
-              paymentOrders.map((order) => {
-                const isMentee =
-                  order.mentee_id === currentUserId;
-                const otherProfileId = isMentee
-                  ? order.mentor_id
-                  : order.mentee_id;
-                const otherProfile =
-                  profileById.get(otherProfileId);
-
-                return (
-                  <article
-                    key={order.id}
-                    className="flex flex-col gap-4 rounded-xl border bg-white p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <ProfileAvatar
-                          avatarPath={otherProfile?.avatar_url}
-                          displayName={otherProfile?.display_name}
-                          size={40}
-                        />
-
-                        <div className="min-w-0">
-                          <Link
-                            className="font-semibold hover:underline"
-                            href={`/profile/${otherProfileId}`}
-                          >
-                            {otherProfile?.display_name ??
-                              "Unknown profile"}
-                          </Link>
-
-                          <p className="mt-1 text-sm text-gray-600">
-                            {order.mentorship_field}
-                          </p>
-
-                          <p className="mt-1 text-xs text-gray-500">
-                            {isMentee
-                              ? "You are the mentee"
-                              : "You are the mentor"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="shrink-0 rounded-full border px-3 py-1 text-xs font-medium capitalize">
-                        {order.status.replaceAll(
-                          "_",
-                          " "
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full border px-3 py-1 font-semibold">
-                        {formatPaymentAmount(
-                          order.gross_amount_minor,
-                          order.currency
-                        )}
-                      </span>
-                      <span className="rounded-full border px-3 py-1">
-                        {formatMentorshipDuration(
-                          order.agreed_duration
-                        )}
-                      </span>
-                      <span className="rounded-full border px-3 py-1">
-                        {formatMentorshipFrequency(
-                          order.agreed_frequency
-                        )}
-                      </span>
-                    </div>
-
-                    {order.status ===
-                      "awaiting_payment" && (
-                      <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700">
-                        <p>
-                          {PUBLIC_PAID_MENTORSHIPS_ENABLED
-                            ? "Payment is required before this mentorship becomes active."
-                            : "Payments are temporarily unavailable until FieldsConnect completes its payment launch approval. This existing order may expire without payment."}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Payment window ends{" "}
-                          {new Intl.DateTimeFormat(
-                            undefined,
-                            {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            }
-                          ).format(
-                            new Date(
-                              order.payment_expires_at
-                            )
-                          )}
-                          .
-                        </p>
-                      </div>
-                    )}
-
-                    {order.status ===
-                      "review_required" && (
-                      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                        Payment was received but requires
-                        review before mentorship activation.
-                      </p>
-                    )}
-
-                    {order.status === "paid" &&
-                      order.mentorship_id && (
-                        <Link
-                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-                          href={`/mentorships/${order.mentorship_id}`}
-                        >
-                          Open mentorship
-                        </Link>
-                      )}
-
-                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
-                      order.status ===
-                      "awaiting_payment" &&
-                      isMentee && (
-                        <button
-                          className="w-fit rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
-                          disabled={isWorking}
-                          onClick={() =>
-                            void startMentorshipPayment(
-                              order
-                            )
-                          }
-                          type="button"
-                        >
-                          {isWorking
-                            ? "Opening secure checkout..."
-                            : `Pay ${formatPaymentAmount(
-                                order.gross_amount_minor,
-                                order.currency
-                              )}`}
-                        </button>
-                      )}
-
-                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
-                      order.status ===
-                      "awaiting_payment" &&
-                      !isMentee && (
-                        <p className="text-sm text-gray-600">
-                          Waiting for the mentee to complete
-                          payment. The mentorship will only
-                          activate after server verification.
-                        </p>
-                      )}
-                  </article>
-                );
-              })
-            )}
-          </ConnectionSection>
-
           <ConnectionSection title="Outgoing mentorship requests">
             {outgoingMentorshipRequests.length === 0 ? (
               <EmptyState text="No outgoing mentorship requests pending." />
@@ -2215,7 +2264,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               type="button"
             >
               <span className="text-lg font-semibold sm:text-xl">
-                Mentorship history · {historicalMentorships.length}
+                Mentorship history · {historicalCycleItems.length}
               </span>
 
               <svg
@@ -2240,11 +2289,13 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
 
             {isMentorshipHistoryOpen && (
               <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
-                {historicalMentorships.length === 0 ? (
+                {historicalCycleItems.length === 0 ? (
                   <EmptyState text="No completed or closed mentorships yet." />
                 ) : (
-                  historicalMentorships.map(
-                    renderMentorshipCard
+                  historicalCycleItems.map((item) =>
+                    item.kind === "mentorship"
+                      ? renderMentorshipCard(item.mentorship)
+                      : renderPaidOrderCard(item.order)
                   )
                 )}
               </div>
@@ -2439,7 +2490,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               <EmptyState text="No connections yet." />
             ) : (
               <>
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                <div className="grid gap-3">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     Search
                     <input
@@ -2453,21 +2504,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                     />
                   </label>
 
-                  <label className="flex flex-col gap-2 text-sm font-medium">
-                    Sort
-                    <select
-                      className="rounded-lg border px-3 py-2 font-normal"
-                      onChange={(event) =>
-                        setConnectionSort(
-                          event.target.value as "newest" | "oldest"
-                        )
-                      }
-                      value={connectionSort}
-                    >
-                      <option value="newest">Newest</option>
-                      <option value="oldest">Oldest</option>
-                    </select>
-                  </label>
                 </div>
 
                 <p className="text-xs text-gray-500">
