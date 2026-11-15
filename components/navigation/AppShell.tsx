@@ -89,18 +89,13 @@ const mobileNavItems: Array<{
   },
   {
     href: "/mentorships",
-    label: "Mentorship",
+    label: "Mentors",
     icon: "mentorship",
   },
   {
     href: "/messages",
     label: "Messages",
     icon: "messages",
-  },
-  {
-    href: "/notifications",
-    label: "Alerts",
-    icon: "notifications",
   },
   {
     href: "/library",
@@ -789,7 +784,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-gray-950">Connect</span>
             </Link>
 
-            <div className="flex items-center">
+            <div className="flex shrink-0 items-center gap-2">
+              {user && (
+                <Link
+                  href="/notifications"
+                  aria-label={`Notifications${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} unread` : ""}`}
+                  title="Notifications"
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-800 transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                >
+                  <MobileNavIcon name="notifications" className="h-6 w-6" />
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -right-1 -top-0.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-black px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                      {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {isLoadingAuth ? (
                 <span className="text-xs text-gray-500">
                   Checking...
@@ -892,25 +902,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav
-            className="grid grid-cols-6 gap-1"
+            className="grid grid-cols-5 gap-1.5"
             aria-label="Primary navigation"
           >
             {mobileNavItems.map((item) => {
               const isActive = pathname === item.href ||
                 (item.href === "/mentorships" && pathname.startsWith("/mentorships/"));
 
-              const unreadCount =
-                item.href === "/messages"
-                  ? unreadMessageCount
-                  : item.href === "/notifications"
-                    ? unreadNotificationCount
-                    : 0;
+              const unreadCount = item.href === "/messages" ? unreadMessageCount : 0;
 
               return (
                 <Link
                   key={item.href}
                   className={[
-                    "relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-0.5 py-2 text-[10px] font-medium leading-none transition",
+                    "relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-0.5 py-2 text-[clamp(9px,2.65vw,12px)] font-medium leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
                     isActive
                       ? "border-black bg-black text-white"
                       : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
@@ -941,7 +946,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </span>
 
-                  <span className="w-full truncate text-center">
+                  <span className="w-full whitespace-nowrap text-center tracking-tight">
                     {item.label}
                   </span>
                 </Link>
