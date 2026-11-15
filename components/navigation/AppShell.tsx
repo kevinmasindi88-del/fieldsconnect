@@ -171,9 +171,8 @@ function MobileNavIcon({
     case "library":
       return (
         <svg {...commonProps}>
-          <path d="M5 4h5.5A2.5 2.5 0 0 1 13 6.5V20a3.5 3.5 0 0 0-3-1.5H5V4Z" />
-          <path d="M19 4h-5.5A2.5 2.5 0 0 0 11 6.5" />
-          <path d="M19 4v14.5h-5a3.5 3.5 0 0 0-3 1.5" />
+          <path d="M12 7v14" />
+          <path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z" />
         </svg>
       );
 
