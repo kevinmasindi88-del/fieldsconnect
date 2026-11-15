@@ -903,10 +903,6 @@ export function TimelineWorkflow() {
         </label>
 
         <div className="flex flex-col gap-2">
-          <label className="inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50">
-            Add image
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
-          </label>
           {pendingImagePreview && (
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -921,7 +917,12 @@ export function TimelineWorkflow() {
           {extractFirstPostUrl(postBody) && <p className="break-all text-xs text-blue-700">Link detected — preview will appear where available.</p>}
         </div>
         <div className="flex items-end justify-between gap-3">
-          <div className="relative flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-600">
+              Add image
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
+            </label>
+            <div className="relative">
             <button
               aria-expanded={isEmojiPickerOpen}
               aria-label="Add emoji"
@@ -979,7 +980,7 @@ export function TimelineWorkflow() {
                 ))}
               </div>
             )}
-
+            </div>
           </div>
 
           <button
@@ -1012,10 +1013,10 @@ export function TimelineWorkflow() {
             <article
               key={post.id}
               data-post-id={post.id}
-              className="flex min-w-0 flex-col gap-4 rounded-xl border bg-white p-3 sm:p-4"
+              className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-4"
             >
               <div>
-                <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
+                <div className="flex items-start justify-between gap-2">
                   {isFcNews ? (
                     <div className="flex min-w-0 items-center gap-3">
                       <FcLogoAvatar size={40} />
@@ -1033,7 +1034,7 @@ export function TimelineWorkflow() {
                       </div>
                     </div>
                   ) : author ? (
-                    <Link className="flex items-center gap-3 rounded-lg hover:bg-gray-50" href={`/profile/${author.id}`}>
+                    <Link className="flex min-w-0 items-center gap-2.5 rounded-lg hover:bg-gray-50" href={`/profile/${author.id}`}>
                       <ProfileAvatar avatarPath={author.avatar_url} displayName={author.display_name} size={40} />
                       <div>
                         <h2 className="text-sm font-semibold leading-snug sm:text-base">
@@ -1076,32 +1077,29 @@ export function TimelineWorkflow() {
                   )}
 
                   <div className="flex items-center gap-2">
-                    <span className="w-fit rounded-full border px-2.5 py-0.5 text-[11px] sm:px-3 sm:py-1 sm:text-xs">
+                    <span className="w-fit rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500">
                       {post.visibility === "public" ? "Public" : "Connections"}
                     </span>
                     {isOwnPost && !isEditing && !isFcNews ? (
-                      <>
-                        <button
-                          aria-label="Edit post"
-                          title="Edit post"
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-950 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 disabled:opacity-50"
-                          disabled={isWorking}
-                          onClick={() => startEditingPost(post)}
-                          type="button"
+                      <details className="relative">
+                        <summary
+                          aria-label="Post options"
+                          title="Post options"
+                          className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 [&::-webkit-details-marker]:hidden"
                         >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          aria-label="Delete post"
-                          title="Delete post"
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
-                          data-delete-post-button="true"
-                          data-post-id={post.id}
-                          type="button"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </>
+                          <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+                          </svg>
+                        </summary>
+                        <div className="absolute right-0 top-full z-30 mt-1 min-w-36 rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                          <button aria-label="Edit post" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50" disabled={isWorking} onClick={() => startEditingPost(post)} type="button">
+                            <PencilIcon className="h-4 w-4" /> Edit
+                          </button>
+                          <button aria-label="Delete post" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-600" data-delete-post-button="true" data-post-id={post.id} type="button">
+                            <TrashIcon className="h-4 w-4" /> Delete
+                          </button>
+                        </div>
+                      </details>
                     ) : (
                       currentUserId && (
                         <ReportMenu
@@ -1150,7 +1148,7 @@ export function TimelineWorkflow() {
                         {fcNewsPublication.title}
                       </h3>
                     )}
-                    <div className={fcNewsPublication ? "mt-2" : "mt-4"}>
+                    <div className={fcNewsPublication ? "mt-2" : "mt-3"}>
                       <PostRichContent body={post.body} imagePath={post.image_path} linkUrl={post.link_url} mentionedProfiles={mentionedProfiles.map((person) => ({ id: person.id, display_name: person.display_name }))} />
                       {mentionedProfiles.some((person) => !post.body.includes(`@${person.display_name}`)) && (
                         <div className="mt-2 flex flex-wrap gap-2">
