@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { useOnlinePresence } from "@/components/navigation/AppShell";
+import { UserActivityPanel, type DadActivityDay } from "@/components/dad/UserActivityPanel";
 
 type MetricRow = {
   metric_date: string;
@@ -1197,6 +1198,8 @@ function AnalystWorkflow() {
 export function DadDashboard() {
   const onlineUserIds = useOnlinePresence();
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
+  const [dailyActivity, setDailyActivity] = useState<DadActivityDay[]>([]);
+  const [dailyActivityError, setDailyActivityError] = useState<string | null>(null);
   const [governance, setGovernance] = useState<MetricGovernanceRow[]>([]);
   const [signupTrend, setSignupTrend] = useState<SignupTrendRow[]>([]);
   const [signupTrendError, setSignupTrendError] = useState<string | null>(null);
@@ -1242,6 +1245,7 @@ export function DadDashboard() {
       signupTrendResult,
       trendReadinessResult,
       derivedKpiReadinessResult,
+      dailyActivityResult,
     ] = await Promise.all([
       supabase
         .from("dad_daily_metrics")
@@ -1266,6 +1270,7 @@ export function DadDashboard() {
       supabase.rpc("get_dad_derived_kpi_readiness", {
         p_as_of: new Date().toISOString().slice(0, 10),
       }),
+      supabase.rpc("get_dad_activity_30d", { p_days: 30 }),
     ]);
 
     if (metricsResult.error) {
@@ -1313,6 +1318,14 @@ export function DadDashboard() {
         (derivedKpiReadinessResult.data ?? []) as DerivedKpiReadinessRow[]
       );
       setDerivedKpiReadinessError(null);
+    }
+
+    if (dailyActivityResult.error) {
+      setDailyActivity([]);
+      setDailyActivityError("Daily login and active-user data is unavailable.");
+    } else {
+      setDailyActivity((dailyActivityResult.data ?? []) as DadActivityDay[]);
+      setDailyActivityError(null);
     }
 
     const newestDate = metricsResult.data?.[0]?.metric_date;
@@ -1466,6 +1479,12 @@ export function DadDashboard() {
             error={signupTrendError}
           />
         </section>
+
+        <UserActivityPanel
+          rows={dailyActivity}
+          error={dailyActivityError}
+          loading={isLoading}
+        />
 
         <MetricBars
           title="Mentorship"
