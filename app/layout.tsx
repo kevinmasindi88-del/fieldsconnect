@@ -26,7 +26,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AppShell>{children}</AppShell>
+        <AppShell
+          initialBuildId={
+            process.env.VERCEL_GIT_COMMIT_SHA ||
+            process.env.VERCEL_DEPLOYMENT_ID ||
+            process.env.VERCEL_URL ||
+            "local"
+          }
+        >
+          {children}
+        </AppShell>
       </body>
     </html>
   );

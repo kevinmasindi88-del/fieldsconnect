@@ -195,7 +195,13 @@ type ActiveSuspension = {
   ends_at: string;
 };
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  initialBuildId,
+}: {
+  children: React.ReactNode;
+  initialBuildId: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const shouldHideNavigation = authRoutes.has(pathname);
@@ -215,10 +221,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     useState<string | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [onlineUserIds, setOnlineUserIds] =
     useState<Set<string>>(
       () => new Set()
     );
+
+  useEffect(() => {
+    // Installed-app windows can remain open across production deployments.
+    // Check on focus and periodically, but never discard an unsent draft.
+    if (!initialBuildId || initialBuildId === "local") return;
+
+    let cancelled = false;
+    let checking = false;
+
+    async function checkForUpdate() {
+      if (checking || document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const response = await fetch(`/api/app-version?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data: { version?: unknown } = await response.json();
+        if (
+          !cancelled &&
+          typeof data.version === "string" &&
+          data.version !== "local" &&
+          data.version !== initialBuildId
+        ) {
+          setUpdateAvailable(true);
+        }
+      } catch {
+        // Offline sessions continue normally; retry at the next check.
+      } finally {
+        checking = false;
+      }
+    }
+
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void checkForUpdate();
+      }
+    };
+
+    void checkForUpdate();
+    window.addEventListener("focus", checkWhenVisible);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+    const interval = window.setInterval(checkWhenVisible, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", checkWhenVisible);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+    };
+  }, [initialBuildId]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -1108,6 +1166,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
+
+        {updateAvailable && (
+          <div role="status" className="border-b border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950 sm:px-6">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+              <span>A newer FieldsConnect version is ready. Refresh when convenient.</span>
+              <button
+                className="min-h-9 shrink-0 rounded-lg bg-blue-700 px-3 py-1.5 font-semibold text-white hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                type="button"
+                onClick={() => window.location.reload()}
+              >
+                Refresh app
+              </button>
+            </div>
+          </div>
+        )}
 
         {children}
       </div>
