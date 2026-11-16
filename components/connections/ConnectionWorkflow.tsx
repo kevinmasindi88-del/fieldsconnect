@@ -2632,19 +2632,19 @@ function ConnectionSection({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold sm:text-xl">
-        {collapsible ? (
+      {collapsible ? (
+        <h2>
           <button
             type="button"
-            className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3 text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
             aria-expanded={!isCollapsed}
             aria-controls="active-mentorship-cycles-list"
             onClick={() => setIsCollapsed((current) => !current)}
           >
-            <span>{title}</span>
+            <span className="text-lg font-semibold sm:text-xl">{title}</span>
             <svg
               aria-hidden="true"
-              className={`h-5 w-5 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+              className={`h-5 w-5 shrink-0 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -2655,13 +2655,21 @@ function ConnectionSection({
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
-        ) : (
-          title
-        )}
-      </h2>
+        </h2>
+      ) : (
+        <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
+      )}
       <div
         id={collapsible ? "active-mentorship-cycles-list" : undefined}
-        className={collapsible && isCollapsed ? "hidden" : "grid gap-3"}
+        aria-label={collapsible ? "Active mentorship cycles list" : undefined}
+        className={
+          collapsible
+            ? isCollapsed
+              ? "hidden"
+              : "max-h-[28rem] space-y-3 overflow-y-auto overscroll-auto pr-1"
+            : "grid gap-3"
+        }
+        tabIndex={collapsible && !isCollapsed ? 0 : undefined}
       >
         {children}
       </div>
