@@ -221,22 +221,79 @@ export function AppShell({
     useState<string | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [onlineUserIds, setOnlineUserIds] =
     useState<Set<string>>(
       () => new Set()
     );
 
   useEffect(() => {
-    // Installed-app windows can remain open across production deployments.
-    // Check on focus and periodically, but never discard an unsent draft.
+    // An installed app may resume an old Next.js client after a new release.
+    // Reload automatically on startup/resume, unless a draft is still being edited.
     if (!initialBuildId || initialBuildId === "local") return;
 
-    let cancelled = false;
+    let disposed = false;
     let checking = false;
+    let pendingVersion: string | null = null;
+
+    function hasUnsentInput() {
+      const editable = document.querySelectorAll(
+        'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), [contenteditable="true"]'
+      );
+
+      return Array.from(editable).some((element) => {
+        if (element instanceof HTMLInputElement) {
+          if (element.type === "file") return Boolean(element.files?.length);
+          return Boolean(element.value.trim()) && element.value !== element.defaultValue;
+        }
+        if (element instanceof HTMLTextAreaElement) {
+          return Boolean(element.value.trim()) && element.value !== element.defaultValue;
+        }
+        return Boolean(element.textContent?.trim());
+      });
+    }
+
+    function refreshIfSafe(version: string) {
+      if (disposed || document.visibilityState !== "visible" || hasUnsentInput()) return;
+
+      // Prevent repeated refreshes if the browser keeps delivering stale HTML.
+      const key = "fc-last-upgrade-attempt";
+      let previousVersion = "";
+      let previousAt = 0;
+      try {
+        const saved = window.sessionStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { version?: string; timestamp?: number };
+          previousVersion = parsed.version ?? "";
+          previousAt = parsed.timestamp ?? 0;
+        }
+      } catch {
+        // Storage may be unavailable; normal navigation must still work.
+      }
+
+      if (previousVersion === version && Date.now() - previousAt < 2 * 60 * 1000) return;
+
+      try {
+        window.sessionStorage.setItem(
+          key,
+          JSON.stringify({ version, timestamp: Date.now() })
+        );
+      } catch {
+        // Still attempt a refresh if session storage is blocked.
+      }
+
+      // A unique URL bypasses old PWA/page caches without logging out.
+      const target = new URL(window.location.href);
+      target.searchParams.set("__fc_release", version.slice(0, 16));
+      window.location.replace(target.toString());
+    }
 
     async function checkForUpdate() {
-      if (checking || document.visibilityState !== "visible") return;
+      if (disposed || checking || document.visibilityState !== "visible") return;
+      if (pendingVersion) {
+        refreshIfSafe(pendingVersion);
+        return;
+      }
+
       checking = true;
       try {
         const response = await fetch(`/api/app-version?t=${Date.now()}`, {
@@ -245,36 +302,43 @@ export function AppShell({
         if (!response.ok) return;
         const data: { version?: unknown } = await response.json();
         if (
-          !cancelled &&
+          !disposed &&
           typeof data.version === "string" &&
           data.version !== "local" &&
           data.version !== initialBuildId
         ) {
-          setUpdateAvailable(true);
+          pendingVersion = data.version;
+          refreshIfSafe(data.version);
         }
       } catch {
-        // Offline sessions continue normally; retry at the next check.
+        // If offline, recheck when connection/focus returns.
       } finally {
         checking = false;
       }
     }
 
-    const checkWhenVisible = () => {
-      if (document.visibilityState === "visible") {
-        void checkForUpdate();
-      }
+    const onResume = () => {
+      if (document.visibilityState === "visible") void checkForUpdate();
     };
 
     void checkForUpdate();
-    window.addEventListener("focus", checkWhenVisible);
-    document.addEventListener("visibilitychange", checkWhenVisible);
-    const interval = window.setInterval(checkWhenVisible, 5 * 60 * 1000);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("online", onResume);
+    window.addEventListener("pageshow", onResume);
+    document.addEventListener("visibilitychange", onResume);
+    const interval = window.setInterval(onResume, 60 * 1000);
+    const pendingDraftRetry = window.setInterval(() => {
+      if (pendingVersion) refreshIfSafe(pendingVersion);
+    }, 10 * 1000);
 
     return () => {
-      cancelled = true;
+      disposed = true;
       window.clearInterval(interval);
-      window.removeEventListener("focus", checkWhenVisible);
-      document.removeEventListener("visibilitychange", checkWhenVisible);
+      window.clearInterval(pendingDraftRetry);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("pageshow", onResume);
+      document.removeEventListener("visibilitychange", onResume);
     };
   }, [initialBuildId]);
 
@@ -1166,21 +1230,6 @@ export function AppShell({
           </nav>
         </div>
       </header>
-
-        {updateAvailable && (
-          <div role="status" className="border-b border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950 sm:px-6">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-              <span>A newer FieldsConnect version is ready. Refresh when convenient.</span>
-              <button
-                className="min-h-9 shrink-0 rounded-lg bg-blue-700 px-3 py-1.5 font-semibold text-white hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-                type="button"
-                onClick={() => window.location.reload()}
-              >
-                Refresh app
-              </button>
-            </div>
-          </div>
-        )}
 
         {children}
       </div>
