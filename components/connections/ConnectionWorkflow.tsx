@@ -1892,7 +1892,8 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
               </ConnectionSection>
 
           <ConnectionSection
-            title={`Mentorship cycles · ${activeCycleItems.length}`}
+            title={`Active Mentorship Cycles · ${activeCycleItems.length}`}
+            collapsible
           >
             {activeCycleItems.length === 0 ? (
               <EmptyState text="No active or pending mentorship cycles yet." />
@@ -2618,11 +2619,52 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   );
 }
 
-function ConnectionSection({ title, children }: { title: string; children: React.ReactNode }) {
+function ConnectionSection({
+  title,
+  children,
+  collapsible = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  collapsible?: boolean;
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
-      <div className="grid gap-3">{children}</div>
+      <h2 className="text-lg font-semibold sm:text-xl">
+        {collapsible ? (
+          <button
+            type="button"
+            className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            aria-expanded={!isCollapsed}
+            aria-controls="active-mentorship-cycles-list"
+            onClick={() => setIsCollapsed((current) => !current)}
+          >
+            <span>{title}</span>
+            <svg
+              aria-hidden="true"
+              className={`h-5 w-5 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        ) : (
+          title
+        )}
+      </h2>
+      <div
+        id={collapsible ? "active-mentorship-cycles-list" : undefined}
+        className={collapsible && isCollapsed ? "hidden" : "grid gap-3"}
+      >
+        {children}
+      </div>
     </section>
   );
 }
