@@ -2628,7 +2628,7 @@ function ConnectionSection({
   children: React.ReactNode;
   collapsible?: boolean;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(collapsible);
 
   return (
     <section className="flex flex-col gap-3">
