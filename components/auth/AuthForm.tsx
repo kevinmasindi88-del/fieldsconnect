@@ -249,6 +249,17 @@ export function AuthForm({ mode }: AuthFormProps) {
         if (error) throw error;
         if (!data.user) throw new Error("Unable to identify the signed-in user.");
 
+        // Record the new Supabase session once. Analytics failure must never
+        // prevent a successful login or expose user details in DAD.
+        try {
+          const { error: trackingError } = await supabase.rpc("record_dad_signin");
+          if (trackingError) {
+            console.warn("Sign-in analytics unavailable:", trackingError.message);
+          }
+        } catch {
+          // Sign-in succeeds even while analytics is unavailable.
+        }
+
         await routeAfterLogin(data.user.id);
         return;
       }

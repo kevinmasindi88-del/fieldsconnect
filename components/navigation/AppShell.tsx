@@ -382,6 +382,58 @@ export function AppShell({
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+    let lastRecordedDay = "";
+    let inFlight = false;
+    let disposed = false;
+
+    function recordDailyActivity() {
+      if (disposed || document.visibilityState !== "visible" || inFlight) return;
+      // South Africa does not observe DST: UTC+02:00 year-round.
+      const sastDay = new Date(Date.now() + 2 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      if (lastRecordedDay === sastDay) return;
+
+      inFlight = true;
+      void (async () => {
+        try {
+          const { error } = await supabase.rpc("record_dad_activity");
+          if (!disposed && !error) {
+            lastRecordedDay = sastDay;
+          } else if (error) {
+            console.warn("Unable to record daily FieldsConnect activity:", error.message);
+          }
+        } catch {
+          // Activity telemetry must never interrupt the application.
+        } finally {
+          inFlight = false;
+        }
+      })();
+    }
+
+    const onResume = () => recordDailyActivity();
+
+    recordDailyActivity();
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("online", onResume);
+    window.addEventListener("pageshow", onResume);
+    const interval = window.setInterval(recordDailyActivity, 5 * 60 * 1000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     if (isLoadingAuth || user || isPublicRoute) return;
 
     router.replace("/login");
