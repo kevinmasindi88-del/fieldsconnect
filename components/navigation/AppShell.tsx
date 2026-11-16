@@ -398,21 +398,20 @@ export function AppShell({
       if (lastRecordedDay === sastDay) return;
 
       inFlight = true;
-      void supabase
-        .rpc("record_dad_activity")
-        .then(({ error }) => {
+      void (async () => {
+        try {
+          const { error } = await supabase.rpc("record_dad_activity");
           if (!disposed && !error) {
             lastRecordedDay = sastDay;
           } else if (error) {
             console.warn("Unable to record daily FieldsConnect activity:", error.message);
           }
-        })
-        .catch(() => {
+        } catch {
           // Activity telemetry must never interrupt the application.
-        })
-        .finally(() => {
+        } finally {
           inFlight = false;
-        });
+        }
+      })();
     }
 
     const onResume = () => recordDailyActivity();
