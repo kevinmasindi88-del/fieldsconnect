@@ -891,8 +891,8 @@ export function LibraryWorkflow() {
             Resource type
           </legend>
 
-          <div className="flex flex-wrap gap-3">
-            <label className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm">
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3">
+            <label className="flex min-w-0 items-center gap-2 rounded-xl border px-2 py-3 text-sm sm:px-4">
               <input
                 checked={resourceType === "uploaded_file"}
                 name="resourceType"
@@ -902,10 +902,10 @@ export function LibraryWorkflow() {
                 type="radio"
               />
 
-              Upload a file
+              <span className="min-w-0">Upload a file</span>
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm">
+            <label className="flex min-w-0 items-center gap-2 rounded-xl border px-2 py-3 text-sm sm:px-4">
               <input
                 checked={resourceType === "external_link"}
                 name="resourceType"
@@ -915,7 +915,7 @@ export function LibraryWorkflow() {
                 type="radio"
               />
 
-              Share an online link
+              <span className="min-w-0">Share an online link</span>
             </label>
           </div>
         </fieldset>
@@ -943,21 +943,13 @@ export function LibraryWorkflow() {
             </label>
 
             <section className="grid min-w-0 gap-4 overflow-hidden rounded-xl border bg-gray-50 p-3 sm:p-4">
-              <div className="min-w-0">
-                <h3 className="break-words font-semibold">
-                  Rights and uploader declaration
-                </h3>
+              <h3 className="break-words font-semibold">
+                Rights and uploader declaration
+              </h3>
 
-                <p className="mt-1 text-sm leading-6 text-gray-600">
-                  Confirm why you are legally permitted
-                  to upload and share this file.
-                </p>
-              </div>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                Rights basis
-
+              <div>
                 <select
+                  aria-label="Rights basis"
                   className="min-w-0 w-full max-w-full rounded-lg border bg-white px-3 py-2"
                   onChange={(event) =>
                     setRightsBasis(event.target.value)
@@ -989,7 +981,7 @@ export function LibraryWorkflow() {
                     I rely on a lawful statutory exception
                   </option>
                 </select>
-              </label>
+              </div>
 
               {rightsBasis &&
                 rightsBasis !== "original_owner" && (
