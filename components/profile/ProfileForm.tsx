@@ -1785,7 +1785,7 @@ export function ProfileForm() {
                 role="status"
                 className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
               >
-                Other members can still find you in people searches, but they cannot view your profile, skills or library files.
+                Your profile will appear under search results but your profile details, skills and library files cannot be viewed.
               </p>
             )}
           </div>
