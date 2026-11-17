@@ -1667,13 +1667,9 @@ export function ProfileForm() {
               <h2 className="text-lg font-semibold">
                 Mentorship
               </h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Make yourself discoverable to people seeking
-                structured mentorship.
-              </p>
             </div>
 
-            <label className="flex gap-3 text-sm">
+            <label className="flex items-center gap-3 text-sm">
               <input
                 type="checkbox"
                 checked={form.mentorAvailable}
@@ -1690,10 +1686,6 @@ export function ProfileForm() {
                   I am available as a mentor
                 </span>
 
-                <span className="mt-1 block text-gray-600">
-                  Your mentor information will be shown to
-                  eligible FieldsConnect users.
-                </span>
               </span>
             </label>
 
