@@ -13,7 +13,6 @@ import {
 type Profile = {
   id: string;
   display_name: string;
-  username: string | null;
   bio: string | null;
   field: string | null;
   role_type: string;
@@ -225,7 +224,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         ] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, display_name, username, bio, field, role_type, profile_visibility, mentor_available, avatar_url")
+            .select("id, display_name, bio, field, role_type, profile_visibility, mentor_available, avatar_url")
             .eq("id", profileId)
             .maybeSingle(),
           supabase
@@ -759,8 +758,6 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
               {profile.profile_visibility}
             </span>
           </div>
-
-          {profile.username && <p className="mt-1 text-xs text-gray-600 sm:text-sm">@{profile.username}</p>}
 
           <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
             {[profile.role_type, profile.field].filter(Boolean).join(" - ") || "Profile"}
