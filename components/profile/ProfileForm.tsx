@@ -424,14 +424,14 @@ export function ProfileForm() {
     useState(1);
   const avatarCanvasRef =
     useRef<HTMLCanvasElement | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
   const avatarImageRef = useRef<AvatarImageSource | null>(null);
   const [avatarImageDimensions, setAvatarImageDimensions] =
     useState<{ width: number; height: number } | null>(null);
-  const avatarDragRef = useRef<{
-    pointerId: number;
-    clientX: number;
-    clientY: number;
-  } | null>(null);
+  const avatarPointersRef = useRef(
+    new Map<number, { x: number; y: number }>()
+  );
+  const avatarPinchDistanceRef = useRef<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -1011,35 +1011,61 @@ export function ProfileForm() {
     }
   }
 
+  function avatarPointerDistance() {
+    const points = Array.from(avatarPointersRef.current.values());
+    if (points.length !== 2) return null;
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  }
+
   function handleAvatarPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (!avatarImageDimensions || avatarDragRef.current || isAvatarWorking) return;
+    if (!avatarImageDimensions || isAvatarWorking) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    const pointers = avatarPointersRef.current;
+    if (pointers.size >= 2 || pointers.has(event.pointerId)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    avatarDragRef.current = {
-      pointerId: event.pointerId,
-      clientX: event.clientX,
-      clientY: event.clientY,
-    };
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      avatarPinchDistanceRef.current = avatarPointerDistance();
+    }
   }
 
   function handleAvatarPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
-    const drag = avatarDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+    const pointers = avatarPointersRef.current;
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
+
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const distance = avatarPointerDistance();
+      const previousDistance = avatarPinchDistanceRef.current;
+      if (distance !== null && previousDistance !== null && previousDistance > 0) {
+        // Incremental ratio supports smooth pinch out and pinch in, even at zoom limits.
+        const ratio = distance / previousDistance;
+        setAvatarZoom((current) => Math.max(1, Math.min(2.5, current * ratio)));
+      }
+      avatarPinchDistanceRef.current = distance;
+      return;
+    }
+
+    // Drag normally with one finger, mouse, or stylus.
     moveAvatarCropByPixels(
-      event.clientX - drag.clientX,
-      event.clientY - drag.clientY,
+      event.clientX - previous.x,
+      event.clientY - previous.y,
       event.currentTarget
     );
-    drag.clientX = event.clientX;
-    drag.clientY = event.clientY;
   }
 
   function handleAvatarPointerEnd(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (avatarDragRef.current?.pointerId !== event.pointerId) return;
-    avatarDragRef.current = null;
+    avatarPointersRef.current.delete(event.pointerId);
+    avatarPinchDistanceRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  }
+
+  function handleAvatarPointerCaptureLost(event: React.PointerEvent<HTMLCanvasElement>) {
+    avatarPointersRef.current.delete(event.pointerId);
+    avatarPinchDistanceRef.current = null;
   }
 
   function handleAvatarArrowKey(event: React.KeyboardEvent<HTMLCanvasElement>) {
@@ -1049,8 +1075,14 @@ export function ProfileForm() {
       ArrowUp: [0, -12],
       ArrowDown: [0, 12],
     };
+    if (!avatarImageDimensions || isAvatarWorking) return;
+    if (event.key === "+" || event.key === "=" || event.key === "-") {
+      event.preventDefault();
+      setAvatarZoom((current) => Math.max(1, Math.min(2.5, current + (event.key === "-" ? -0.1 : 0.1))));
+      return;
+    }
     const delta = movement[event.key];
-    if (!delta || !avatarImageDimensions || isAvatarWorking) return;
+    if (!delta) return;
     event.preventDefault();
     moveAvatarCropByPixels(delta[0], delta[1], event.currentTarget);
   }
@@ -1063,7 +1095,8 @@ export function ProfileForm() {
 
     if (!file) {
       setSelectedAvatarFile(null);
-      avatarDragRef.current = null;
+      avatarPointersRef.current.clear();
+      avatarPinchDistanceRef.current = null;
       setAvatarImageDimensions(null);
       setAvatarCropX(50);
       setAvatarCropY(50);
@@ -1094,7 +1127,8 @@ export function ProfileForm() {
         }
       );
 
-      avatarDragRef.current = null;
+      avatarPointersRef.current.clear();
+      avatarPinchDistanceRef.current = null;
       setAvatarImageDimensions(null);
       setSelectedAvatarFile(safeFile);
       setAvatarCropX(50);
@@ -1545,7 +1579,7 @@ export function ProfileForm() {
                   {selectedAvatarFile ? (
                     <canvas
                       ref={avatarCanvasRef}
-                      aria-label="Profile picture crop. Drag to reposition or use arrow keys."
+                      aria-label="Profile picture crop. Drag to reposition, pinch to zoom, or use arrow and plus/minus keys."
                       role="img"
                       tabIndex={0}
                       className="h-full w-full cursor-grab touch-none select-none outline-offset-4 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
@@ -1555,7 +1589,7 @@ export function ProfileForm() {
                       onPointerMove={handleAvatarPointerMove}
                       onPointerUp={handleAvatarPointerEnd}
                       onPointerCancel={handleAvatarPointerEnd}
-                      onLostPointerCapture={() => { avatarDragRef.current = null; }}
+                      onLostPointerCapture={handleAvatarPointerCaptureLost}
                       onKeyDown={handleAvatarArrowKey}
                     />
                   ) : avatarPreviewUrl ? (
@@ -1570,27 +1604,39 @@ export function ProfileForm() {
                 </div>
                 {selectedAvatarFile && (
                   <p className="text-center text-xs text-gray-600 sm:text-left">
-                    Drag the photo to reposition it.
+                    Drag to reposition · Pinch to zoom
                   </p>
                 )}
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-3">
-                <input
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="block w-full min-w-0 max-w-full rounded-lg border px-2 py-2 text-sm"
-                  type="file"
-                  onChange={(event) => {
-                    const file =
-                      event.target.files?.[0] ??
-                      null;
-
-                    void handleAvatarSelection(file);
-                  }}
-                />
+                <div>
+                  <input
+                    ref={avatarFileInputRef}
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    aria-label="Choose profile picture file"
+                    className="sr-only"
+                    tabIndex={-1}
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0] ?? null;
+                      // Allow selecting the same photo again after a failed attempt.
+                      event.currentTarget.value = "";
+                      void handleAvatarSelection(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900"
+                    disabled={isAvatarWorking}
+                    onClick={() => avatarFileInputRef.current?.click()}
+                  >
+                    Choose file
+                  </button>
+                </div>
 
                 {selectedAvatarFile && (
-                  <div className="grid min-w-0 gap-3 rounded-xl border bg-gray-50 p-3">
+                  <div className="hidden min-w-0 gap-3 rounded-xl border bg-gray-50 p-3 sm:grid">
                     <label className="grid min-w-0 gap-1 text-sm font-medium">
                       Zoom
                       <input
