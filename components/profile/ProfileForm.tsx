@@ -415,6 +415,7 @@ export function ProfileForm() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [selectedAvatarFile, setSelectedAvatarFile] =
     useState<File | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [avatarCropX, setAvatarCropX] =
     useState(50);
   const [avatarCropY, setAvatarCropY] =
@@ -950,7 +951,9 @@ export function ProfileForm() {
           setAvatarImageDimensions(getAvatarImageDimensions(image));
         })
         .catch(() => {
-          // Avatar validation/upload reports decoding errors to the user.
+          if (!cancelled) {
+            setAvatarError("Unable to read this photo. Please choose a valid JPG, PNG, WebP, or GIF image.");
+          }
         });
     }
 
@@ -1056,6 +1059,7 @@ export function ProfileForm() {
     file: File | null
   ) {
     setMessage(null);
+    setAvatarError(null);
 
     if (!file) {
       setSelectedAvatarFile(null);
@@ -1072,7 +1076,7 @@ export function ProfileForm() {
 
     if (validationError) {
       setSelectedAvatarFile(null);
-      setMessage(validationError);
+      setAvatarError(validationError);
       return;
     }
 
@@ -1104,15 +1108,15 @@ export function ProfileForm() {
 
       setSelectedAvatarFile(null);
 
-      setMessage(
-        `Unable to copy the selected profile picture: ${detail}`
+      setAvatarError(
+        `Unable to read this photo. Please try another image. (${detail})`
       );
     }
   }
 
   function validateAvatarFile(file: File) {
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
-      return "Profile picture must be a JPG, PNG, WebP, or GIF image.";
+      return "Format not supported. Please upload a JPG, PNG, WebP, or GIF image.";
     }
 
 
@@ -1128,12 +1132,13 @@ export function ProfileForm() {
       );
 
     if (validationError) {
-      setMessage(validationError);
+      setAvatarError(validationError);
       return;
     }
 
     setIsAvatarWorking(true);
     setMessage(null);
+    setAvatarError(null);
 
     const supabase =
       getSupabaseBrowserClient();
@@ -1191,7 +1196,19 @@ export function ProfileForm() {
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
-      setMessage(getActionErrorMessage(error, "upload profile picture"));
+      const detail = error instanceof Error ? error.message : "";
+      if (detail.includes("larger than 2 MB")) {
+        setAvatarError("Size too big. Please upload a photo that is 2 MB or less.");
+      } else if (
+        detail.includes("could not be processed") ||
+        detail.includes("Unable to decode profile picture") ||
+        detail.includes("Unable to read profile picture bytes") ||
+        detail.includes("empty or incomplete")
+      ) {
+        setAvatarError("Unable to process this photo. Please try another JPG, PNG, WebP, or GIF image.");
+      } else {
+        setAvatarError(getActionErrorMessage(error, "upload profile picture"));
+      }
     } finally {
       setIsAvatarWorking(false);
     }
@@ -1227,6 +1244,7 @@ export function ProfileForm() {
       setAvatarPath(null);
       setAvatarPreviewUrl(null);
       setSelectedAvatarFile(null);
+      setAvatarError(null);
       setMessage("Profile picture deleted.");
     } catch (error) {
       setMessage(getActionErrorMessage(error, "delete profile picture"));
@@ -1591,9 +1609,9 @@ export function ProfileForm() {
                   </div>
                 )}
 
-                <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap">
+                <div className={`grid min-w-0 gap-2 ${avatarPath ? "grid-cols-2" : "grid-cols-1"}`}>
                   <button
-                    className="w-full min-w-0 rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
+                    className="w-full min-w-0 rounded-lg bg-black px-2 py-2 text-sm font-medium text-white disabled:opacity-50"
                     disabled={
                       !selectedAvatarFile ||
                       isAvatarWorking
@@ -1610,7 +1628,7 @@ export function ProfileForm() {
 
                   {avatarPath && (
                     <button
-                      className="w-full min-w-0 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50 sm:w-auto"
+                      className="w-full min-w-0 rounded-lg border border-red-300 px-2 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
                       disabled={isAvatarWorking}
                       onClick={deleteAvatar}
                       type="button"
@@ -1620,12 +1638,11 @@ export function ProfileForm() {
                   )}
                 </div>
 
-                <p className="max-w-full break-words text-xs leading-5 text-gray-500">
-                  JPG, PNG, WebP, or GIF. FieldsConnect will
-                  crop your selected framing to a square and
-                  automatically compress the uploaded profile
-                  picture to below 2 MB.
-                </p>
+                {avatarError && (
+                  <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+                    {avatarError}
+                  </p>
+                )}
               </div>
             </div>
           </section>
