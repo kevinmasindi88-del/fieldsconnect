@@ -2453,7 +2453,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
           </ConnectionSection>
 
           <div id="incoming-connection-requests" className="scroll-mt-32">
-            <ConnectionSection title="Incoming requests">
+            <ConnectionSection title={`Incoming requests · ${incomingRequests.length}`}>
             {incomingRequests.length === 0 ? (
               <EmptyState text="No incoming requests yet." />
             ) : (
@@ -2483,6 +2483,33 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             )}
           </ConnectionSection>
           </div>
+
+          <ConnectionSection title={`Outgoing requests · ${outgoingRequests.length}`}>
+            {outgoingRequests.length === 0 ? (
+              <EmptyState text="No outgoing requests pending." />
+            ) : (
+              <div
+                aria-label="Outgoing connection requests"
+                className={`grid gap-3 ${
+                  outgoingRequests.length > 3
+                    ? "max-h-[23rem] overflow-y-auto overscroll-contain pr-2 md:max-h-[18rem]"
+                    : ""
+                }`}
+                tabIndex={outgoingRequests.length > 3 ? 0 : undefined}
+              >
+                {outgoingRequests.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    profile={profileById.get(connection.recipient_id)}
+                    showBio={false}
+                    showMentorAvailability={false}
+                  >
+                    <span className="text-sm font-medium text-gray-700">Pending</span>
+                  </ConnectionCard>
+                ))}
+              </div>
+            )}
+          </ConnectionSection>
 
           <ConnectionSection
             title={`Your connections · ${acceptedConnections.length}`}
@@ -2580,33 +2607,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   </div>
                 )}
               </>
-            )}
-          </ConnectionSection>
-
-          <ConnectionSection title="Outgoing requests">
-            {outgoingRequests.length === 0 ? (
-              <EmptyState text="No outgoing requests pending." />
-            ) : (
-              <div
-                aria-label="Outgoing connection requests"
-                className={`grid gap-3 ${
-                  outgoingRequests.length > 3
-                    ? "max-h-[23rem] overflow-y-auto overscroll-contain pr-2 md:max-h-[18rem]"
-                    : ""
-                }`}
-                tabIndex={outgoingRequests.length > 3 ? 0 : undefined}
-              >
-                {outgoingRequests.map((connection) => (
-                  <ConnectionCard
-                    key={connection.id}
-                    profile={profileById.get(connection.recipient_id)}
-                    showBio={false}
-                    showMentorAvailability={false}
-                  >
-                    <span className="text-sm font-medium text-gray-700">Pending</span>
-                  </ConnectionCard>
-                ))}
-              </div>
             )}
           </ConnectionSection>
 
