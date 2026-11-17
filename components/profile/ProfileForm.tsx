@@ -1641,7 +1641,13 @@ export function ProfileForm() {
               <select
                 className="w-full min-w-0 rounded-lg border px-3 py-2"
                 value={form.profileVisibility}
-                aria-describedby={form.profileVisibility === "private" ? "private-profile-visibility-help" : undefined}
+                aria-describedby={
+                  form.profileVisibility === "private"
+                    ? "private-profile-visibility-help"
+                    : form.profileVisibility === "public"
+                      ? "public-profile-visibility-help"
+                      : undefined
+                }
                 onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
               >
                 <option value="public">Public</option>
@@ -1649,6 +1655,17 @@ export function ProfileForm() {
                 <option value="private">Private</option>
               </select>
             </label>
+            {form.profileVisibility === "public" && (
+              <p
+                id="public-profile-visibility-help"
+                role="status"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
+              >
+                Other members can view your public profile and published skills, as well as library files and resources you choose to share with them.
+                Unpublished or restricted library resources remain subject to their individual visibility settings.
+                Changes take effect after you save your profile.
+              </p>
+            )}
             {form.profileVisibility === "private" && (
               <p
                 id="private-profile-visibility-help"
