@@ -1661,9 +1661,7 @@ export function ProfileForm() {
                 role="status"
                 className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
               >
-                Other members can view your public profile and published skills, as well as library files and resources you choose to share with them.
-                Unpublished or restricted library resources remain subject to their individual visibility settings.
-                Changes take effect after you save your profile.
+                Other members can view your public profile and published skills, as well as library files.
               </p>
             )}
             {form.profileVisibility === "private" && (
