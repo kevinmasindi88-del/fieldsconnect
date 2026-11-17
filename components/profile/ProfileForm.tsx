@@ -1785,8 +1785,7 @@ export function ProfileForm() {
                 role="status"
                 className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
               >
-                Your profile will not be visible to other members or appear in people searches.
-                You can still search for and discover other members. Changes take effect after you save your profile.
+                Other members can still find you in people searches, but they cannot view your profile, skills or library files.
               </p>
             )}
           </div>
