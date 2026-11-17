@@ -423,6 +423,14 @@ export function ProfileForm() {
     useState(1);
   const avatarCanvasRef =
     useRef<HTMLCanvasElement | null>(null);
+  const avatarImageRef = useRef<AvatarImageSource | null>(null);
+  const [avatarImageDimensions, setAvatarImageDimensions] =
+    useState<{ width: number; height: number } | null>(null);
+  const avatarDragRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -923,55 +931,126 @@ export function ProfileForm() {
     setAvatarPreviewUrl(data?.signedUrl ?? null);
   }
 
+  // Keep a decoded image while a photo is selected, rather than decoding on every drag.
   useEffect(() => {
     let cancelled = false;
+    avatarImageRef.current = null;
+    setAvatarImageDimensions(null);
 
-    async function renderSelectedAvatar() {
-      if (!selectedAvatarFile) return;
-
-      try {
-        const image =
-          await loadAvatarImage(
-            selectedAvatarFile
-          );
-
-        if (cancelled) return;
-
-        const canvas =
-          avatarCanvasRef.current;
-
-        if (!canvas) return;
-
-        const context =
-          canvas.getContext("2d");
-
-        if (!context) return;
-
-        drawCroppedAvatar(
-          context,
-          image,
-          canvas.width,
-          avatarCropX,
-          avatarCropY,
-          avatarZoom
-        );
-      } catch {
-        // Validation/upload will surface a useful
-        // message if the file cannot be decoded.
-      }
+    if (selectedAvatarFile) {
+      void loadAvatarImage(selectedAvatarFile)
+        .then((image) => {
+          if (cancelled) {
+            if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
+              image.close();
+            }
+            return;
+          }
+          avatarImageRef.current = image;
+          setAvatarImageDimensions(getAvatarImageDimensions(image));
+        })
+        .catch(() => {
+          // Avatar validation/upload reports decoding errors to the user.
+        });
     }
-
-    void renderSelectedAvatar();
 
     return () => {
       cancelled = true;
+      const image = avatarImageRef.current;
+      avatarImageRef.current = null;
+      if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
+        image.close();
+      }
     };
-  }, [
-    selectedAvatarFile,
-    avatarCropX,
-    avatarCropY,
-    avatarZoom,
-  ]);
+  }, [selectedAvatarFile]);
+
+  useEffect(() => {
+    const image = avatarImageRef.current;
+    const canvas = avatarCanvasRef.current;
+    if (!selectedAvatarFile || !avatarImageDimensions || !image || !canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    drawCroppedAvatar(
+      context,
+      image,
+      canvas.width,
+      avatarCropX,
+      avatarCropY,
+      avatarZoom
+    );
+  }, [selectedAvatarFile, avatarImageDimensions, avatarCropX, avatarCropY, avatarZoom]);
+
+  function moveAvatarCropByPixels(
+    deltaX: number,
+    deltaY: number,
+    canvas: HTMLCanvasElement
+  ) {
+    const dimensions = avatarImageDimensions;
+    const bounds = canvas.getBoundingClientRect();
+    if (!dimensions || !bounds.width || !bounds.height) return;
+
+    // Match the cover-and-zoom geometry used by the final saved crop.
+    const scale = Math.max(
+      canvas.width / dimensions.width,
+      canvas.height / dimensions.height
+    ) * avatarZoom;
+    const maxX = Math.max(0, (dimensions.width * scale - canvas.width) / 2);
+    const maxY = Math.max(0, (dimensions.height * scale - canvas.height) / 2);
+
+    // Drag right or down to move the photo that way inside the circular frame.
+    if (maxX > 0) {
+      const cropStepX = (deltaX * canvas.width / bounds.width) * 50 / maxX;
+      setAvatarCropX((current) => Math.max(0, Math.min(100, current - cropStepX)));
+    }
+    if (maxY > 0) {
+      const cropStepY = (deltaY * canvas.height / bounds.height) * 50 / maxY;
+      setAvatarCropY((current) => Math.max(0, Math.min(100, current - cropStepY)));
+    }
+  }
+
+  function handleAvatarPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!avatarImageDimensions || avatarDragRef.current || isAvatarWorking) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    avatarDragRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+  }
+
+  function handleAvatarPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    const drag = avatarDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    moveAvatarCropByPixels(
+      event.clientX - drag.clientX,
+      event.clientY - drag.clientY,
+      event.currentTarget
+    );
+    drag.clientX = event.clientX;
+    drag.clientY = event.clientY;
+  }
+
+  function handleAvatarPointerEnd(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (avatarDragRef.current?.pointerId !== event.pointerId) return;
+    avatarDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleAvatarArrowKey(event: React.KeyboardEvent<HTMLCanvasElement>) {
+    const movement: Record<string, [number, number]> = {
+      ArrowLeft: [-12, 0],
+      ArrowRight: [12, 0],
+      ArrowUp: [0, -12],
+      ArrowDown: [0, 12],
+    };
+    const delta = movement[event.key];
+    if (!delta || !avatarImageDimensions || isAvatarWorking) return;
+    event.preventDefault();
+    moveAvatarCropByPixels(delta[0], delta[1], event.currentTarget);
+  }
 
   async function handleAvatarSelection(
     file: File | null
@@ -980,6 +1059,8 @@ export function ProfileForm() {
 
     if (!file) {
       setSelectedAvatarFile(null);
+      avatarDragRef.current = null;
+      setAvatarImageDimensions(null);
       setAvatarCropX(50);
       setAvatarCropY(50);
       setAvatarZoom(1);
@@ -1009,6 +1090,8 @@ export function ProfileForm() {
         }
       );
 
+      avatarDragRef.current = null;
+      setAvatarImageDimensions(null);
       setSelectedAvatarFile(safeFile);
       setAvatarCropX(50);
       setAvatarCropY(50);
@@ -1439,15 +1522,23 @@ export function ProfileForm() {
             </h2>
 
             <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-              <div className="flex shrink-0 justify-center sm:justify-start">
-                <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500">
+              <div className="flex shrink-0 flex-col items-center gap-2 sm:items-start">
+                <div className={`flex items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500 ${selectedAvatarFile ? "h-56 w-56" : "h-32 w-32"}`}>
                   {selectedAvatarFile ? (
                     <canvas
                       ref={avatarCanvasRef}
-                      aria-label="Selected profile picture crop preview"
-                      className="h-full w-full"
+                      aria-label="Profile picture crop. Drag to reposition or use arrow keys."
+                      role="img"
+                      tabIndex={0}
+                      className="h-full w-full cursor-grab touch-none select-none outline-offset-4 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
                       height={256}
                       width={256}
+                      onPointerDown={handleAvatarPointerDown}
+                      onPointerMove={handleAvatarPointerMove}
+                      onPointerUp={handleAvatarPointerEnd}
+                      onPointerCancel={handleAvatarPointerEnd}
+                      onLostPointerCapture={() => { avatarDragRef.current = null; }}
+                      onKeyDown={handleAvatarArrowKey}
                     />
                   ) : avatarPreviewUrl ? (
                     <img
@@ -1459,6 +1550,11 @@ export function ProfileForm() {
                     <span>No photo</span>
                   )}
                 </div>
+                {selectedAvatarFile && (
+                  <p className="text-center text-xs text-gray-600 sm:text-left">
+                    Drag the photo to reposition it.
+                  </p>
+                )}
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -1477,58 +1573,15 @@ export function ProfileForm() {
 
                 {selectedAvatarFile && (
                   <div className="grid min-w-0 gap-3 rounded-xl border bg-gray-50 p-3">
-                    <p className="text-sm font-medium">
-                      Choose how your picture is shown
-                    </p>
-
-                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
-                      Horizontal position
-                      <input
-                        className="w-full"
-                        max={100}
-                        min={0}
-                        onChange={(event) =>
-                          setAvatarCropX(
-                            Number(
-                              event.target.value
-                            )
-                          )
-                        }
-                        type="range"
-                        value={avatarCropX}
-                      />
-                    </label>
-
-                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
-                      Vertical position
-                      <input
-                        className="w-full"
-                        max={100}
-                        min={0}
-                        onChange={(event) =>
-                          setAvatarCropY(
-                            Number(
-                              event.target.value
-                            )
-                          )
-                        }
-                        type="range"
-                        value={avatarCropY}
-                      />
-                    </label>
-
-                    <label className="grid min-w-0 gap-1 text-xs text-gray-600">
+                    <label className="grid min-w-0 gap-1 text-sm font-medium">
                       Zoom
                       <input
+                        aria-label="Profile picture zoom"
                         className="w-full"
                         max={2.5}
                         min={1}
                         onChange={(event) =>
-                          setAvatarZoom(
-                            Number(
-                              event.target.value
-                            )
-                          )
+                          setAvatarZoom(Number(event.target.value))
                         }
                         step={0.05}
                         type="range"
