@@ -83,7 +83,6 @@ type MentorSettingsState = {
 
 type ProfileFormState = {
   displayName: string;
-  username: string;
   roleType: RoleType | "";
   field: string;
   bio: string;
@@ -93,7 +92,6 @@ type ProfileFormState = {
 
 const initialState: ProfileFormState = {
   displayName: "",
-  username: "",
   roleType: "",
   field: "",
   bio: "",
@@ -475,7 +473,7 @@ export function ProfileForm() {
           supabase
             .from("profiles")
             .select(
-              "display_name, username, role_type, field, bio, profile_visibility, mentor_available, avatar_url"
+              "display_name, role_type, field, bio, profile_visibility, mentor_available, avatar_url"
             )
             .eq("id", userId)
             .maybeSingle(),
@@ -566,7 +564,6 @@ export function ProfileForm() {
         if (profileData) {
           setForm({
             displayName: profileData.display_name ?? "",
-            username: profileData.username ?? "",
             roleType: profileData.role_type ?? "",
             field: profileData.field ?? "",
             bio: profileData.bio ?? "",
@@ -1276,7 +1273,6 @@ export function ProfileForm() {
         .upsert({
           id: userId,
           display_name: form.displayName.trim(),
-          username: form.username.trim() || null,
           role_type: form.roleType,
           field: form.field.trim() || null,
           bio: form.bio.trim() || null,
@@ -1588,16 +1584,6 @@ export function ProfileForm() {
               value={form.displayName}
               onChange={(event) => updateField("displayName", event.target.value)}
               required
-            />
-          </label>
-
-          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
-            Username
-            <input
-              className="w-full min-w-0 rounded-lg border px-3 py-2"
-              value={form.username}
-              onChange={(event) => updateField("username", event.target.value)}
-              placeholder="Optional"
             />
           </label>
 
@@ -2253,7 +2239,7 @@ export function ProfileForm() {
                 </section>
                 )}
 
-                <label className="flex gap-3 rounded-lg border px-3 py-3 text-sm">
+                <label className="flex items-center gap-3 rounded-lg border px-3 py-3 text-sm">
                   <input
                     type="checkbox"
                     checked={mentorSettings.isAcceptingRequests}
@@ -2264,16 +2250,8 @@ export function ProfileForm() {
                       )
                     }
                   />
-
-                  <span>
-                    <span className="font-medium">
-                      Accept new mentorship requests
-                    </span>
-
-                    <span className="mt-1 block text-gray-600">
-                      Turn this off temporarily without removing
-                      your mentor information.
-                    </span>
+                  <span className="font-medium">
+                    Accept new mentorship requests
                   </span>
                 </label>
               </div>
