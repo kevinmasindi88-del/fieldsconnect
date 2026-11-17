@@ -1891,22 +1891,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 </div>
               </ConnectionSection>
 
-          <ConnectionSection
-            title={`Active Mentorship Cycles · ${activeCycleItems.length}`}
-            collapsible
-          >
-            {activeCycleItems.length === 0 ? (
-              <EmptyState text="No active or pending mentorship cycles yet." />
-            ) : (
-              activeCycleItems.map((item) =>
-                item.kind === "mentorship"
-                  ? renderMentorshipCard(item.mentorship)
-                  : renderPaidOrderCard(item.order)
-              )
-            )}
-          </ConnectionSection>
-
-          <ConnectionSection title="Mentorship requests">
+          <ConnectionSection title={`Incoming mentorship requests · ${incomingMentorshipRequests.length}`}>
             {incomingMentorshipRequests.length === 0 ? (
               <EmptyState text="No incoming mentorship requests yet." />
             ) : (
@@ -2146,7 +2131,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             )}
           </ConnectionSection>
 
-          <ConnectionSection title="Outgoing mentorship requests">
+          <ConnectionSection title={`Outgoing mentorship requests · ${outgoingMentorshipRequests.length}`}>
             {outgoingMentorshipRequests.length === 0 ? (
               <EmptyState text="No outgoing mentorship requests pending." />
             ) : (
@@ -2250,6 +2235,21 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   </article>
                 );
               })
+            )}
+          </ConnectionSection>
+
+          <ConnectionSection
+            title={`Active Mentorship Cycles · ${activeCycleItems.length}`}
+            collapsible
+          >
+            {activeCycleItems.length === 0 ? (
+              <EmptyState text="No active or pending mentorship cycles yet." />
+            ) : (
+              activeCycleItems.map((item) =>
+                item.kind === "mentorship"
+                  ? renderMentorshipCard(item.mentorship)
+                  : renderPaidOrderCard(item.order)
+              )
             )}
           </ConnectionSection>
 
