@@ -1610,7 +1610,7 @@ export function ProfileForm() {
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex w-full min-w-0 items-center justify-center">
                   <input
                     ref={avatarFileInputRef}
                     accept="image/jpeg,image/png,image/webp,image/gif"
@@ -1625,27 +1625,31 @@ export function ProfileForm() {
                       void handleAvatarSelection(file);
                     }}
                   />
-                  <button
-                    type="button"
-                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900"
-                    disabled={isAvatarWorking}
-                    onClick={() => avatarFileInputRef.current?.click()}
-                  >
-                    Choose file
-                  </button>
-                  {(selectedAvatarFile || avatarError) && (
+                  <div className="relative inline-flex items-center">
                     <button
                       type="button"
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900"
                       disabled={isAvatarWorking}
-                      onClick={() => {
-                        if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
-                        void handleAvatarSelection(null);
-                      }}
+                      onClick={() => avatarFileInputRef.current?.click()}
                     >
-                      Cancel
+                      Choose file
                     </button>
-                  )}
+                    {(selectedAvatarFile || avatarError) && (
+                      <button
+                        type="button"
+                        aria-label="Cancel photo selection"
+                        title="Cancel and restore original picture"
+                        className="absolute left-full ml-2 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+                        disabled={isAvatarWorking}
+                        onClick={() => {
+                          if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
+                          void handleAvatarSelection(null);
+                        }}
+                      >
+                        <span aria-hidden="true" className="text-xl leading-none">×</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {selectedAvatarFile && (
