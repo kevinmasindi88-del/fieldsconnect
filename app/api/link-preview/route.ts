@@ -106,6 +106,68 @@ async function youtubeOembedFallback(target: URL): Promise<NextResponse> {
   }
 }
 
+
+/**
+ * Public Facebook posts and videos may not expose Open Graph metadata to
+ * crawlers. Meta's tokenless oEmbed can validate public posts (June 2026+).
+ * Never return provider HTML or fetch a user-specified redirect.
+ */
+function facebookContentKind(url: URL): "post" | "video" | "link" | null {
+  const host = url.hostname.toLowerCase();
+  if (!["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com",
+        "mbasic.facebook.com", "fb.watch", "www.fb.watch", "fb.com", "www.fb.com"].includes(host)) return null;
+  const parts = url.pathname.toLowerCase().split("/").filter(Boolean);
+  if (host === "fb.watch" || host === "www.fb.watch") return "video";
+  if (["reel", "watch", "videos", "video.php"].includes(parts[0]) ||
+      parts.includes("videos") || (parts[0] === "share" && ["v", "r"].includes(parts[1]))) return "video";
+  if (["permalink.php", "story.php", "posts"].includes(parts[0]) ||
+      parts.includes("posts") || (parts[0] === "share" && parts[1] === "p")) return "post";
+  return "link";
+}
+
+async function facebookPreviewFallback(url: URL): Promise<NextResponse> {
+  const kind = facebookContentKind(url);
+  if (!kind) return NextResponse.json({ error: "Preview unavailable" }, { status: 422 });
+  let verifiedEmbed = false;
+  if (kind !== "link") {
+    try {
+      // The endpoint is fixed and only the already validated Facebook URL is a parameter.
+      const endpoint = "https://graph.facebook.com/v27.0/oembed_" + kind +
+        "?url=" + encodeURIComponent(url.href) + "&maxwidth=500";
+      const response = await fetch(endpoint, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(3500),
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (response.ok && (response.headers.get("content-type") ?? "").includes("json")) {
+        const payload = await response.json() as { html?: unknown; provider_name?: unknown };
+        verifiedEmbed = typeof payload.html === "string" && payload.html.length > 0 &&
+          payload.provider_name === "Facebook";
+      }
+    } catch {
+      // Normal fallback still provides a useful, clickable preview.
+    }
+  }
+  const label = kind === "video" ? "Facebook video" :
+                kind === "post" ? "Facebook post" : "Facebook link";
+  // Only confirmed public posts get a Facebook embed; private or unsupported
+  // links remain clickable cards, never a blank iframe.
+  const facebookEmbedUrl = verifiedEmbed && kind === "post"
+    ? "https://www.facebook.com/plugins/post.php?href=" +
+      encodeURIComponent(url.href) + "&show_text=true&width=500"
+    : undefined;
+  return NextResponse.json({
+    url: url.href,
+    domain: url.hostname,
+    title: label,
+    description: "View on Facebook",
+    facebookEmbedUrl,
+    facebookEmbedKind: facebookEmbedUrl ? "post" : undefined,
+    fallback: true,
+  }, { headers: { "Cache-Control": "private, max-age=900" } });
+}
+
 export async function GET(request: NextRequest) {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9._~-]+)$/i)?.[1];
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -120,6 +182,7 @@ export async function GET(request: NextRequest) {
   }
   const target = safeUrl(request.nextUrl.searchParams.get("url") ?? "");
   if (!target) return NextResponse.json({ error: "Unsupported external link" }, { status: 400 });
+  const isFacebook = facebookContentKind(target) !== null;
   try {
     // Prevent fetching loopback, private-network, link-local, and literal IP hosts.
     // Never follow redirects, which could change an otherwise valid destination.
@@ -134,10 +197,10 @@ export async function GET(request: NextRequest) {
       cache: "no-store",
     });
     if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) {
-      return youtubeOembedFallback(target);
+      return isFacebook ? facebookPreviewFallback(target) : youtubeOembedFallback(target);
     }
     const reader = response.body?.getReader();
-    if (!reader) return youtubeOembedFallback(target);
+    if (!reader) return isFacebook ? facebookPreviewFallback(target) : youtubeOembedFallback(target);
     const chunks: Uint8Array[] = [];
     let size = 0;
     while (size < 131072) {
@@ -159,6 +222,10 @@ export async function GET(request: NextRequest) {
     const metadata = metaTags(html);
     const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
     const title = metadata["og:title"] || metadata["twitter:title"] || htmlDecode(titleTag) || target.hostname;
+    // Facebook often returns a generic sign-in wall instead of actual post metadata.
+    // Prefer a safe branded preview rather than showing misleading login titles.
+    if (isFacebook && (!title || /^(facebook|log in|login|sign in|sign up)(\\b|\\s|$)/i.test(title) ||
+        /log in or sign up|you must log in/i.test(title))) return facebookPreviewFallback(target);
     const description = metadata["og:description"] || metadata.description || metadata["twitter:description"] || "";
     const imageValue = metadata["og:image:secure_url"] || metadata["og:image"] || metadata["twitter:image"] || "";
     let image: string | undefined;
@@ -171,6 +238,6 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, max-age=3600" } }
     );
   } catch {
-    return youtubeOembedFallback(target);
+    return isFacebook ? facebookPreviewFallback(target) : youtubeOembedFallback(target);
   }
 }
