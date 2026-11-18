@@ -4,7 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string };
+type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" };
+
+function isFacebookLink(rawUrl: string | null): boolean {
+  if (!rawUrl) return false;
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase();
+    return ["facebook.com", "www.facebook.com", "m.facebook.com",
+      "web.facebook.com", "mbasic.facebook.com", "fb.watch", "www.fb.watch",
+      "fb.com", "www.fb.com"].includes(hostname);
+  } catch { return false; }
+}
 
 export function extractFirstPostUrl(body: string): string | null {
   const match = body.match(/https?:\/\/[^\s<>"']+/i);
@@ -331,6 +341,7 @@ export function PostRichContent({
   const [expanded, setExpanded] = useState(false);
   const targetLink = linkUrl ?? extractFirstPostUrl(body);
   const externalVideo = getExternalVideo(targetLink);
+  const isFacebook = isFacebookLink(targetLink);
 
   useEffect(() => {
     let cancelled = false;
@@ -388,14 +399,38 @@ export function PostRichContent({
       {targetLink && externalVideo && (
         <ExternalVideoCard key={targetLink} video={externalVideo} preview={preview} />
       )}
-      {targetLink && !externalVideo && (
+      {targetLink && !externalVideo && preview?.facebookEmbedKind === "post" && preview.facebookEmbedUrl && (
+        <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {/* This source is constructed by our server only after Meta validates a public post. */}
+          <iframe
+            title="Facebook post preview"
+            src={preview.facebookEmbedUrl}
+            className="h-[480px] w-full border-0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="encrypted-media; picture-in-picture"
+          />
+          <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="block min-w-0 truncate border-t border-gray-100 px-3 py-2 text-xs font-medium text-blue-700 hover:underline">
+            Facebook post · View source
+          </a>
+        </div>
+      )}
+      {targetLink && !externalVideo && !(preview?.facebookEmbedKind === "post" && preview.facebookEmbedUrl) && (
         <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="group block min-w-0 overflow-hidden rounded-xl border bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50">
-          {preview?.image && (
+          {preview?.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview.image} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="max-h-48 w-full object-cover" />
-          )}
+          ) : isFacebook ? (
+            <div className="flex h-28 items-center justify-center bg-[#eef3ff] text-[#1877f2]" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor">
+                <path d="M22 12a10 10 0 1 0-11.56 9.88v-6.98H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.1 0 2.25.2 2.25.2v2.47h-1.27c-1.24 0-1.63.77-1.63 1.56V12h2.77l-.44 2.9h-2.33v6.98A10 10 0 0 0 22 12Z"/>
+              </svg>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-1 p-3">
-            <span className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:text-blue-700">{preview?.title ?? "Open external link"}</span>
+            <span className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:text-blue-700">
+              {preview?.title || (isFacebook ? "Facebook post" : "Open external link")}
+            </span>
             {preview?.description && <span className="line-clamp-2 text-xs text-gray-600">{preview.description}</span>}
             <span className="truncate text-xs text-blue-700">{preview?.domain ?? (() => { try { return new URL(targetLink).hostname; } catch { return targetLink; } })()} · Visit link ↗</span>
           </div>
