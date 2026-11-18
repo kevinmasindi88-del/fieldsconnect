@@ -254,6 +254,102 @@ async function tiktokVideoPreview(target: URL): Promise<NextResponse> {
   }
 }
 
+
+/**
+ * Resolve Vimeo vanity URLs, including /newyorktimes/stalinboys, via the
+ * official oEmbed API. Only approved Vimeo player URLs are returned.
+ */
+async function vimeoVideoPreview(target: URL): Promise<NextResponse> {
+  const fallback = () => NextResponse.json({
+    url: target.href,
+    domain: "vimeo.com",
+    title: "Vimeo video",
+    description: "View on Vimeo",
+  }, { headers: { "Cache-Control": "private, max-age=900" } });
+
+  const host = target.hostname.toLowerCase();
+  if (!["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(host)) return fallback();
+  const parts = target.pathname.split("/").filter(Boolean);
+  if (!parts.length || parts.length > 6 ||
+      parts.some((part) => !/^[a-zA-Z0-9_-]{1,100}$/.test(part))) return fallback();
+
+  // Keep the privacy hash of an unlisted video; discard marketing parameters.
+  const cleanUrl = new URL(target.href);
+  for (const key of Array.from(cleanUrl.searchParams.keys())) {
+    if (key !== "h") cleanUrl.searchParams.delete(key);
+  }
+
+  try {
+    // The upstream URL is fixed; never fetch arbitrary destinations or follow redirects.
+    const endpoint = "https://vimeo.com/api/oembed.json?url=" + encodeURIComponent(cleanUrl.href);
+    const response = await fetch(endpoint, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(5000),
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("json")) {
+      return fallback();
+    }
+    const metadata = await response.json() as {
+      title?: unknown; author_name?: unknown; thumbnail_url?: unknown;
+      html?: unknown; video_id?: unknown; type?: unknown;
+    };
+    if (metadata.type && metadata.type !== "video") return fallback();
+
+    // Never inject Vimeo's HTML. Extract and validate the official player URL.
+    const html = typeof metadata.html === "string" ? metadata.html : "";
+    const src = html.match(/<iframe\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1] ?? "";
+    let id: string | null = null;
+    let hash: string | null = null;
+    try {
+      const embedded = new URL(src.replace(/&amp;/gi, "&"));
+      const match = embedded.pathname.match(/^\/video\/([0-9]{1,12})\/?$/);
+      if (embedded.protocol === "https:" && embedded.hostname === "player.vimeo.com" &&
+          !embedded.port && !embedded.username && !embedded.password && match) {
+        id = match[1];
+        const embeddedHash = embedded.searchParams.get("h");
+        if (embeddedHash && /^[a-zA-Z0-9]{5,64}$/.test(embeddedHash)) hash = embeddedHash;
+      }
+    } catch {
+      // Some oEmbed responses supply video_id but not an iframe.
+    }
+    if (!id && /^[0-9]{1,12}$/.test(String(metadata.video_id ?? ""))) {
+      id = String(metadata.video_id);
+    }
+    const requestedHash = cleanUrl.searchParams.get("h");
+    if (!hash && requestedHash && /^[a-zA-Z0-9]{5,64}$/.test(requestedHash)) {
+      hash = requestedHash;
+    }
+    const vimeoPlayerUrl = id
+      ? "https://player.vimeo.com/video/" + id +
+        (hash ? "?h=" + hash + "&dnt=1&autoplay=0" : "?dnt=1&autoplay=0")
+      : undefined;
+
+    let image: string | undefined;
+    if (typeof metadata.thumbnail_url === "string") {
+      try {
+        const thumbnail = new URL(metadata.thumbnail_url);
+        if (thumbnail.protocol === "https:" && !thumbnail.port && !thumbnail.username &&
+            !thumbnail.password && !isIP(thumbnail.hostname)) image = thumbnail.href;
+      } catch {}
+    }
+
+    return NextResponse.json({
+      url: target.href,
+      domain: "vimeo.com",
+      title: typeof metadata.title === "string" && metadata.title.trim()
+        ? metadata.title.trim().slice(0, 240) : "Vimeo video",
+      description: typeof metadata.author_name === "string" && metadata.author_name.trim()
+        ? "By " + metadata.author_name.trim().slice(0, 150) : "",
+      image,
+      vimeoPlayerUrl,
+    }, { headers: { "Cache-Control": "private, max-age=3600" } });
+  } catch {
+    return fallback();
+  }
+}
+
 export async function GET(request: NextRequest) {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9._~-]+)$/i)?.[1];
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -271,6 +367,9 @@ export async function GET(request: NextRequest) {
   const isFacebook = facebookContentKind(target) !== null;
   if (["tiktok.com", "www.tiktok.com", "m.tiktok.com", "vt.tiktok.com", "vm.tiktok.com"].includes(target.hostname.toLowerCase())) {
     return tiktokVideoPreview(target);
+  }
+  if (["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(target.hostname.toLowerCase())) {
+    return vimeoVideoPreview(target);
   }
   try {
     // Prevent fetching loopback, private-network, link-local, and literal IP hosts.
