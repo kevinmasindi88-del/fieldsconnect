@@ -153,9 +153,10 @@ async function facebookPreviewFallback(url: URL): Promise<NextResponse> {
                 kind === "post" ? "Facebook post" : "Facebook link";
   // Only confirmed public posts get a Facebook embed; private or unsupported
   // links remain clickable cards, never a blank iframe.
-  const facebookEmbedUrl = verifiedEmbed && kind === "post"
-    ? "https://www.facebook.com/plugins/post.php?href=" +
-      encodeURIComponent(url.href) + "&show_text=true&width=500"
+  const facebookEmbedUrl = verifiedEmbed
+    ? "https://www.facebook.com/plugins/" + (kind === "video" ? "video.php" : "post.php") +
+      "?href=" + encodeURIComponent(url.href) +
+      (kind === "video" ? "&show_text=false&width=500" : "&show_text=true&width=500")
     : undefined;
   return NextResponse.json({
     url: url.href,
@@ -163,7 +164,7 @@ async function facebookPreviewFallback(url: URL): Promise<NextResponse> {
     title: label,
     description: "View on Facebook",
     facebookEmbedUrl,
-    facebookEmbedKind: facebookEmbedUrl ? "post" : undefined,
+    facebookEmbedKind: facebookEmbedUrl ? kind : undefined,
     fallback: true,
   }, { headers: { "Cache-Control": "private, max-age=900" } });
 }
@@ -224,7 +225,7 @@ export async function GET(request: NextRequest) {
     const title = metadata["og:title"] || metadata["twitter:title"] || htmlDecode(titleTag) || target.hostname;
     // Facebook often returns a generic sign-in wall instead of actual post metadata.
     // Prefer a safe branded preview rather than showing misleading login titles.
-    if (isFacebook && (!title || /^(facebook|log in|login|sign in|sign up)(\\b|\\s|$)/i.test(title) ||
+    if (isFacebook && (!title || /^(facebook|log in|login|sign in|sign up)(\b|\s|$)/i.test(title) ||
         /log in or sign up|you must log in/i.test(title))) return facebookPreviewFallback(target);
     const description = metadata["og:description"] || metadata.description || metadata["twitter:description"] || "";
     const imageValue = metadata["og:image:secure_url"] || metadata["og:image"] || metadata["twitter:image"] || "";
