@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" };
+type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video" };
 
 function isFacebookLink(rawUrl: string | null): boolean {
   if (!rawUrl) return false;
@@ -340,8 +340,18 @@ export function PostRichContent({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [expanded, setExpanded] = useState(false);
   const targetLink = linkUrl ?? extractFirstPostUrl(body);
-  const externalVideo = getExternalVideo(targetLink);
   const isFacebook = isFacebookLink(targetLink);
+  // Meta-validated share/v, share/r and fb.watch links do not always contain
+  // a raw video ID. Use Meta's own video player when public oEmbed succeeds.
+  const facebookSharedVideo = preview?.facebookEmbedKind === "video" && preview.facebookEmbedUrl
+    ? {
+        provider: "Facebook" as const,
+        playerUrl: preview.facebookEmbedUrl,
+        displayLabel: "Facebook video",
+        vertical: Boolean(targetLink && /\/share\/r\//i.test(targetLink)),
+      }
+    : null;
+  const externalVideo = getExternalVideo(targetLink) ?? facebookSharedVideo;
 
   useEffect(() => {
     let cancelled = false;
