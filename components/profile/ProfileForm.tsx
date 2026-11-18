@@ -140,6 +140,9 @@ const PAYMENT_SETUP_UI_ENABLED = PUBLIC_PAID_MENTORSHIPS_ENABLED;
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
 const AVATAR_OUTPUT_SIZE = 512;
+// A little extra image coverage lets people reposition both horizontally and vertically
+// without ever leaving empty space inside the circular crop.
+const AVATAR_MIN_ZOOM = 1.2;
 const ALLOWED_AVATAR_TYPES = [
   "image/jpeg",
   "image/png",
@@ -421,7 +424,7 @@ export function ProfileForm() {
   const [avatarCropY, setAvatarCropY] =
     useState(50);
   const [avatarZoom, setAvatarZoom] =
-    useState(1);
+    useState(AVATAR_MIN_ZOOM);
   const avatarCanvasRef =
     useRef<HTMLCanvasElement | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -992,7 +995,7 @@ export function ProfileForm() {
     const bounds = canvas.getBoundingClientRect();
     if (!dimensions || !bounds.width || !bounds.height) return;
 
-    // Match the cover-and-zoom geometry used by the final saved crop.
+    // Zoom leaves pan room on both axes, matching the final saved crop.
     const scale = Math.max(
       canvas.width / dimensions.width,
       canvas.height / dimensions.height
@@ -1041,7 +1044,7 @@ export function ProfileForm() {
       if (distance !== null && previousDistance !== null && previousDistance > 0) {
         // Incremental ratio supports smooth pinch out and pinch in, even at zoom limits.
         const ratio = distance / previousDistance;
-        setAvatarZoom((current) => Math.max(1, Math.min(2.5, current * ratio)));
+        setAvatarZoom((current) => Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current * ratio)));
       }
       avatarPinchDistanceRef.current = distance;
       return;
@@ -1078,7 +1081,7 @@ export function ProfileForm() {
     if (!avatarImageDimensions || isAvatarWorking) return;
     if (event.key === "+" || event.key === "=" || event.key === "-") {
       event.preventDefault();
-      setAvatarZoom((current) => Math.max(1, Math.min(2.5, current + (event.key === "-" ? -0.1 : 0.1))));
+      setAvatarZoom((current) => Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current + (event.key === "-" ? -0.1 : 0.1))));
       return;
     }
     const delta = movement[event.key];
@@ -1100,7 +1103,7 @@ export function ProfileForm() {
       setAvatarImageDimensions(null);
       setAvatarCropX(50);
       setAvatarCropY(50);
-      setAvatarZoom(1);
+      setAvatarZoom(AVATAR_MIN_ZOOM);
       return;
     }
 
@@ -1133,7 +1136,7 @@ export function ProfileForm() {
       setSelectedAvatarFile(safeFile);
       setAvatarCropX(50);
       setAvatarCropY(50);
-      setAvatarZoom(1);
+      setAvatarZoom(AVATAR_MIN_ZOOM);
     } catch (error) {
       const detail =
         error instanceof Error
@@ -1226,7 +1229,7 @@ export function ProfileForm() {
       setSelectedAvatarFile(null);
       setAvatarCropX(50);
       setAvatarCropY(50);
-      setAvatarZoom(1);
+      setAvatarZoom(AVATAR_MIN_ZOOM);
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
@@ -1604,7 +1607,7 @@ export function ProfileForm() {
                 </div>
                 {selectedAvatarFile && (
                   <p className="text-center text-xs text-gray-600 sm:text-left">
-                    Drag to reposition · Pinch to zoom
+                    Drag in any direction · Pinch to zoom
                   </p>
                 )}
               </div>
@@ -1660,7 +1663,7 @@ export function ProfileForm() {
                         aria-label="Profile picture zoom"
                         className="w-full"
                         max={2.5}
-                        min={1}
+                        min={AVATAR_MIN_ZOOM}
                         onChange={(event) =>
                           setAvatarZoom(Number(event.target.value))
                         }
