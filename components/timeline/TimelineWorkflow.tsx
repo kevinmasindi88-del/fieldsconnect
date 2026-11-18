@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
-import { PostRichContent, MentionedText, extractFirstPostUrl, compressTimelineImage } from "@/components/timeline/PostRichContent";
+import { PostRichContent, MentionedText, extractFirstPostUrl, getExternalVideo, compressTimelineImage } from "@/components/timeline/PostRichContent";
 import { MentionEditor, type MentionCandidate } from "@/components/timeline/MentionEditor";
 import { PencilIcon, TrashIcon } from "@/components/timeline/ActionIcons";
 import {
@@ -902,7 +902,13 @@ export function TimelineWorkflow() {
               }}>Remove image</button>
             </div>
           )}
-          {extractFirstPostUrl(postBody) && <p className="break-all text-xs text-blue-700">Link detected — preview will appear where available.</p>}
+          {extractFirstPostUrl(postBody) && (
+            <p className="break-words text-xs text-blue-700">
+              {getExternalVideo(extractFirstPostUrl(postBody))
+                ? "Video detected — viewers can play it here, streamed from YouTube or Vimeo."
+                : "Link detected — preview will appear where available."}
+            </p>
+          )}
         </div>
         <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <div className="relative shrink-0">

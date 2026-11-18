@@ -17,6 +17,115 @@ export function extractFirstPostUrl(body: string): string | null {
   } catch { return null; }
 }
 
+
+type ExternalVideo = {
+  provider: "YouTube" | "Vimeo";
+  playerUrl: string;
+  thumbnailUrl?: string;
+};
+
+// Only recognized HTTPS links from exact provider hostnames become iframes.
+// Video IDs are validated and never inserted into iframe HTML.
+export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
+  if (!rawUrl) return null;
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
+
+  const host = url.hostname.toLowerCase();
+  const segments = url.pathname.split("/").filter(Boolean);
+  let youtubeId: string | null = null;
+
+  if (host === "youtu.be" || host === "www.youtu.be") {
+    if (segments.length === 1) youtubeId = segments[0];
+  } else if (["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "www.youtube-nocookie.com", "youtube-nocookie.com"].includes(host)) {
+    if (url.pathname === "/watch") {
+      youtubeId = url.searchParams.get("v");
+    } else if (
+      segments.length === 2 &&
+      ["shorts", "live", "embed"].includes(segments[0])
+    ) {
+      youtubeId = segments[1];
+    }
+  }
+
+  if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
+    return {
+      provider: "YouTube",
+      playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&autoplay=1",
+      thumbnailUrl: "https://i.ytimg.com/vi/" + youtubeId + "/hqdefault.jpg",
+    };
+  }
+
+  let vimeoId: string | null = null;
+  if (host === "vimeo.com" || host === "www.vimeo.com") {
+    if (segments.length === 1) vimeoId = segments[0];
+  } else if (host === "player.vimeo.com") {
+    if (segments.length === 2 && segments[0] === "video") vimeoId = segments[1];
+  }
+
+  if (vimeoId && /^[0-9]{1,12}$/.test(vimeoId)) {
+    return {
+      provider: "Vimeo",
+      playerUrl: "https://player.vimeo.com/video/" + vimeoId + "?dnt=1&autoplay=1",
+    };
+  }
+
+  return null;
+}
+
+function ExternalVideoCard({
+  video, originalUrl, preview,
+}: { video: ExternalVideo; originalUrl: string; preview: LinkPreview | null }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const thumbnail = video.thumbnailUrl ?? preview?.image;
+
+  return (
+    <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {isPlaying ? (
+        <div className="relative aspect-video w-full bg-black">
+          <iframe
+            className="absolute inset-0 h-full w-full"
+            title={video.provider + " video player"}
+            src={video.playerUrl}
+            loading="lazy"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          aria-label={"Play " + video.provider + " video"}
+          className="group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-gray-900 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+          onClick={() => setIsPlaying(true)}
+        >
+          {thumbnail && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbnail} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-95" />
+          )}
+          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-black/75 shadow-lg transition-transform group-hover:scale-105" aria-hidden="true">
+            <svg className="ml-1 h-8 w-8" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 14 8-14 8V4Z" /></svg>
+          </span>
+          <span className="absolute bottom-3 left-3 rounded bg-black/75 px-2 py-1 text-xs font-medium text-white">Play from {video.provider}</span>
+        </button>
+      )}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{preview?.title ?? video.provider + " video"}</span>
+        {isPlaying && (
+          <button type="button" className="text-xs font-medium text-gray-600 underline underline-offset-2 hover:text-gray-950" onClick={() => setIsPlaying(false)}>Close player</button>
+        )}
+        <a href={originalUrl} target="_blank" rel="noopener noreferrer nofollow" className="shrink-0 text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Open on {video.provider}</a>
+      </div>
+    </div>
+  );
+}
+
 export type MentionIdentity = { id: string; display_name: string };
 
 export function MentionedText({ text, mentions = [] }: { text: string; mentions?: MentionIdentity[] }) {
@@ -89,6 +198,7 @@ export function PostRichContent({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [expanded, setExpanded] = useState(false);
   const targetLink = linkUrl ?? extractFirstPostUrl(body);
+  const externalVideo = getExternalVideo(targetLink);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,7 +215,7 @@ export function PostRichContent({
   useEffect(() => {
     let cancelled = false;
     setPreview(null);
-    if (!targetLink || !targetLink.startsWith("https://")) return;
+    if (!targetLink || !targetLink.startsWith("https://") || externalVideo?.provider === "YouTube") return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabaseBrowserClient();
     void supabase.auth.getSession().then(({ data }) => {
@@ -118,12 +228,12 @@ export function PostRichContent({
       .then((data: LinkPreview | null) => { if (!cancelled) setPreview(data); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [targetLink]);
+  }, [targetLink, externalVideo?.provider]);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div className="text-sm leading-relaxed text-gray-800">
-        <LinkedText body={body} hidePreviewUrl={preview ? targetLink : null} mentionedProfiles={mentionedProfiles} />
+        <LinkedText body={body} hidePreviewUrl={(preview || externalVideo) ? targetLink : null} mentionedProfiles={mentionedProfiles} />
       </div>
       {imageUrl && (
         <>
@@ -141,7 +251,10 @@ export function PostRichContent({
           )}
         </>
       )}
-      {targetLink && (
+      {targetLink && externalVideo && (
+        <ExternalVideoCard key={targetLink} video={externalVideo} originalUrl={targetLink} preview={preview} />
+      )}
+      {targetLink && !externalVideo && (
         <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="group block min-w-0 overflow-hidden rounded-xl border bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50">
           {preview?.image && (
             // eslint-disable-next-line @next/next/no-img-element
