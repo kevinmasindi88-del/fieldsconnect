@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
@@ -58,7 +58,7 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
   if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
     return {
       provider: "YouTube",
-      playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&autoplay=1",
+      playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&controls=1&fs=1&playsinline=1",
       thumbnailUrl: "https://i.ytimg.com/vi/" + youtubeId + "/hqdefault.jpg",
       vertical: segments.length === 2 && segments[0] === "shorts",
     };
@@ -74,7 +74,7 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
   if (vimeoId && /^[0-9]{1,12}$/.test(vimeoId)) {
     return {
       provider: "Vimeo",
-      playerUrl: "https://player.vimeo.com/video/" + vimeoId + "?dnt=1&autoplay=1",
+      playerUrl: "https://player.vimeo.com/video/" + vimeoId + "?dnt=1&autoplay=0",
     };
   }
 
@@ -90,7 +90,7 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
     if (videoId && /^[0-9]{15,23}$/.test(videoId)) {
       return {
         provider: "TikTok",
-        playerUrl: "https://www.tiktok.com/player/v1/" + videoId + "?autoplay=1",
+        playerUrl: "https://www.tiktok.com/player/v1/" + videoId + "?autoplay=0",
         vertical: true,
       };
     }
@@ -152,50 +152,94 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
   return null;
 }
 
-function ExternalVideoCard({
-  video, originalUrl, preview,
-}: { video: ExternalVideo; originalUrl: string; preview: LinkPreview | null }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const thumbnail = video.thumbnailUrl ?? preview?.image;
-  const aspectClass = video.vertical ? "aspect-[9/16]" : "aspect-video";
+
+function ExternalVideoCard({ video }: { video: ExternalVideo }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    // ESC exits browser fullscreen; keep the inline layout in sync.
+    const onFullscreenChange = () => {
+      if (document.fullscreenElement !== containerRef.current) setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+    // On devices without Element Fullscreen API, the viewport overlay still
+    // provides an enlarged player and can be dismissed with Escape.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [expanded]);
+
+  async function expandVideo() {
+    setExpanded(true);
+    try {
+      await containerRef.current?.requestFullscreen?.();
+    } catch {
+      // Keep the viewport-sized fallback when fullscreen is unavailable/denied.
+    }
+  }
+
+  async function collapseVideo() {
+    if (document.fullscreenElement === containerRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // Also allow the CSS overlay to close if the browser denies exit.
+      }
+    }
+    setExpanded(false);
+  }
+
+  // Keep the full video visible: standard clips are 16:9; Shorts and Reels
+  // are 9:16. The iframe itself fills the box without object-cover cropping.
+  const inlineRatio = video.vertical
+    ? "mx-auto aspect-[9/16] max-w-[380px]"
+    : "aspect-video";
 
   return (
-    <div className={"min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white " + (video.vertical ? "max-w-[340px]" : "")}>
-      {isPlaying ? (
-        <div className={"relative w-full bg-black " + aspectClass}>
-          <iframe
-            className="absolute inset-0 h-full w-full"
-            title={video.provider + " video player"}
-            src={video.playerUrl}
-            loading="lazy"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
-      ) : (
+    <div
+      ref={containerRef}
+      className={expanded
+        ? "fixed inset-0 z-[100] flex items-center justify-center bg-black"
+        : "min-w-0 w-full"}
+    >
+      <div className={expanded
+        ? "relative h-full w-full bg-black"
+        : "relative w-full overflow-hidden rounded-xl bg-black " + inlineRatio}
+      >
+        <iframe
+          title={video.provider + " video player"}
+          src={video.playerUrl}
+          className="absolute inset-0 h-full w-full border-0"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
         <button
+          aria-label={expanded ? "Close expanded video" : "Expand video"}
+          title={expanded ? "Close expanded video" : "Expand video"}
           type="button"
-          aria-label={"Play " + video.provider + " video"}
-          className={"group relative flex w-full items-center justify-center overflow-hidden bg-gray-900 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 " + aspectClass}
-          onClick={() => setIsPlaying(true)}
+          onClick={() => { void (expanded ? collapseVideo() : expandVideo()); }}
+          className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-lg bg-black/65 text-white shadow-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
-          {thumbnail && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbnail} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-95" />
+          {expanded ? (
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6 18 18M18 6 6 18" />
+            </svg>
+          ) : (
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" />
+            </svg>
           )}
-          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-black/75 shadow-lg transition-transform group-hover:scale-105" aria-hidden="true">
-            <svg className="ml-1 h-8 w-8" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 14 8-14 8V4Z" /></svg>
-          </span>
-          <span className="absolute bottom-3 left-3 rounded bg-black/75 px-2 py-1 text-xs font-medium text-white">Play from {video.provider}</span>
         </button>
-      )}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{preview?.title ?? video.displayLabel ?? video.provider + " video"}</span>
-        {isPlaying && (
-          <button type="button" className="text-xs font-medium text-gray-600 underline underline-offset-2 hover:text-gray-950" onClick={() => setIsPlaying(false)}>Close player</button>
-        )}
-        <a href={originalUrl} target="_blank" rel="noopener noreferrer nofollow" className="shrink-0 text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Open on {video.provider}</a>
       </div>
     </div>
   );
@@ -330,7 +374,7 @@ export function PostRichContent({
         </>
       )}
       {targetLink && externalVideo && (
-        <ExternalVideoCard key={targetLink} video={externalVideo} originalUrl={targetLink} preview={preview} />
+        <ExternalVideoCard key={targetLink} video={externalVideo} />
       )}
       {targetLink && !externalVideo && (
         <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="group block min-w-0 overflow-hidden rounded-xl border bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50">
