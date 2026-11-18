@@ -905,7 +905,7 @@ export function TimelineWorkflow() {
           {extractFirstPostUrl(postBody) && (
             <p className="break-words text-xs text-blue-700">
               {getExternalVideo(extractFirstPostUrl(postBody))
-                ? "Video detected — viewers can play it here from its original platform."
+                ? "Video detected — viewers can play it here."
                 : "Link detected — preview will appear where available."}
             </p>
           )}
