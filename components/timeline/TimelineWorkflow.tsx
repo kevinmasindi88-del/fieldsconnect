@@ -72,6 +72,43 @@ type CommentMention = {
   mentioned_profile_id: string;
 };
 
+// Keep the separate video-link composer action restricted to known providers
+// and supported media URL shapes; don't accept profiles or arbitrary pages.
+function videoLinkProvider(raw: string): string | null {
+  if (!raw.trim()) return null;
+  try {
+    const parsed = new URL(raw.trim());
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port) return null;
+    const embedded = getExternalVideo(parsed.href);
+    if (embedded) return embedded.provider;
+
+    const host = parsed.hostname.toLowerCase();
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (["vimeo.com", "www.vimeo.com"].includes(host) &&
+        segments.length >= 2 && segments.length <= 6 &&
+        segments.every((segment) => /^[a-zA-Z0-9_-]{1,100}$/.test(segment))) {
+      return "Vimeo";
+    }
+    if (["fb.watch", "www.fb.watch"].includes(host) &&
+        segments.length === 1 && /^[a-zA-Z0-9_-]{3,100}$/.test(segments[0])) {
+      return "Facebook";
+    }
+    if (["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"].includes(host) &&
+        segments.length === 3 && segments[0] === "share" &&
+        ["v", "r"].includes(segments[1]) &&
+        /^[a-zA-Z0-9_-]{3,100}$/.test(segments[2])) {
+      return "Facebook";
+    }
+    if (["vt.tiktok.com", "vm.tiktok.com"].includes(host) &&
+        segments.length === 1 && /^[a-zA-Z0-9_-]{3,100}$/.test(segments[0])) {
+      return "TikTok";
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 const postEmojis = [
   "😀",
   "😂",
@@ -100,6 +137,12 @@ export function TimelineWorkflow() {
   const [postMentions, setPostMentions] = useState<PostMention[]>([]);
   const [commentMentions, setCommentMentions] = useState<CommentMention[]>([]);
   const [postBody, setPostBody] = useState("");
+  const [isVideoLinkOpen, setIsVideoLinkOpen] = useState(false);
+  const [videoLinkDraft, setVideoLinkDraft] = useState("");
+  const videoLink = videoLinkDraft.trim();
+  const videoProvider = videoLinkProvider(videoLink);
+  const videoLinkInvalid = Boolean(videoLink) && !videoProvider;
+  const canSubmitPost = Boolean(postBody.trim() || videoProvider) && !videoLinkInvalid;
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -455,7 +498,15 @@ export function TimelineWorkflow() {
 
   async function createPost(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!currentUserId || !postBody.trim() || !isSupabaseConfigured()) return;
+    if (!currentUserId || !canSubmitPost || !isSupabaseConfigured()) return;
+    // Persist the video URL in the post body as well as link_url, so the
+    // existing mention RPC and timeline preview path work without a migration.
+    // A link-only post is allowed; a caption stays separate from the video.
+    const postText = postBody.trim();
+    const alreadyIncluded = videoLink && postText.includes(videoLink);
+    const completeBody = videoLink && !alreadyIncluded
+      ? [postText, videoLink].filter(Boolean).join("\n")
+      : postText;
     setIsWorking(true);
     setMessage(null);
     const supabase = getSupabaseBrowserClient();
@@ -470,13 +521,13 @@ export function TimelineWorkflow() {
         if (uploadError) throw uploadError;
       }
       const { data: createdPostId, error } = await supabase.rpc("create_post_with_mentions", {
-        post_body: postBody.trim(),
+        post_body: completeBody,
         post_visibility: visibility,
         mentioned_profile_ids: selectedMentions.map((mention) => mention.profile_id),
       });
       if (error) throw error;
       postCreated = true;
-      const url = extractFirstPostUrl(postBody);
+      const url = videoLink || extractFirstPostUrl(completeBody);
       if (uploadedPath || url) {
         const { error: mediaError } = await supabase.from("posts")
           .update({ image_path: uploadedPath, link_url: url }).eq("id", createdPostId);
@@ -486,6 +537,8 @@ export function TimelineWorkflow() {
       setPendingImage(null);
       setPendingImagePreview(null);
       setPostBody("");
+      setVideoLinkDraft("");
+      setIsVideoLinkOpen(false);
       setVisibility("public");
       setSelectedMentions([]);
       setIsEmojiPickerOpen(false);
@@ -902,7 +955,52 @@ export function TimelineWorkflow() {
               }}>Remove image</button>
             </div>
           )}
-          {extractFirstPostUrl(postBody) && (
+          {(isVideoLinkOpen || videoLink) && (
+            <div id="timeline-video-link-field" className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label htmlFor="timeline-video-url" className="text-xs font-medium text-gray-700">
+                Video link
+              </label>
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  id="timeline-video-url"
+                  aria-label="Paste a video link"
+                  type="url"
+                  inputMode="url"
+                  placeholder="Paste a video URL"
+                  value={videoLinkDraft}
+                  onChange={(event) => setVideoLinkDraft(event.target.value)}
+                  disabled={isWorking}
+                  aria-invalid={videoLinkInvalid}
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVideoLinkDraft("");
+                    setIsVideoLinkOpen(false);
+                  }}
+                  disabled={isWorking}
+                  className="h-10 shrink-0 rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Remove
+                </button>
+              </div>
+              {videoLinkInvalid ? (
+                <p className="text-xs text-red-700" role="alert">
+                  Use a video URL from YouTube, Vimeo, TikTok, Instagram or Facebook.
+                </p>
+              ) : videoProvider ? (
+                <p className="text-xs text-blue-700">
+                  {videoProvider} video link attached. Preview will appear in your post.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  Add a public video link; you can also include a caption above.
+                </p>
+              )}
+            </div>
+          )}
+          {!videoLink && extractFirstPostUrl(postBody) && (
             <p className="break-words text-xs text-blue-700">
               {getExternalVideo(extractFirstPostUrl(postBody))
                 ? "Video detected — viewers can play it here."
@@ -982,6 +1080,26 @@ export function TimelineWorkflow() {
             </svg>
             <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={selectPostImage} disabled={isWorking} />
           </label>
+          <button
+            type="button"
+            title="Add video link"
+            aria-label="Add video link"
+            aria-expanded={isVideoLinkOpen || Boolean(videoLink)}
+            aria-controls="timeline-video-link-field"
+            disabled={isWorking}
+            onClick={() => setIsVideoLinkOpen((open) => videoLink ? true : !open)}
+            className={[
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50",
+              isVideoLinkOpen || videoLink
+                ? "border-blue-600 bg-blue-50 text-blue-700"
+                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+            ].join(" ")}
+          >
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2.5" y="5" width="19" height="14" rx="2" />
+              <path d="m10 9 5 3-5 3V9Z" />
+            </svg>
+          </button>
           <select
             aria-label="Post visibility"
             title="Post visibility"
@@ -995,7 +1113,7 @@ export function TimelineWorkflow() {
           </select>
           <button
             className="ml-auto h-9 shrink-0 rounded-lg bg-gray-950 px-3 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 sm:px-5"
-            disabled={!postBody.trim() || isWorking}
+            disabled={!canSubmitPost || isWorking}
             type="submit"
           >
             Post
