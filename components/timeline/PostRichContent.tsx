@@ -169,8 +169,8 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
   const [expanded, setExpanded] = useState(false);
   const [playerErrorCode, setPlayerErrorCode] = useState<number | null>(null);
   const isTikTok = video.provider === "TikTok";
-  const unavailable = isTikTok && (playerErrorCode !== null || preview?.tiktokValidation === "unavailable");
-  const errorMessage = playerErrorCode === 1001 || preview?.tiktokValidation === "unavailable"
+  const unavailable = isTikTok && playerErrorCode !== null;
+  const errorMessage = playerErrorCode === 1001
     ? "TikTok cannot find or embed this post."
     : playerErrorCode === 2001
       ? "TikTok could not serve this video right now."
@@ -254,6 +254,47 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
     setExpanded(false);
   }
 
+  // A TikTok delivery failure should not reserve the full vertical video's
+  // height. Keep the post readable and provide a retry for transient errors.
+  if (unavailable) {
+    return (
+      <div className="min-w-0 w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="flex min-h-44 flex-col items-center justify-center gap-3 bg-gray-950 px-4 py-5 text-center text-white">
+          <p className="max-w-sm text-sm font-medium leading-relaxed">{errorMessage}</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setPlayerErrorCode(null); }}
+              className="rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              Retry
+            </button>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-950 transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              Watch on TikTok
+            </a>
+          </div>
+          {playerErrorCode !== null && (
+            <p className="text-xs text-gray-400">TikTok player error {playerErrorCode}</p>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
+          <p className="line-clamp-2 break-words text-sm font-semibold text-gray-900">
+            {preview?.title || video.displayLabel || "TikTok video"}
+          </p>
+          {preview?.description && (
+            <p className="line-clamp-2 break-words text-xs text-gray-600">{preview.description}</p>
+          )}
+          <p className="truncate text-xs text-gray-500">{preview?.domain || "tiktok.com"}</p>
+        </div>
+      </div>
+    );
+  }
+
   // Keep the full video visible: standard clips are 16:9; Shorts and Reels
   // are 9:16. The iframe itself fills the box without object-cover cropping.
   const inlineRatio = video.vertical
@@ -272,7 +313,6 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
           ? "relative h-full w-full bg-black"
           : "relative w-full overflow-hidden bg-black " + inlineRatio}
         >
-        {!unavailable ? (
         <iframe
           ref={iframeRef}
           title={video.provider + " video player"}
@@ -283,31 +323,7 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
         />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gray-950 px-5 text-center text-white">
-            {preview?.image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-            )}
-            <p className="relative text-sm font-medium sm:text-base">
-              {errorMessage}
-            </p>
-            <a
-              className="relative rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-            >
-              Watch on TikTok
-            </a>
-            {playerErrorCode !== null && (
-              <span className="relative text-xs text-white/70" aria-label={"TikTok player error " + playerErrorCode}>
-                Player error {playerErrorCode}
-              </span>
-            )}
-          </div>
-        )}
-        {!unavailable && <button
+        <button
           aria-label={expanded ? "Close expanded video" : "Expand video"}
           title={expanded ? "Close expanded video" : "Expand video"}
           type="button"
@@ -323,7 +339,7 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
               <path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" />
             </svg>
           )}
-        </button>}
+        </button>
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
