@@ -167,27 +167,48 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [expanded, setExpanded] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [playerErrorCode, setPlayerErrorCode] = useState<number | null>(null);
   const isTikTok = video.provider === "TikTok";
-  const unavailable = isTikTok && (failed || preview?.tiktokValidation === "unavailable");
+  const unavailable = isTikTok && (playerErrorCode !== null || preview?.tiktokValidation === "unavailable");
+  const errorMessage = playerErrorCode === 1001 || preview?.tiktokValidation === "unavailable"
+    ? "TikTok cannot find or embed this post."
+    : playerErrorCode === 2001
+      ? "TikTok could not serve this video right now."
+      : "This TikTok video cannot play in the embedded player.";
+  // Strip the lengthy sharing and tracking parameters when offering a source link.
+  const sourceUrl = isTikTok ? (() => {
+    try {
+      const parsed = new URL(originalUrl);
+      parsed.search = "";
+      parsed.hash = "";
+      return parsed.href;
+    } catch { return originalUrl; }
+  })() : originalUrl;
 
   useEffect(() => {
     if (!isTikTok) return;
     // TikTok officially reports player failures through postMessage. Check
     // origin and iframe source so other embedded content cannot trigger this.
     const handleTikTokMessage = (event: MessageEvent) => {
-      if (event.origin !== "https://www.tiktok.com" ||
+      if (!["https://www.tiktok.com", "https://tiktok.com"].includes(event.origin) ||
           event.source !== iframeRef.current?.contentWindow) return;
       const data: unknown = event.data;
       if (!data || typeof data !== "object") return;
       const msg = data as { type?: unknown; value?: unknown; "x-tiktok-player"?: unknown };
-      if (msg["x-tiktok-player"] !== true || msg.type !== "onPlayerError") return;
+      if (msg["x-tiktok-player"] !== true) return;
+      // Older TikTok embeds may use the deprecated onError event instead.
+      if (msg.type === "onError") {
+        if ([1, 2, 3, 4].includes(Number(msg.value))) setPlayerErrorCode(3001);
+        return;
+      }
+      if (msg.type !== "onPlayerError") return;
       const detail = msg.value;
       if (!detail || typeof detail !== "object") return;
       const error = detail as { errorCode?: unknown };
-      // INVALID_VIDEO, SERVER_ERROR, PLAYBACK_ERROR. Autoplay denial does
-      // not mean the video is unavailable and must not replace the player.
-      if ([1001, 2001, 3001].includes(Number(error.errorCode))) setFailed(true);
+      // INVALID_VIDEO, SERVER_ERROR, PLAYBACK_ERROR. Autoplay denial (3002)
+      // must never replace a usable player.
+      const code = Number(error.errorCode);
+      if ([1001, 2001, 3001].includes(code)) setPlayerErrorCode(code);
     };
     window.addEventListener("message", handleTikTokMessage);
     return () => window.removeEventListener("message", handleTikTokMessage);
@@ -269,16 +290,21 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
               <img src={preview.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-25" />
             )}
             <p className="relative text-sm font-medium sm:text-base">
-              This TikTok video isn't available to play here.
+              {errorMessage}
             </p>
             <a
               className="relative rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              href={originalUrl}
+              href={sourceUrl}
               target="_blank"
               rel="noopener noreferrer nofollow"
             >
               Watch on TikTok
             </a>
+            {playerErrorCode !== null && (
+              <span className="relative text-xs text-white/70" aria-label={"TikTok player error " + playerErrorCode}>
+                Player error {playerErrorCode}
+              </span>
+            )}
           </div>
         )}
         {!unavailable && <button
