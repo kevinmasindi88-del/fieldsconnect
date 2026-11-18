@@ -153,7 +153,7 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
 }
 
 
-function ExternalVideoCard({ video }: { video: ExternalVideo }) {
+function ExternalVideoCard({ video, preview }: { video: ExternalVideo; preview: LinkPreview | null }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -204,16 +204,17 @@ function ExternalVideoCard({ video }: { video: ExternalVideo }) {
     : "aspect-video";
 
   return (
-    <div
-      ref={containerRef}
-      className={expanded
-        ? "fixed inset-0 z-[100] flex items-center justify-center bg-black"
-        : "min-w-0 w-full"}
-    >
-      <div className={expanded
-        ? "relative h-full w-full bg-black"
-        : "relative w-full overflow-hidden rounded-xl bg-black " + inlineRatio}
+    <div className="min-w-0 w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div
+        ref={containerRef}
+        className={expanded
+          ? "fixed inset-0 z-[100] flex items-center justify-center bg-black"
+          : "min-w-0 w-full"}
       >
+        <div className={expanded
+          ? "relative h-full w-full bg-black"
+          : "relative w-full overflow-hidden bg-black " + inlineRatio}
+        >
         <iframe
           title={video.provider + " video player"}
           src={video.playerUrl}
@@ -240,6 +241,18 @@ function ExternalVideoCard({ video }: { video: ExternalVideo }) {
             </svg>
           )}
         </button>
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
+        <p className="line-clamp-2 break-words text-sm font-semibold text-gray-900">
+          {preview?.title || video.displayLabel || video.provider + " video"}
+        </p>
+        {preview?.description && (
+          <p className="line-clamp-2 break-words text-xs leading-relaxed text-gray-600">
+            {preview.description}
+          </p>
+        )}
+        <p className="truncate text-xs text-gray-500">{preview?.domain || video.provider}</p>
       </div>
     </div>
   );
@@ -334,10 +347,9 @@ export function PostRichContent({
   useEffect(() => {
     let cancelled = false;
     setPreview(null);
-    // Avoid unnecessary server-side scraping of social video providers.
-    // Vimeo still uses the existing authorized link-preview endpoint for metadata.
-    if (!targetLink || !targetLink.startsWith("https://") ||
-        (externalVideo && externalVideo.provider !== "Vimeo")) return;
+    // Request safe, authenticated link metadata for both normal links and
+    // recognized videos so embedded players retain the same rich preview text.
+    if (!targetLink || !targetLink.startsWith("https://")) return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabaseBrowserClient();
     void supabase.auth.getSession().then(({ data }) => {
@@ -350,7 +362,7 @@ export function PostRichContent({
       .then((data: LinkPreview | null) => { if (!cancelled) setPreview(data); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [targetLink, externalVideo?.provider]);
+  }, [targetLink]);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -374,7 +386,7 @@ export function PostRichContent({
         </>
       )}
       {targetLink && externalVideo && (
-        <ExternalVideoCard key={targetLink} video={externalVideo} />
+        <ExternalVideoCard key={targetLink} video={externalVideo} preview={preview} />
       )}
       {targetLink && !externalVideo && (
         <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="group block min-w-0 overflow-hidden rounded-xl border bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50">
