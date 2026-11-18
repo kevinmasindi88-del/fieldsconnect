@@ -144,8 +144,7 @@ function EditingPostImageThumbnail({ imagePath }: { imagePath: string }) {
   }, [imagePath]);
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-2.5 sm:p-3">
-      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white sm:h-24 sm:w-24">
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white sm:h-24 sm:w-24">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -162,13 +161,6 @@ function EditingPostImageThumbnail({ imagePath }: { imagePath: string }) {
             <path d="m3 16 5-5 4 4 3-3 6 6" />
           </svg>
         )}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-900">Attached image</p>
-        <p className="mt-1 text-xs leading-relaxed text-gray-600">
-          Your photo will remain attached when you save this edit.
-        </p>
-      </div>
     </div>
   );
 }
