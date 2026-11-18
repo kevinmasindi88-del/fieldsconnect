@@ -905,7 +905,7 @@ export function TimelineWorkflow() {
           {extractFirstPostUrl(postBody) && (
             <p className="break-words text-xs text-blue-700">
               {getExternalVideo(extractFirstPostUrl(postBody))
-                ? "Video detected — viewers can play it here, streamed from YouTube or Vimeo."
+                ? "Video detected — viewers can play it here from its original platform."
                 : "Link detected — preview will appear where available."}
             </p>
           )}
