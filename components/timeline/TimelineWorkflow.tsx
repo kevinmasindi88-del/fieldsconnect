@@ -124,6 +124,55 @@ const postEmojis = [
   "❤️",
 ];
 
+
+/**
+ * Editing only changes the post text. Show the already-attached image without
+ * reuploading it, using the same authorized Storage URL as the timeline card.
+ */
+function EditingPostImageThumbnail({ imagePath }: { imagePath: string }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setImageUrl(null);
+    if (!isSupabaseConfigured()) return;
+    const supabase = getSupabaseBrowserClient();
+    void supabase.storage.from("timeline-images").createSignedUrl(imagePath, 3600)
+      .then(({ data, error }) => {
+        if (active && !error) setImageUrl(data?.signedUrl ?? null);
+      });
+    return () => { active = false; };
+  }, [imagePath]);
+
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-2.5 sm:p-3">
+      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white sm:h-24 sm:w-24">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt="Image attached to this post"
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <svg aria-hidden="true" className="h-7 w-7 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="m3 16 5-5 4 4 3-3 6 6" />
+          </svg>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-gray-900">Attached image</p>
+        <p className="mt-1 text-xs leading-relaxed text-gray-600">
+          Your photo will remain attached when you save this edit.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function TimelineWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -1246,10 +1295,15 @@ export function TimelineWorkflow() {
                 {isEditing ? (
                   <div className="mt-4 flex flex-col gap-3">
                     <textarea
+                      aria-label="Edit post text"
                       className="min-h-28 rounded-lg border px-3 py-2 text-sm"
                       value={editingPostBody}
                       onChange={(event) => setEditingPostBody(event.target.value)}
+                      disabled={isWorking}
                     />
+                    {post.image_path && (
+                      <EditingPostImageThumbnail imagePath={post.image_path} />
+                    )}
                     <div className="flex gap-2">
                       <button
                         className="min-h-10 rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
