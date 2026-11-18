@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video" };
+type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video"; tiktokValidation?: "valid" | "unavailable" | "unknown" };
 
 function isFacebookLink(rawUrl: string | null): boolean {
   if (!rawUrl) return false;
@@ -163,9 +163,35 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
 }
 
 
-function ExternalVideoCard({ video, preview }: { video: ExternalVideo; preview: LinkPreview | null }) {
+function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVideo; preview: LinkPreview | null; originalUrl: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [expanded, setExpanded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const isTikTok = video.provider === "TikTok";
+  const unavailable = isTikTok && (failed || preview?.tiktokValidation === "unavailable");
+
+  useEffect(() => {
+    if (!isTikTok) return;
+    // TikTok officially reports player failures through postMessage. Check
+    // origin and iframe source so other embedded content cannot trigger this.
+    const handleTikTokMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://www.tiktok.com" ||
+          event.source !== iframeRef.current?.contentWindow) return;
+      const data: unknown = event.data;
+      if (!data || typeof data !== "object") return;
+      const msg = data as { type?: unknown; value?: unknown; "x-tiktok-player"?: unknown };
+      if (msg["x-tiktok-player"] !== true || msg.type !== "onPlayerError") return;
+      const detail = msg.value;
+      if (!detail || typeof detail !== "object") return;
+      const error = detail as { errorCode?: unknown };
+      // INVALID_VIDEO, SERVER_ERROR, PLAYBACK_ERROR. Autoplay denial does
+      // not mean the video is unavailable and must not replace the player.
+      if ([1001, 2001, 3001].includes(Number(error.errorCode))) setFailed(true);
+    };
+    window.addEventListener("message", handleTikTokMessage);
+    return () => window.removeEventListener("message", handleTikTokMessage);
+  }, [isTikTok]);
 
   useEffect(() => {
     // ESC exits browser fullscreen; keep the inline layout in sync.
@@ -225,7 +251,9 @@ function ExternalVideoCard({ video, preview }: { video: ExternalVideo; preview: 
           ? "relative h-full w-full bg-black"
           : "relative w-full overflow-hidden bg-black " + inlineRatio}
         >
+        {!unavailable ? (
         <iframe
+          ref={iframeRef}
           title={video.provider + " video player"}
           src={video.playerUrl}
           className="absolute inset-0 h-full w-full border-0"
@@ -234,7 +262,26 @@ function ExternalVideoCard({ video, preview }: { video: ExternalVideo; preview: 
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
         />
-        <button
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gray-950 px-5 text-center text-white">
+            {preview?.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+            )}
+            <p className="relative text-sm font-medium sm:text-base">
+              This TikTok video isn't available to play here.
+            </p>
+            <a
+              className="relative rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              href={originalUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+            >
+              Watch on TikTok
+            </a>
+          </div>
+        )}
+        {!unavailable && <button
           aria-label={expanded ? "Close expanded video" : "Expand video"}
           title={expanded ? "Close expanded video" : "Expand video"}
           type="button"
@@ -250,7 +297,7 @@ function ExternalVideoCard({ video, preview }: { video: ExternalVideo; preview: 
               <path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" />
             </svg>
           )}
-        </button>
+        </button>}
         </div>
       </div>
       <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
@@ -407,7 +454,7 @@ export function PostRichContent({
         </>
       )}
       {targetLink && externalVideo && (
-        <ExternalVideoCard key={targetLink} video={externalVideo} preview={preview} />
+        <ExternalVideoCard key={targetLink} video={externalVideo} preview={preview} originalUrl={targetLink} />
       )}
       {targetLink && !externalVideo && preview?.facebookEmbedKind === "post" && preview.facebookEmbedUrl && (
         <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
