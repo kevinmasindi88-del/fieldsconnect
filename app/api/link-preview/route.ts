@@ -169,6 +169,91 @@ async function facebookPreviewFallback(url: URL): Promise<NextResponse> {
   }, { headers: { "Cache-Control": "private, max-age=900" } });
 }
 
+
+/**
+ * Fetch the actual TikTok video's metadata rather than the generic
+ * "TikTok - Make Your Day" homepage title. The URL is validated by safeUrl,
+ * and requests only go to TikTok's fixed official oEmbed endpoint.
+ */
+async function tiktokVideoPreview(target: URL): Promise<NextResponse> {
+  const originalHost = target.hostname.toLowerCase();
+  const path = target.pathname.split("/").filter(Boolean);
+  const isShort = ["vt.tiktok.com", "vm.tiktok.com"].includes(originalHost);
+  const isVideo = (path.length === 3 && path[0].startsWith("@") && ["video", "photo"].includes(path[1])) ||
+    (path.length === 3 && path[0] === "player" && path[1] === "v1");
+  if (!isShort && !isVideo) {
+    return NextResponse.json({ error: "Not a TikTok video URL" }, { status: 422 });
+  }
+
+  const id = isShort ? null : path[2];
+  if (id && !/^[0-9]{15,23}$/.test(id)) {
+    return NextResponse.json({ error: "Invalid TikTok media ID" }, { status: 422 });
+  }
+
+  const fallback = (status: "unknown" | "unavailable") => NextResponse.json({
+    url: target.href,
+    domain: "tiktok.com",
+    title: "TikTok video",
+    description: "",
+    tiktokValidation: status,
+  }, { headers: { "Cache-Control": "private, max-age=600" } });
+
+  try {
+    // A canonical post URL is best, while TikTok's oEmbed also accepts
+    // standard user share URLs. No arbitrary host is fetched.
+    const videoUrl = new URL(target.href);
+    videoUrl.search = "";
+    videoUrl.hash = "";
+    const endpoint = "https://www.tiktok.com/oembed?url=" + encodeURIComponent(videoUrl.href);
+    const response = await fetch(endpoint, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(4500),
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (response.status === 404 || response.status === 400) {
+      return fallback("unavailable");
+    }
+    if (!response.ok || !(response.headers.get("content-type") ?? "").includes("json")) {
+      // Transient TikTok/API restrictions are not proof that the video is gone.
+      return fallback("unknown");
+    }
+
+    const data = await response.json() as {
+      title?: unknown; author_name?: unknown; thumbnail_url?: unknown;
+      provider_name?: unknown; embed_product_id?: unknown;
+    };
+    if (data.provider_name && data.provider_name !== "TikTok") return fallback("unknown");
+    if (id && typeof data.embed_product_id === "string" && data.embed_product_id !== id) {
+      return fallback("unknown");
+    }
+    const title = typeof data.title === "string" && data.title.trim()
+      ? data.title.trim().slice(0, 240)
+      : "TikTok video";
+    const description = typeof data.author_name === "string" && data.author_name.trim()
+      ? "By " + data.author_name.trim().slice(0, 150)
+      : "";
+    let image: string | undefined;
+    if (typeof data.thumbnail_url === "string") {
+      try {
+        const thumbnail = new URL(data.thumbnail_url);
+        if (thumbnail.protocol === "https:" && !thumbnail.username && !thumbnail.password &&
+            !thumbnail.port && !isIP(thumbnail.hostname)) image = thumbnail.href;
+      } catch {}
+    }
+    return NextResponse.json({
+      url: target.href,
+      domain: "tiktok.com",
+      title,
+      description,
+      image,
+      tiktokValidation: "valid",
+    }, { headers: { "Cache-Control": "private, max-age=3600" } });
+  } catch {
+    return fallback("unknown");
+  }
+}
+
 export async function GET(request: NextRequest) {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9._~-]+)$/i)?.[1];
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -184,6 +269,9 @@ export async function GET(request: NextRequest) {
   const target = safeUrl(request.nextUrl.searchParams.get("url") ?? "");
   if (!target) return NextResponse.json({ error: "Unsupported external link" }, { status: 400 });
   const isFacebook = facebookContentKind(target) !== null;
+  if (["tiktok.com", "www.tiktok.com", "m.tiktok.com", "vt.tiktok.com", "vm.tiktok.com"].includes(target.hostname.toLowerCase())) {
+    return tiktokVideoPreview(target);
+  }
   try {
     // Prevent fetching loopback, private-network, link-local, and literal IP hosts.
     // Never follow redirects, which could change an otherwise valid destination.
