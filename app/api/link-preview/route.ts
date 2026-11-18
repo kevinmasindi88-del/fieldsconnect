@@ -57,6 +57,55 @@ function metaTags(html: string): Record<string, string> {
   return tags;
 }
 
+
+/**
+ * YouTube sometimes blocks ordinary server-side page previews. Fall back to
+ * its public oEmbed metadata, which provides the real title and channel name.
+ * This never fetches a user-controlled URL: only a validated video ID is
+ * passed to YouTube's fixed official endpoint.
+ */
+async function youtubeOembedFallback(target: URL): Promise<NextResponse> {
+  const unavailable = () => NextResponse.json({ error: "Preview unavailable" }, { status: 422 });
+  const host = target.hostname.toLowerCase();
+  const segments = target.pathname.split("/").filter(Boolean);
+  let id: string | null = null;
+  if (["youtu.be", "www.youtu.be"].includes(host) && segments.length === 1) {
+    id = segments[0];
+  } else if (["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"].includes(host)) {
+    if (target.pathname === "/watch") id = target.searchParams.get("v");
+    if (segments.length === 2 && ["shorts", "live", "embed"].includes(segments[0])) id = segments[1];
+  }
+  if (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id)) return unavailable();
+
+  try {
+    const videoUrl = "https://www.youtube.com/watch?v=" + id;
+    const endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(videoUrl);
+    const response = await fetch(endpoint, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(4000),
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok || !(response.headers.get("content-type") ?? "").includes("json")) return unavailable();
+    const metadata = await response.json() as { title?: unknown; author_name?: unknown };
+    if (typeof metadata.title !== "string" || !metadata.title.trim()) return unavailable();
+    const title = metadata.title.trim().slice(0, 240);
+    // oEmbed exposes creator attribution, but not the video's full description.
+    const description = typeof metadata.author_name === "string" && metadata.author_name.trim()
+      ? "By " + metadata.author_name.trim().slice(0, 150)
+      : "";
+    return NextResponse.json({
+      url: target.href,
+      domain: target.hostname,
+      title,
+      description,
+      image: "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+    }, { headers: { "Cache-Control": "private, max-age=3600" } });
+  } catch {
+    return unavailable();
+  }
+}
+
 export async function GET(request: NextRequest) {
   const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9._~-]+)$/i)?.[1];
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -85,10 +134,10 @@ export async function GET(request: NextRequest) {
       cache: "no-store",
     });
     if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) {
-      return NextResponse.json({ error: "Preview unavailable" }, { status: 422 });
+      return youtubeOembedFallback(target);
     }
     const reader = response.body?.getReader();
-    if (!reader) return NextResponse.json({ error: "No preview" }, { status: 422 });
+    if (!reader) return youtubeOembedFallback(target);
     const chunks: Uint8Array[] = [];
     let size = 0;
     while (size < 131072) {
@@ -122,6 +171,6 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, max-age=3600" } }
     );
   } catch {
-    return NextResponse.json({ error: "Preview unavailable" }, { status: 422 });
+    return youtubeOembedFallback(target);
   }
 }
