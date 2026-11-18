@@ -19,9 +19,11 @@ export function extractFirstPostUrl(body: string): string | null {
 
 
 type ExternalVideo = {
-  provider: "YouTube" | "Vimeo";
+  provider: "YouTube" | "Vimeo" | "TikTok" | "Instagram" | "Facebook";
   playerUrl: string;
   thumbnailUrl?: string;
+  vertical?: boolean;
+  displayLabel?: string;
 };
 
 // Only recognized HTTPS links from exact provider hostnames become iframes.
@@ -58,6 +60,7 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
       provider: "YouTube",
       playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&autoplay=1",
       thumbnailUrl: "https://i.ytimg.com/vi/" + youtubeId + "/hqdefault.jpg",
+      vertical: segments.length === 2 && segments[0] === "shorts",
     };
   }
 
@@ -75,6 +78,77 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
     };
   }
 
+  // TikTok's official player supports public video IDs from standard post URLs.
+  // Short share links with no media ID fall back to the existing link card.
+  if (["tiktok.com", "www.tiktok.com", "m.tiktok.com"].includes(host)) {
+    let videoId: string | null = null;
+    if (segments.length === 3 && segments[0].startsWith("@") && segments[1] === "video") {
+      videoId = segments[2];
+    } else if (segments.length === 3 && segments[0] === "player" && segments[1] === "v1") {
+      videoId = segments[2];
+    }
+    if (videoId && /^[0-9]{15,23}$/.test(videoId)) {
+      return {
+        provider: "TikTok",
+        playerUrl: "https://www.tiktok.com/player/v1/" + videoId + "?autoplay=1",
+        vertical: true,
+      };
+    }
+  }
+
+  // Official Instagram embed pages can show eligible public Reels and media
+  // posts. A /p/ URL may be a video, image, or carousel.
+  if (["instagram.com", "www.instagram.com", "m.instagram.com"].includes(host)) {
+    const kind = segments[0] === "reels" ? "reel" : segments[0];
+    const shortcode = segments.length === 2 ? segments[1] : null;
+    if (
+      ["reel", "p", "tv"].includes(kind) &&
+      shortcode && /^[a-zA-Z0-9_-]{5,30}$/.test(shortcode)
+    ) {
+      return {
+        provider: "Instagram",
+        playerUrl: "https://www.instagram.com/" + kind + "/" + shortcode + "/embed/",
+        vertical: true,
+        displayLabel: kind === "reel" ? "Instagram Reel" : "Instagram post",
+      };
+    }
+  }
+
+  // Facebook's official video plugin accepts the public video URL as its href.
+  // Restrict to known Reel, Watch and video permalink shapes.
+  if (["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"].includes(host)) {
+    let publicVideoUrl: string | null = null;
+    let isReel = false;
+    if (segments.length === 2 && segments[0] === "reel" && /^[0-9]{5,25}$/.test(segments[1])) {
+      publicVideoUrl = "https://www.facebook.com/reel/" + segments[1] + "/";
+      isReel = true;
+    } else if ((url.pathname === "/watch/" || url.pathname === "/watch" || url.pathname === "/video.php")) {
+      const videoId = url.searchParams.get("v");
+      if (videoId && /^[0-9]{5,25}$/.test(videoId)) {
+        publicVideoUrl = "https://www.facebook.com/watch/?v=" + videoId;
+      }
+    } else if (segments.length >= 2 && segments.length <= 4 && segments[segments.length - 2] === "videos") {
+      const videoId = segments[segments.length - 1];
+      const author = segments.slice(0, -2);
+      if (
+        /^[0-9]{5,25}$/.test(videoId) &&
+        author.every((part) => /^[a-zA-Z0-9_.-]{1,100}$/.test(part))
+      ) {
+        publicVideoUrl = "https://www.facebook.com/" +
+          [...author, "videos", videoId].join("/") + "/";
+      }
+    }
+    if (publicVideoUrl) {
+      return {
+        provider: "Facebook",
+        playerUrl: "https://www.facebook.com/plugins/video.php?href=" +
+          encodeURIComponent(publicVideoUrl) + "&show_text=false&width=560",
+        vertical: isReel,
+        displayLabel: isReel ? "Facebook Reel" : "Facebook video",
+      };
+    }
+  }
+
   return null;
 }
 
@@ -83,17 +157,18 @@ function ExternalVideoCard({
 }: { video: ExternalVideo; originalUrl: string; preview: LinkPreview | null }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const thumbnail = video.thumbnailUrl ?? preview?.image;
+  const aspectClass = video.vertical ? "aspect-[9/16]" : "aspect-video";
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className={"min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white " + (video.vertical ? "max-w-[340px]" : "")}>
       {isPlaying ? (
-        <div className="relative aspect-video w-full bg-black">
+        <div className={"relative w-full bg-black " + aspectClass}>
           <iframe
             className="absolute inset-0 h-full w-full"
             title={video.provider + " video player"}
             src={video.playerUrl}
             loading="lazy"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
           />
@@ -102,7 +177,7 @@ function ExternalVideoCard({
         <button
           type="button"
           aria-label={"Play " + video.provider + " video"}
-          className="group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-gray-900 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+          className={"group relative flex w-full items-center justify-center overflow-hidden bg-gray-900 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 " + aspectClass}
           onClick={() => setIsPlaying(true)}
         >
           {thumbnail && (
@@ -116,7 +191,7 @@ function ExternalVideoCard({
         </button>
       )}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{preview?.title ?? video.provider + " video"}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{preview?.title ?? video.displayLabel ?? video.provider + " video"}</span>
         {isPlaying && (
           <button type="button" className="text-xs font-medium text-gray-600 underline underline-offset-2 hover:text-gray-950" onClick={() => setIsPlaying(false)}>Close player</button>
         )}
@@ -215,7 +290,10 @@ export function PostRichContent({
   useEffect(() => {
     let cancelled = false;
     setPreview(null);
-    if (!targetLink || !targetLink.startsWith("https://") || externalVideo?.provider === "YouTube") return;
+    // Avoid unnecessary server-side scraping of social video providers.
+    // Vimeo still uses the existing authorized link-preview endpoint for metadata.
+    if (!targetLink || !targetLink.startsWith("https://") ||
+        (externalVideo && externalVideo.provider !== "Vimeo")) return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabaseBrowserClient();
     void supabase.auth.getSession().then(({ data }) => {
