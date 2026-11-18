@@ -4,7 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video"; tiktokValidation?: "valid" | "unavailable" | "unknown" };
+type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video"; tiktokValidation?: "valid" | "unavailable" | "unknown"; vimeoPlayerUrl?: string };
+
+function isVimeoLink(rawUrl: string | null): boolean {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === "https:" &&
+      ["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(parsed.hostname.toLowerCase());
+  } catch { return false; }
+}
 
 function isFacebookLink(rawUrl: string | null): boolean {
   if (!rawUrl) return false;
@@ -459,7 +468,22 @@ export function PostRichContent({
         vertical: Boolean(targetLink && /\/share\/r\//i.test(targetLink)),
       }
     : null;
-  const externalVideo = getExternalVideo(targetLink) ?? facebookSharedVideo;
+  // Vanity URLs cannot supply an ID until Vimeo resolves their metadata.
+  // Accept only the allowlisted player URL returned by our server endpoint.
+  const resolvedVimeoVideo = isVimeoLink(targetLink) && preview?.vimeoPlayerUrl &&
+    (() => {
+      try {
+        const parsed = new URL(preview.vimeoPlayerUrl);
+        return parsed.protocol === "https:" && parsed.hostname === "player.vimeo.com" &&
+          /^\/video\/[0-9]{1,12}$/.test(parsed.pathname);
+      } catch { return false; }
+    })()
+    ? {
+        provider: "Vimeo" as const,
+        playerUrl: preview.vimeoPlayerUrl,
+      }
+    : null;
+  const externalVideo = resolvedVimeoVideo ?? getExternalVideo(targetLink) ?? facebookSharedVideo;
 
   useEffect(() => {
     let cancelled = false;
