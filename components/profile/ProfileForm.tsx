@@ -425,6 +425,12 @@ export function ProfileForm() {
     useState(50);
   const [avatarZoom, setAvatarZoom] =
     useState(AVATAR_MIN_ZOOM);
+  // Keep the latest crop synchronously available across high-frequency pointer events.
+  const avatarTransformRef = useRef({
+    cropX: 50,
+    cropY: 50,
+    zoom: AVATAR_MIN_ZOOM,
+  });
   const avatarCanvasRef =
     useRef<HTMLCanvasElement | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -986,6 +992,45 @@ export function ProfileForm() {
     );
   }, [selectedAvatarFile, avatarImageDimensions, avatarCropX, avatarCropY, avatarZoom]);
 
+  function updateAvatarCropTransform(next: {
+    cropX: number;
+    cropY: number;
+    zoom: number;
+  }) {
+    avatarTransformRef.current = next;
+    setAvatarCropX(next.cropX);
+    setAvatarCropY(next.cropY);
+    setAvatarZoom(next.zoom);
+  }
+
+  function resetAvatarCropTransform() {
+    updateAvatarCropTransform({
+      cropX: 50,
+      cropY: 50,
+      zoom: AVATAR_MIN_ZOOM,
+    });
+  }
+
+  function getAvatarPanLimits(
+    dimensions: { width: number; height: number },
+    canvas: HTMLCanvasElement,
+    zoom: number
+  ) {
+    const scale = Math.max(
+      canvas.width / dimensions.width,
+      canvas.height / dimensions.height
+    ) * zoom;
+
+    return {
+      maxX: Math.max(0, (dimensions.width * scale - canvas.width) / 2),
+      maxY: Math.max(0, (dimensions.height * scale - canvas.height) / 2),
+    };
+  }
+
+  function clampAvatarCrop(value: number) {
+    return Math.max(0, Math.min(100, value));
+  }
+
   function moveAvatarCropByPixels(
     deltaX: number,
     deltaY: number,
@@ -995,29 +1040,33 @@ export function ProfileForm() {
     const bounds = canvas.getBoundingClientRect();
     if (!dimensions || !bounds.width || !bounds.height) return;
 
-    // Zoom leaves pan room on both axes, matching the final saved crop.
-    const scale = Math.max(
-      canvas.width / dimensions.width,
-      canvas.height / dimensions.height
-    ) * avatarZoom;
-    const maxX = Math.max(0, (dimensions.width * scale - canvas.width) / 2);
-    const maxY = Math.max(0, (dimensions.height * scale - canvas.height) / 2);
+    const current = avatarTransformRef.current;
+    const { maxX, maxY } = getAvatarPanLimits(dimensions, canvas, current.zoom);
 
-    // Drag right or down to move the photo that way inside the circular frame.
-    if (maxX > 0) {
-      const cropStepX = (deltaX * canvas.width / bounds.width) * 50 / maxX;
-      setAvatarCropX((current) => Math.max(0, Math.min(100, current - cropStepX)));
-    }
-    if (maxY > 0) {
-      const cropStepY = (deltaY * canvas.height / bounds.height) * 50 / maxY;
-      setAvatarCropY((current) => Math.max(0, Math.min(100, current - cropStepY)));
-    }
+    // Drag the image in the same direction as the finger, on both axes.
+    const nextX = maxX > 0
+      ? clampAvatarCrop(current.cropX - (deltaX * canvas.width / bounds.width) * 50 / maxX)
+      : 50;
+    const nextY = maxY > 0
+      ? clampAvatarCrop(current.cropY - (deltaY * canvas.height / bounds.height) * 50 / maxY)
+      : 50;
+
+    updateAvatarCropTransform({ ...current, cropX: nextX, cropY: nextY });
   }
 
   function avatarPointerDistance() {
     const points = Array.from(avatarPointersRef.current.values());
     if (points.length !== 2) return null;
     return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  }
+
+  function avatarPointerMidpoint() {
+    const points = Array.from(avatarPointersRef.current.values());
+    if (points.length !== 2) return null;
+    return {
+      x: (points[0].x + points[1].x) / 2,
+      y: (points[0].y + points[1].y) / 2,
+    };
   }
 
   function handleAvatarPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
@@ -1037,15 +1086,50 @@ export function ProfileForm() {
     const previous = pointers.get(event.pointerId);
     if (!previous) return;
 
+    const previousMidpoint = pointers.size === 2 ? avatarPointerMidpoint() : null;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
     if (pointers.size === 2) {
       const distance = avatarPointerDistance();
+      const midpoint = avatarPointerMidpoint();
       const previousDistance = avatarPinchDistanceRef.current;
-      if (distance !== null && previousDistance !== null && previousDistance > 0) {
-        // Incremental ratio supports smooth pinch out and pinch in, even at zoom limits.
-        const ratio = distance / previousDistance;
-        setAvatarZoom((current) => Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current * ratio)));
+      const dimensions = avatarImageDimensions;
+      const canvas = event.currentTarget;
+      const bounds = canvas.getBoundingClientRect();
+
+      if (
+        distance !== null && previousDistance !== null &&
+        previousDistance > 0 && midpoint && previousMidpoint &&
+        dimensions && bounds.width > 0 && bounds.height > 0
+      ) {
+        const current = avatarTransformRef.current;
+        const nextZoom = Math.max(
+          AVATAR_MIN_ZOOM,
+          Math.min(2.5, current.zoom * distance / previousDistance)
+        );
+        // Use the *applied* zoom ratio so the focal point stays steady at limits.
+        const ratio = nextZoom / current.zoom;
+        const before = getAvatarPanLimits(dimensions, canvas, current.zoom);
+        const after = getAvatarPanLimits(dimensions, canvas, nextZoom);
+
+        // Image offsets grow with zoom. Correct for the previous finger midpoint
+        // and the midpoint's own movement, anchoring the touched image detail.
+        const focusX = (previousMidpoint.x - bounds.left) * canvas.width / bounds.width - canvas.width / 2;
+        const focusY = (previousMidpoint.y - bounds.top) * canvas.height / bounds.height - canvas.height / 2;
+        const movementX = (midpoint.x - previousMidpoint.x) * canvas.width / bounds.width;
+        const movementY = (midpoint.y - previousMidpoint.y) * canvas.height / bounds.height;
+        const oldOffsetX = ((current.cropX - 50) / 50) * before.maxX;
+        const oldOffsetY = ((current.cropY - 50) / 50) * before.maxY;
+        const nextOffsetX = oldOffsetX * ratio + (ratio - 1) * focusX - movementX;
+        const nextOffsetY = oldOffsetY * ratio + (ratio - 1) * focusY - movementY;
+
+        updateAvatarCropTransform({
+          cropX: after.maxX > 0 ? clampAvatarCrop(50 + nextOffsetX * 50 / after.maxX) : 50,
+          cropY: after.maxY > 0 ? clampAvatarCrop(50 + nextOffsetY * 50 / after.maxY) : 50,
+          zoom: nextZoom,
+        });
       }
+
       avatarPinchDistanceRef.current = distance;
       return;
     }
@@ -1081,7 +1165,11 @@ export function ProfileForm() {
     if (!avatarImageDimensions || isAvatarWorking) return;
     if (event.key === "+" || event.key === "=" || event.key === "-") {
       event.preventDefault();
-      setAvatarZoom((current) => Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current + (event.key === "-" ? -0.1 : 0.1))));
+      const current = avatarTransformRef.current;
+      updateAvatarCropTransform({
+        ...current,
+        zoom: Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current.zoom + (event.key === "-" ? -0.1 : 0.1))),
+      });
       return;
     }
     const delta = movement[event.key];
@@ -1101,9 +1189,7 @@ export function ProfileForm() {
       avatarPointersRef.current.clear();
       avatarPinchDistanceRef.current = null;
       setAvatarImageDimensions(null);
-      setAvatarCropX(50);
-      setAvatarCropY(50);
-      setAvatarZoom(AVATAR_MIN_ZOOM);
+      resetAvatarCropTransform();
       return;
     }
 
@@ -1134,9 +1220,7 @@ export function ProfileForm() {
       avatarPinchDistanceRef.current = null;
       setAvatarImageDimensions(null);
       setSelectedAvatarFile(safeFile);
-      setAvatarCropX(50);
-      setAvatarCropY(50);
-      setAvatarZoom(AVATAR_MIN_ZOOM);
+      resetAvatarCropTransform();
     } catch (error) {
       const detail =
         error instanceof Error
@@ -1227,9 +1311,7 @@ export function ProfileForm() {
 
       setAvatarPath(newAvatarPath);
       setSelectedAvatarFile(null);
-      setAvatarCropX(50);
-      setAvatarCropY(50);
-      setAvatarZoom(AVATAR_MIN_ZOOM);
+      resetAvatarCropTransform();
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
@@ -1582,7 +1664,7 @@ export function ProfileForm() {
                   {selectedAvatarFile ? (
                     <canvas
                       ref={avatarCanvasRef}
-                      aria-label="Profile picture crop. Drag to reposition, pinch to zoom, or use arrow and plus/minus keys."
+                      aria-label="Profile picture crop. Drag to reposition in any direction, pinch to zoom at the finger midpoint, or use arrow and plus/minus keys."
                       role="img"
                       tabIndex={0}
                       className="h-full w-full cursor-grab touch-none select-none outline-offset-4 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
@@ -1607,7 +1689,7 @@ export function ProfileForm() {
                 </div>
                 {selectedAvatarFile && (
                   <p className="text-center text-xs text-gray-600 sm:text-left">
-                    Drag in any direction · Pinch to zoom
+                    Drag in any direction · Pinch to zoom at your fingers
                   </p>
                 )}
               </div>
@@ -1664,9 +1746,13 @@ export function ProfileForm() {
                         className="w-full"
                         max={2.5}
                         min={AVATAR_MIN_ZOOM}
-                        onChange={(event) =>
-                          setAvatarZoom(Number(event.target.value))
-                        }
+                        onChange={(event) => {
+                          const current = avatarTransformRef.current;
+                          updateAvatarCropTransform({
+                            ...current,
+                            zoom: Number(event.target.value),
+                          });
+                        }}
                         step={0.05}
                         type="range"
                         value={avatarZoom}
