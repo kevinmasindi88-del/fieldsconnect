@@ -167,14 +167,24 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [expanded, setExpanded] = useState(false);
-  const [playerErrorCode, setPlayerErrorCode] = useState<number | null>(null);
+  // Do not translate deprecated MediaError codes (1–4) into TikTok's distinct
+  // onPlayerError codes (1001/2001/3001). Preserve the actual error source.
+  const [playerError, setPlayerError] = useState<
+    { source: "player" | "media"; code: number } | null
+  >(null);
   const isTikTok = video.provider === "TikTok";
-  const unavailable = isTikTok && playerErrorCode !== null;
-  const errorMessage = playerErrorCode === 1001
+  const unavailable = isTikTok && playerError !== null;
+  const errorMessage = playerError?.source === "player" && playerError.code === 1001
     ? "TikTok cannot find or embed this post."
-    : playerErrorCode === 2001
+    : playerError?.source === "player" && playerError.code === 2001
       ? "TikTok could not serve this video right now."
-      : "This TikTok video cannot play in the embedded player.";
+      : playerError?.source === "media" && playerError.code === 2
+        ? "The embedded video encountered a network error."
+        : playerError?.source === "media" && playerError.code === 3
+          ? "The embedded video could not be decoded."
+          : playerError?.source === "media" && playerError.code === 4
+            ? "This video format isn't supported by the embedded player."
+            : "This TikTok video cannot play in the embedded player.";
   // Strip the lengthy sharing and tracking parameters when offering a source link.
   const sourceUrl = isTikTok ? (() => {
     try {
@@ -196,9 +206,15 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
       if (!data || typeof data !== "object") return;
       const msg = data as { type?: unknown; value?: unknown; "x-tiktok-player"?: unknown };
       if (msg["x-tiktok-player"] !== true) return;
-      // Older TikTok embeds may use the deprecated onError event instead.
+      // Deprecated onError reports browser MediaError.code (1–4), NOT the
+      // TikTok onPlayerError 3001 playback code. Keep them separate.
       if (msg.type === "onError") {
-        if ([1, 2, 3, 4].includes(Number(msg.value))) setPlayerErrorCode(3001);
+        const mediaCode = Number(msg.value);
+        if ([1, 2, 3, 4].includes(mediaCode)) {
+          setPlayerError((current) => current?.source === "player"
+            ? current
+            : { source: "media", code: mediaCode });
+        }
         return;
       }
       if (msg.type !== "onPlayerError") return;
@@ -208,7 +224,7 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
       // INVALID_VIDEO, SERVER_ERROR, PLAYBACK_ERROR. Autoplay denial (3002)
       // must never replace a usable player.
       const code = Number(error.errorCode);
-      if ([1001, 2001, 3001].includes(code)) setPlayerErrorCode(code);
+      if ([1001, 2001, 3001].includes(code)) setPlayerError({ source: "player", code });
     };
     window.addEventListener("message", handleTikTokMessage);
     return () => window.removeEventListener("message", handleTikTokMessage);
@@ -264,7 +280,7 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
-              onClick={() => { setPlayerErrorCode(null); }}
+              onClick={() => { setPlayerError(null); }}
               className="rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               Retry
@@ -278,8 +294,11 @@ function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVid
               Watch on TikTok
             </a>
           </div>
-          {playerErrorCode !== null && (
-            <p className="text-xs text-gray-400">TikTok player error {playerErrorCode}</p>
+          {playerError && (
+            <p className="text-xs text-gray-400">
+              {playerError.source === "player" ? "TikTok player error " : "Browser media error "}
+              {playerError.code}
+            </p>
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
