@@ -1,31 +1,346 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { User } from "@supabase/supabase-js";
+import {
+  restoreDevicePushForSignedInUser,
+  waitForDevicePushRestore,
+} from "@/lib/push-preferences";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import { RoleAwareAccountLinks } from "@/components/navigation/RoleAwareAccountLinks";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  getSupabaseBrowserClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/browser";
+
+type OnlinePresence = {
+  user_id?: string;
+  online_at?: string;
+};
+
+const OnlinePresenceContext =
+  createContext<ReadonlySet<string>>(
+    new Set()
+  );
+
+export function useOnlinePresence() {
+  return useContext(
+    OnlinePresenceContext
+  );
+}
 
 const authRoutes = new Set(["/login", "/signup", "/reset-password"]);
 
+const publicRoutes = new Set([
+  "/",
+  "/login",
+  "/signup",
+  "/reset-password",
+  "/code-of-conduct",
+  "/terms-of-use",
+  "/privacy-policy",
+  "/contact",
+  "/refund-policy",
+]);
+
+const suspensionAllowedRoutes = new Set([
+  "/notifications",
+  "/code-of-conduct",
+]);
+
 const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/profile", label: "Profile" },
+  { href: "/timeline", label: "Home" },
   { href: "/connections", label: "Connections" },
+  { href: "/mentorships", label: "Mentorship" },
   { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Notifications" },
-  { href: "/timeline", label: "Timeline" },
-  { href: "/skills", label: "Skills" },
   { href: "/library", label: "Library" },
-  { href: "/moderation", label: "Moderation" },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type MobileNavIconName =
+  | "home"
+  | "connections"
+  | "messages"
+  | "notifications"
+  | "mentorship"
+  | "library";
+
+const mobileNavItems: Array<{
+  href: string;
+  label: string;
+  icon: MobileNavIconName;
+}> = [
+  {
+    href: "/timeline",
+    label: "Home",
+    icon: "home",
+  },
+  {
+    href: "/connections",
+    label: "Connect",
+    icon: "connections",
+  },
+  {
+    href: "/mentorships",
+    label: "Mentors",
+    icon: "mentorship",
+  },
+  {
+    href: "/messages",
+    label: "Messages",
+    icon: "messages",
+  },
+  {
+    href: "/library",
+    label: "Library",
+    icon: "library",
+  },
+];
+
+function MobileNavIcon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: MobileNavIconName | "account";
+  className?: string;
+}) {
+  const commonProps = {
+    className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  switch (name) {
+    case "home":
+      return (
+        <svg {...commonProps}>
+          <path d="M3 11.5 12 4l9 7.5" />
+          <path d="M5.5 10.5V20h13v-9.5" />
+          <path d="M9.5 20v-6h5v6" />
+        </svg>
+      );
+
+    case "connections":
+      return (
+        <svg {...commonProps}>
+          <circle cx="9" cy="8" r="3" />
+          <circle cx="17" cy="9" r="2.5" />
+          <path d="M3.5 19c.5-3.5 2.6-5.5 5.5-5.5S14 15.5 14.5 19" />
+          <path d="M14 14.5c2.7-.4 5.2 1.2 5.8 4.5" />
+        </svg>
+      );
+
+    case "messages":
+      return (
+        <svg {...commonProps}>
+          <path d="M4 5.5h16v11H9l-5 3v-14Z" />
+          <path d="M8 10h8" />
+          <path d="M8 13h5" />
+        </svg>
+      );
+
+    case "notifications":
+      return (
+        <svg {...commonProps}>
+          <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 5 2 5.5 2 5.5h-15S6.5 15 6.5 10Z" />
+          <path d="M10 19h4" />
+        </svg>
+      );
+
+    case "mentorship":
+      return (
+        <svg {...commonProps}>
+          <circle cx="8" cy="8" r="3" />
+          <path d="M2.5 19c.5-3.6 2.6-5.5 5.5-5.5s5 1.9 5.5 5.5" />
+          <path d="m15 11 2.5 2.5L22 8" />
+        </svg>
+      );
+
+    case "library":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 7v14" />
+          <path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1h-4a4 4 0 0 0-4 2 4 4 0 0 0-4-2H4a1 1 0 0 1-1-1Z" />
+        </svg>
+      );
+
+    case "account":
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5.5 20c.6-4.2 3-6.5 6.5-6.5s5.9 2.3 6.5 6.5" />
+        </svg>
+      );
+  }
+}
+
+type ActiveSuspension = {
+  suspension_id: string;
+  report_id: string;
+  duration_days: number;
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+};
+
+export function AppShell({
+  children,
+  initialBuildId,
+}: {
+  children: React.ReactNode;
+  initialBuildId: string;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const shouldHideNavigation = authRoutes.has(pathname);
+  const isPublicRoute = publicRoutes.has(pathname);
+
   const [user, setUser] = useState<User | null>(null);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const [accountAvatarPath, setAccountAvatarPath] = useState<string | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [showLoadingScreen, setShowLoadingScreen] =
+    useState(false);
+
+  const [activeSuspension, setActiveSuspension] =
+    useState<ActiveSuspension | null>(null);
+
+  const [suspensionCheckMessage, setSuspensionCheckMessage] =
+    useState<string | null>(null);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [onlineUserIds, setOnlineUserIds] =
+    useState<Set<string>>(
+      () => new Set()
+    );
+
+  useEffect(() => {
+    // An installed app may resume an old Next.js client after a new release.
+    // Reload automatically on startup/resume, unless a draft is still being edited.
+    if (!initialBuildId || initialBuildId === "local") return;
+
+    let disposed = false;
+    let checking = false;
+    let pendingVersion: string | null = null;
+
+    function hasUnsentInput() {
+      const editable = document.querySelectorAll(
+        'textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), [contenteditable="true"]'
+      );
+
+      return Array.from(editable).some((element) => {
+        if (element instanceof HTMLInputElement) {
+          if (element.type === "file") return Boolean(element.files?.length);
+          return Boolean(element.value.trim()) && element.value !== element.defaultValue;
+        }
+        if (element instanceof HTMLTextAreaElement) {
+          return Boolean(element.value.trim()) && element.value !== element.defaultValue;
+        }
+        return Boolean(element.textContent?.trim());
+      });
+    }
+
+    function refreshIfSafe(version: string) {
+      if (disposed || document.visibilityState !== "visible" || hasUnsentInput()) return;
+
+      // Prevent repeated refreshes if the browser keeps delivering stale HTML.
+      const key = "fc-last-upgrade-attempt";
+      let previousVersion = "";
+      let previousAt = 0;
+      try {
+        const saved = window.sessionStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { version?: string; timestamp?: number };
+          previousVersion = parsed.version ?? "";
+          previousAt = parsed.timestamp ?? 0;
+        }
+      } catch {
+        // Storage may be unavailable; normal navigation must still work.
+      }
+
+      if (previousVersion === version && Date.now() - previousAt < 2 * 60 * 1000) return;
+
+      try {
+        window.sessionStorage.setItem(
+          key,
+          JSON.stringify({ version, timestamp: Date.now() })
+        );
+      } catch {
+        // Still attempt a refresh if session storage is blocked.
+      }
+
+      // A unique URL bypasses old PWA/page caches without logging out.
+      const target = new URL(window.location.href);
+      target.searchParams.set("__fc_release", version.slice(0, 16));
+      window.location.replace(target.toString());
+    }
+
+    async function checkForUpdate() {
+      if (disposed || checking || document.visibilityState !== "visible") return;
+      if (pendingVersion) {
+        refreshIfSafe(pendingVersion);
+        return;
+      }
+
+      checking = true;
+      try {
+        const response = await fetch(`/api/app-version?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data: { version?: unknown } = await response.json();
+        if (
+          !disposed &&
+          typeof data.version === "string" &&
+          data.version !== "local" &&
+          data.version !== initialBuildId
+        ) {
+          pendingVersion = data.version;
+          refreshIfSafe(data.version);
+        }
+      } catch {
+        // If offline, recheck when connection/focus returns.
+      } finally {
+        checking = false;
+      }
+    }
+
+    const onResume = () => {
+      if (document.visibilityState === "visible") void checkForUpdate();
+    };
+
+    void checkForUpdate();
+    window.addEventListener("focus", onResume);
+    window.addEventListener("online", onResume);
+    window.addEventListener("pageshow", onResume);
+    document.addEventListener("visibilitychange", onResume);
+    const interval = window.setInterval(onResume, 60 * 1000);
+    const pendingDraftRetry = window.setInterval(() => {
+      if (pendingVersion) refreshIfSafe(pendingVersion);
+    }, 10 * 1000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.clearInterval(pendingDraftRetry);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("pageshow", onResume);
+      document.removeEventListener("visibilitychange", onResume);
+    };
+  }, [initialBuildId]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -51,25 +366,349 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!user?.id) return;
+
+    // Remember authenticated visitors on this device without storing
+    // account identifiers or other personal information.
+    try {
+      window.localStorage.setItem("fc-returning-member", "1");
+    } catch {
+      // Browsers may disable local storage; authentication still works.
+    }
+
+    void restoreDevicePushForSignedInUser(user.id).catch((error) => {
+      console.warn("Unable to restore device notifications:", error);
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured()) return;
+
+    const supabase = getSupabaseBrowserClient();
+    let lastRecordedDay = "";
+    let inFlight = false;
+    let disposed = false;
+
+    function recordDailyActivity() {
+      if (disposed || document.visibilityState !== "visible" || inFlight) return;
+      // South Africa does not observe DST: UTC+02:00 year-round.
+      const sastDay = new Date(Date.now() + 2 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      if (lastRecordedDay === sastDay) return;
+
+      inFlight = true;
+      void (async () => {
+        try {
+          const { error } = await supabase.rpc("record_dad_activity");
+          if (!disposed && !error) {
+            lastRecordedDay = sastDay;
+          } else if (error) {
+            console.warn("Unable to record daily FieldsConnect activity:", error.message);
+          }
+        } catch {
+          // Activity telemetry must never interrupt the application.
+        } finally {
+          inFlight = false;
+        }
+      })();
+    }
+
+    const onResume = () => recordDailyActivity();
+
+    recordDailyActivity();
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("online", onResume);
+    window.addEventListener("pageshow", onResume);
+    const interval = window.setInterval(recordDailyActivity, 5 * 60 * 1000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isLoadingAuth || user || isPublicRoute) return;
+
+    router.replace("/login");
+  }, [isLoadingAuth, user, isPublicRoute, router]);
+
+  useEffect(() => {
+    if (
+      !user ||
+      !isSupabaseConfigured()
+    ) {
+      setOnlineUserIds(new Set());
+      return;
+    }
+
+    const supabase =
+      getSupabaseBrowserClient();
+
+    const channel = supabase.channel(
+      "fieldsconnect-online"
+    );
+
+    function syncOnlineUsers() {
+      const presenceState =
+        channel.presenceState() as Record<
+          string,
+          OnlinePresence[]
+        >;
+
+      const nextOnlineUserIds =
+        new Set<string>();
+
+      Object.values(
+        presenceState
+      ).forEach((presences) => {
+        presences.forEach(
+          (presence) => {
+            if (
+              typeof presence.user_id ===
+                "string" &&
+              presence.user_id
+            ) {
+              nextOnlineUserIds.add(
+                presence.user_id
+              );
+            }
+          }
+        );
+      });
+
+      setOnlineUserIds(
+        nextOnlineUserIds
+      );
+    }
+
+    channel
+      .on(
+        "presence",
+        { event: "sync" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "join" },
+        syncOnlineUsers
+      )
+      .on(
+        "presence",
+        { event: "leave" },
+        syncOnlineUsers
+      )
+      .subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") {
+          return;
+        }
+
+        const presenceTrackStatus =
+          await channel.track({
+            user_id: user.id,
+            online_at:
+              new Date().toISOString(),
+          });
+
+        if (
+          presenceTrackStatus !== "ok"
+        ) {
+          console.warn(
+            "Unable to publish online presence:",
+            presenceTrackStatus
+          );
+        }
+      });
+
+    return () => {
+      void channel.untrack();
+      void supabase.removeChannel(
+        channel
+      );
+    };
+  }, [user]);
+  useEffect(() => {
+    const isWaitingForProtectedAccess =
+      !isPublicRoute &&
+      (isLoadingAuth || !user);
+
+    if (!isWaitingForProtectedAccess) {
+      setShowLoadingScreen(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowLoadingScreen(true);
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isLoadingAuth, user, isPublicRoute]);
+
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      setWelcomeName(null);
+      setAccountAvatarPath(null);
+      return;
+    }
+
+    let isActive = true;
+    const supabase = getSupabaseBrowserClient();
+    const authenticatedUser = user;
+
+    async function loadAccountProfile() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("id", authenticatedUser.id)
+        .maybeSingle();
+
+      if (!isActive) return;
+
+      setAccountAvatarPath(
+        !error && typeof data?.avatar_url === "string"
+          ? data.avatar_url
+          : null
+      );
+
+      if (!error && data?.display_name?.trim()) {
+        setWelcomeName(data.display_name.trim());
+        return;
+      }
+
+      const metadataName =
+        typeof authenticatedUser.user_metadata?.display_name === "string"
+          ? authenticatedUser.user_metadata.display_name
+          : typeof authenticatedUser.user_metadata?.full_name === "string"
+            ? authenticatedUser.user_metadata.full_name
+            : null;
+
+      setWelcomeName(
+        metadataName?.trim() ||
+          authenticatedUser.email?.split("@")[0] ||
+          "there"
+      );
+    }
+
+    void loadAccountProfile();
+    window.addEventListener("fc:profile-updated", loadAccountProfile);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("fc:profile-updated", loadAccountProfile);
+    };
+  }, [user, pathname]);
+
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) {
+      setActiveSuspension(null);
+      setSuspensionCheckMessage(null);
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    let isCancelled = false;
+
+    async function loadActiveSuspension() {
+      try {
+        const { data, error } = await supabase.rpc(
+          "get_my_active_suspension"
+        );
+
+        if (error) throw error;
+        if (isCancelled) return;
+
+        const suspensionData = Array.isArray(data)
+          ? data[0]
+          : data;
+
+        setActiveSuspension(
+          suspensionData
+            ? (suspensionData as ActiveSuspension)
+            : null
+        );
+
+        setSuspensionCheckMessage(null);
+      } catch (error) {
+        if (isCancelled) return;
+
+        const suspensionError =
+          error && typeof error === "object"
+            ? error
+            : { message: String(error) };
+
+        console.warn(
+          "Unable to check active account suspension:",
+          suspensionError
+        );
+
+        setSuspensionCheckMessage(
+          "Unable to refresh your account status. Please try again shortly."
+        );
+      }
+    }
+
+    void loadActiveSuspension();
+
+    const intervalId = window.setInterval(() => {
+      void loadActiveSuspension();
+    }, 30000);
+
+    function handleWindowFocus() {
+      void loadActiveSuspension();
+    }
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (!user || !isSupabaseConfigured()) {
       setUnreadNotificationCount(0);
+      setUnreadMessageCount(0);
       return;
     }
 
     const supabase = getSupabaseBrowserClient();
 
-    async function loadUnreadCount() {
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .is("read_at", null);
+    async function loadUnreadCounts() {
+      const [
+        { count: notificationCount, error: notificationError },
+        { count: messageCount, error: messageError },
+      ] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .is("read_at", null),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("notification_type", "new_message")
+          .is("read_at", null),
+      ]);
 
-      if (!error) {
-        setUnreadNotificationCount(count ?? 0);
+      if (!notificationError) {
+        setUnreadNotificationCount(notificationCount ?? 0);
+      }
+
+      if (!messageError) {
+        setUnreadMessageCount(messageCount ?? 0);
       }
     }
 
-    void loadUnreadCount();
+    void loadUnreadCounts();
 
     const channel = supabase
       .channel(`notifications:${user.id}`)
@@ -82,7 +721,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           filter: `recipient_id=eq.${user.id}`,
         },
         () => {
-          void loadUnreadCount();
+          void loadUnreadCounts();
         }
       )
       .subscribe();
@@ -92,66 +731,495 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [user, pathname]);
 
+  useEffect(() => {
+    async function syncAppBadge() {
+      if (typeof navigator === "undefined") return;
+
+      try {
+        if (
+          unreadNotificationCount > 0 &&
+          "setAppBadge" in navigator
+        ) {
+          await navigator.setAppBadge(
+            unreadNotificationCount
+          );
+          return;
+        }
+
+        if (
+          unreadNotificationCount === 0 &&
+          "clearAppBadge" in navigator
+        ) {
+          await navigator.clearAppBadge();
+        }
+      } catch (error) {
+        console.warn(
+          "Unable to update app badge:",
+          error
+        );
+      }
+    }
+
+    void syncAppBadge();
+  }, [unreadNotificationCount]);
+
   async function handleLogout() {
+    if (
+      typeof navigator !== "undefined" &&
+      "clearAppBadge" in navigator
+    ) {
+      try {
+        await navigator.clearAppBadge();
+      } catch {
+        // Badge clearing is best-effort only.
+      }
+    }
+
     if (!isSupabaseConfigured()) return;
 
     const supabase = getSupabaseBrowserClient();
+
+    if (user?.id) {
+      await waitForDevicePushRestore(user.id);
+    }
+
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "serviceWorker" in navigator &&
+        "PushManager" in window
+      ) {
+        const registration =
+          await navigator.serviceWorker.getRegistration();
+
+        const subscription =
+          registration
+            ? await registration.pushManager.getSubscription()
+            : null;
+
+        if (subscription) {
+          const endpoint = subscription.endpoint;
+
+          const { error } = await supabase.rpc(
+            "unregister_push_subscription",
+            {
+              subscription_endpoint: endpoint,
+            }
+          );
+
+          if (error) {
+            console.warn(
+              "Unable to unregister push subscription during logout:",
+              error
+            );
+            // If server cleanup fails, disable the browser subscription.
+            await subscription.unsubscribe();
+          }
+          // Otherwise retain the inactive browser subscription for reuse.
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Unable to clean up push subscription during logout:",
+        error
+      );
+    }
+
     await supabase.auth.signOut();
     window.location.href = "/login";
   }
 
-  if (shouldHideNavigation) {
+  const isWaitingForProtectedAccess =
+    !isPublicRoute &&
+    (isLoadingAuth || !user);
+
+  if (
+    isWaitingForProtectedAccess &&
+    showLoadingScreen
+  ) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[var(--fc-page)] px-4">
+        <div className="text-center">
+          <div
+            aria-label="FieldsConnect"
+            className="text-3xl font-bold tracking-tight"
+          >
+            <span className="text-blue-700">
+              Fields
+            </span>
+
+            <span className="text-gray-950">
+              Connect
+            </span>
+          </div>
+
+          <p className="mt-3 text-sm text-gray-600">
+            Loading...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isWaitingForProtectedAccess) {
+    return null;
+  }
+
+  if (shouldHideNavigation || pathname === "/" || pathname === "/contact" || pathname === "/refund-policy") {
     return <>{children}</>;
   }
 
-  return (
-    <div className="min-h-screen bg-white text-gray-950">
-      <header className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4">
-          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-            <Link href="/" className="text-xl font-bold tracking-tight">
-              FieldsConnect
+  if (user && activeSuspension) {
+    const isAllowedSuspensionRoute =
+      suspensionAllowedRoutes.has(pathname);
+
+    return (
+      <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
+        <header className="border-b border-gray-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between">
+            <Link className="inline-flex items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" href="/">
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span>
             </Link>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {isLoadingAuth ? (
-                <span className="text-sm text-gray-500">Checking session...</span>
-              ) : user ? (
-                <>
-                  <span className="rounded-lg border px-3 py-2 text-sm text-gray-700">
-                    Signed in
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">
+                {welcomeName
+                  ? `Signed in as ${welcomeName}`
+                  : "Signed in"}
+              </span>
+
+              <Link
+                className="rounded-lg border px-3 py-2 text-sm font-medium"
+                href="/notifications"
+              >
+                Notifications
+                {unreadNotificationCount > 0 && (
+                  <span className="ml-2 rounded-full bg-red-700 px-2 py-0.5 text-xs font-semibold text-white">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
                   </span>
+                )}
+              </Link>
+
+              <Link
+                className="rounded-lg border px-3 py-2 text-sm font-medium"
+                href="/code-of-conduct"
+              >
+                Code of Conduct
+              </Link>
+
+              <button
+                className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
+                onClick={handleLogout}
+                type="button"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {isAllowedSuspensionRoute ? (
+          <>
+            <div className="mx-auto max-w-5xl px-6 pt-6">
+              <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+                Your account is currently suspended. Only notifications,
+                the Code of Conduct and logout are available.
+              </div>
+            </div>
+
+            {children}
+          </>
+        ) : (
+          <SuspensionScreen
+            suspension={activeSuspension}
+            suspensionCheckMessage={suspensionCheckMessage}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <OnlinePresenceContext.Provider
+      value={onlineUserIds}
+    >
+      <div className="min-h-screen bg-[var(--fc-page)] text-gray-950">
+      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 shadow-[0_1px_0_rgba(15,23,42,0.03)] backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2.5 sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="inline-flex shrink-0 items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            >
+              <span className="text-blue-700">Fields</span>
+              <span className="text-gray-950">Connect</span>
+            </Link>
+
+            <div className="flex shrink-0 items-center gap-2">
+              {user && (
+                <Link
+                  href="/notifications"
+                  aria-label={`Notifications${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} unread` : ""}`}
+                  title="Notifications"
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-800 transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                >
+                  <MobileNavIcon name="notifications" className="h-6 w-6" />
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -right-1 -top-0.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-black px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                      {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+              {isLoadingAuth ? (
+                <span className="text-xs text-gray-500">
+                  Checking...
+                </span>
+              ) : user ? (
+                <details className="group relative">
+                  <summary
+                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                    aria-label={`Account menu for ${welcomeName ?? "user"}`}
+                  >
+                    <ProfileAvatar
+                      avatarPath={accountAvatarPath}
+                      displayName={welcomeName}
+                      size={40}
+                    />
+                  </summary>
+
+                  <div className="absolute right-0 top-full z-30 mt-2 min-w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+                    <div className="border-b border-gray-100 px-3 py-2">
+                      <p className="text-xs text-gray-500">
+                        Signed in as
+                      </p>
+
+                      <p className="max-w-44 truncate text-sm font-semibold text-gray-950">
+                        {welcomeName ?? user.email ?? "Account"}
+                      </p>
+                    </div>
+
+                    <Link
+                      className={[
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname === "/profile"
+                          ? "bg-gray-100 font-medium text-gray-950"
+                          : "text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                      href="/profile"
+                      onClick={(event) => {
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
+                      }}
+                    >
+                      Profile
+                    </Link>
+
+                    <Link
+                      className={[
+                        "block rounded-lg px-3 py-2 text-sm",
+                        pathname === "/skills"
+                          ? "bg-gray-100 font-medium text-gray-950"
+                          : "text-gray-700 hover:bg-gray-50",
+                      ].join(" ")}
+                      href="/skills"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      Skills
+                    </Link>
+
+                    <RoleAwareAccountLinks pathname={pathname} />
+
+                    <Link
+                      className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      href="/contact"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      Contact Us
+                    </Link>
+
+                    <button
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      type="button"
+                      onClick={handleLogout}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </details>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    className="rounded-lg border px-2.5 py-2 text-xs font-medium"
+                    href="/login"
+                  >
+                    Login
+                  </Link>
 
                   <Link
-                    className="relative rounded-lg border px-3 py-2 text-sm font-medium"
-                    href="/notifications"
+                    className="rounded-lg bg-black px-2.5 py-2 text-xs font-medium text-white"
+                    href="/signup"
                   >
-                    Notifications
-                    {unreadNotificationCount > 0 && (
-                      <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-black px-1.5 py-0.5 text-xs font-semibold text-white">
-                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                    Sign up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <nav
+            className="grid grid-cols-5 gap-1.5"
+            aria-label="Primary navigation"
+          >
+            {mobileNavItems.map((item) => {
+              const isActive = pathname === item.href ||
+                (item.href === "/mentorships" && pathname.startsWith("/mentorships/"));
+
+              const unreadCount = item.href === "/messages" ? unreadMessageCount : 0;
+
+              return (
+                <Link
+                  key={item.href}
+                  className={[
+                    "relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[clamp(9px,2.65vw,12px)] font-medium leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                    isActive
+                      ? "bg-black text-white"
+                      : "bg-transparent text-gray-700 hover:bg-gray-100",
+                  ].join(" ")}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  title={item.label}
+                >
+                  <span className="relative flex h-5 w-5 items-center justify-center">
+                    <MobileNavIcon
+                      name={item.icon}
+                      className="h-5 w-5"
+                    />
+
+                    {unreadCount > 0 && (
+                      <span
+                        className={[
+                          "absolute -right-3 -top-2 inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none",
+                          isActive
+                            ? "bg-white text-black"
+                            : "bg-black text-white",
+                        ].join(" ")}
+                      >
+                        {unreadCount > 99
+                          ? "99+"
+                          : unreadCount}
                       </span>
                     )}
-                  </Link>
+                  </span>
 
-                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/profile">
-                    Profile
-                  </Link>
+                  <span className="w-full whitespace-nowrap text-center tracking-tight">
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
-                  <button
-                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
-                    type="button"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </button>
+        <div className="mx-auto hidden max-w-6xl flex-col gap-3 px-4 py-3 sm:flex sm:px-6 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="inline-flex shrink-0 items-center text-xl font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span>
+            </Link>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {isLoadingAuth ? (
+                <span className="text-sm text-gray-500">
+                  Checking session...
+                </span>
+              ) : user ? (
+                <>
+                  <details className="group relative">
+                    <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                      <span>Welcome, {welcomeName ?? "..."}</span>
+
+                      <span
+                        aria-hidden="true"
+                        className="text-xs text-gray-500"
+                      >
+                        &#9662;
+                      </span>
+                    </summary>
+
+                    <div className="absolute right-0 top-full z-30 mt-2 min-w-44 overflow-hidden rounded-xl border bg-white p-1 shadow-lg">
+                      <Link
+                        className={[
+                          "block rounded-lg px-3 py-2 text-sm",
+                          pathname === "/profile"
+                            ? "bg-gray-100 font-medium text-gray-950"
+                            : "text-gray-700 hover:bg-gray-50",
+                        ].join(" ")}
+                        href="/profile"
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                        }}
+                      >
+                        Profile
+                      </Link>
+                      <Link
+                        className={[
+                          "block rounded-lg px-3 py-2 text-sm",
+                          pathname === "/skills"
+                            ? "bg-gray-100 font-medium text-gray-950"
+                            : "text-gray-700 hover:bg-gray-50",
+                        ].join(" ")}
+                        href="/skills"
+                        onClick={(event) => {
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                      >
+                        Skills
+                      </Link>
+
+                      <RoleAwareAccountLinks pathname={pathname} />
+
+                      <Link
+                        className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        href="/contact"
+                        onClick={(event) => {
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                      >
+                        Contact Us
+                      </Link>
+
+                      <button
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        type="button"
+                        onClick={handleLogout}
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </details>
                 </>
               ) : (
                 <>
-                  <Link className="rounded-lg border px-3 py-2 text-sm font-medium" href="/login">
+                  <Link
+                    className="rounded-lg border px-3 py-2 text-sm font-medium"
+                    href="/login"
+                  >
                     Login
                   </Link>
-                  <Link className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white" href="/signup">
+
+                  <Link
+                    className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white"
+                    href="/signup"
+                  >
                     Sign up
                   </Link>
                 </>
@@ -161,29 +1229,53 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <nav className="flex gap-2 overflow-x-auto pb-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href ||
+                (item.href === "/mentorships" && pathname.startsWith("/mentorships/"));
 
               return (
                 <Link
                   key={item.href}
                   className={[
                     "whitespace-nowrap rounded-full border px-3 py-2 text-sm",
-                    isActive ? "bg-black text-white" : "bg-white text-gray-700 hover:bg-gray-50",
+                    isActive
+                      ? "bg-black text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50",
                   ].join(" ")}
                   href={item.href}
                 >
                   {item.label}
 
-                  {item.href === "/notifications" && unreadNotificationCount > 0 && (
-                    <span
-                      className={[
-                        "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
-                        isActive ? "bg-white text-black" : "bg-black text-white",
-                      ].join(" ")}
-                    >
-                      {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-                    </span>
-                  )}
+                  {item.href === "/messages" &&
+                    unreadMessageCount > 0 && (
+                      <span
+                        className={[
+                          "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
+                          isActive
+                            ? "bg-white text-black"
+                            : "bg-black text-white",
+                        ].join(" ")}
+                      >
+                        {unreadMessageCount > 99
+                          ? "99+"
+                          : unreadMessageCount}
+                      </span>
+                    )}
+
+                  {item.href === "/notifications" &&
+                    unreadNotificationCount > 0 && (
+                      <span
+                        className={[
+                          "ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
+                          isActive
+                            ? "bg-white text-black"
+                            : "bg-black text-white",
+                        ].join(" ")}
+                      >
+                        {unreadNotificationCount > 99
+                          ? "99+"
+                          : unreadNotificationCount}
+                      </span>
+                    )}
                 </Link>
               );
             })}
@@ -191,7 +1283,148 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {children}
-    </div>
+        {children}
+      </div>
+    </OnlinePresenceContext.Provider>
+  );
+}
+
+function SuspensionScreen({
+  suspension,
+  suspensionCheckMessage,
+}: {
+  suspension: ActiveSuspension;
+  suspensionCheckMessage: string | null;
+}) {
+  const startDate = new Date(suspension.starts_at);
+  const endDate = new Date(suspension.ends_at);
+
+  const remainingMilliseconds = Math.max(
+    0,
+    endDate.getTime() - Date.now()
+  );
+
+  const remainingDays = Math.max(
+    1,
+    Math.ceil(remainingMilliseconds / (1000 * 60 * 60 * 24))
+  );
+
+  return (
+    <main className="mx-auto flex w-full max-w-3xl flex-col px-6 py-12">
+      <section className="overflow-hidden rounded-2xl border border-red-300 bg-white shadow-sm">
+        <div className="border-b border-red-200 bg-red-50 px-6 py-5">
+          <p className="text-sm font-semibold uppercase tracking-wide text-red-700">
+            Account suspended
+          </p>
+
+          <h1 className="mt-2 text-3xl font-semibold text-red-950">
+            FieldsConnect activity is temporarily unavailable
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-red-900">
+            Your account remains accessible for reviewing notifications
+            and the Code of Conduct, but platform participation is disabled
+            until the suspension ends or is lifted following senior review.
+          </p>
+        </div>
+
+        <div className="space-y-6 p-6">
+          <dl className="grid gap-4 text-sm md:grid-cols-2">
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="font-medium text-gray-600">
+                Suspension duration
+              </dt>
+              <dd className="mt-1 text-lg font-semibold">
+                {suspension.duration_days} days
+              </dd>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="font-medium text-gray-600">
+                Estimated remaining period
+              </dt>
+              <dd className="mt-1 text-lg font-semibold">
+                {remainingDays}{" "}
+                {remainingDays === 1 ? "day" : "days"}
+              </dd>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="font-medium text-gray-600">
+                Suspension started
+              </dt>
+              <dd className="mt-1 font-medium">
+                {startDate.toLocaleString("en-ZA", {
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })}
+              </dd>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4">
+              <dt className="font-medium text-gray-600">
+                Scheduled restoration
+              </dt>
+              <dd className="mt-1 font-medium">
+                {endDate.toLocaleString("en-ZA", {
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <h2 className="font-semibold text-red-950">
+              Reason for suspension
+            </h2>
+
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-red-900">
+              {suspension.reason}
+            </p>
+          </div>
+
+          <div className="rounded-xl border p-4">
+            <h2 className="font-semibold">
+              Available during suspension
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              You may review platform notifications and read the
+              <span className="text-blue-700">Fields</span><span className="text-gray-950">Connect</span> Code of Conduct. Normal access will be restored
+              automatically when the suspension expires or is lifted early.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
+                href="/notifications"
+              >
+                View notifications
+              </Link>
+
+              <Link
+                className="rounded-lg border px-4 py-2 text-sm font-medium"
+                href="/code-of-conduct"
+              >
+                Read Code of Conduct
+              </Link>
+            </div>
+          </div>
+
+          {suspensionCheckMessage && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              {suspensionCheckMessage}
+            </p>
+          )}
+
+          <p className="text-xs leading-5 text-gray-500">
+            Account status is checked automatically. Following an early
+            lift, access should return within 30 seconds or when this tab
+            regains focus.
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }

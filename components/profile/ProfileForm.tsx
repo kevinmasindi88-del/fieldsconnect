@@ -1,15 +1,89 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
+import {
+  getActionErrorMessage,
+  getMessageAlertClass,
+} from "@/lib/action-errors";
 
 type RoleType = "student" | "professional" | "institution";
 type ProfileVisibility = "public" | "connections" | "private";
+type MentorshipFrequency =
+  | "weekly"
+  | "fortnightly"
+  | "monthly"
+  | "flexible";
+
+type MentorshipDuration =
+  | "3_months"
+  | "6_months"
+  | "1_year"
+  | "ongoing";
+
+type MentorshipPaymentMode = "free" | "paid";
+
+type MentorshipPricingState = Record<
+  MentorshipDuration,
+  {
+    paymentMode: MentorshipPaymentMode;
+    price: string;
+  }
+>;
+
+type MentorPaymentAccountSummary = {
+  status: "active" | "disabled" | "pending_verification";
+  can_receive_payments: boolean;
+};
+
+type PaystackBankOption = {
+  name: string;
+  code: string;
+};
+
+type MentorPaymentSettingsResponse = {
+  ok?: boolean;
+  state?: string;
+  banks?: PaystackBankOption[];
+  error?: string;
+};
+
+const mentorPaymentErrorMessages: Record<
+  string,
+  string
+> = {
+  invalid_bank_details:
+    "Check the bank, account holder name and account number, then try again.",
+  mentor_profile_required:
+    "Save your mentor profile before setting up a payout account.",
+  mentor_profile_lookup_failed:
+    "FieldsConnect could not verify your mentor profile. Please try again.",
+  payment_policy_unavailable:
+    "Mentorship payments are temporarily unavailable. Please try again later.",
+  payment_account_lookup_failed:
+    "FieldsConnect could not load your payout configuration. Please try again.",
+  payout_account_configuration_failed:
+    "Our payment provider could not accept those bank details. Check the selected bank and account number, then try again.",
+  payment_account_save_failed:
+    "Your payout account could not be activated in FieldsConnect. Please try again later.",
+};
+
+type MentorSettingsState = {
+  mentorshipSummary: string;
+  mentoringFields: string;
+  mentoringLevels: RoleType[];
+  maximumActiveMentees: number;
+  preferredFrequency: MentorshipFrequency;
+  accepts3Month: boolean;
+  accepts6Month: boolean;
+  accepts1Year: boolean;
+  acceptsOngoing: boolean;
+  isAcceptingRequests: boolean;
+};
 
 type ProfileFormState = {
   displayName: string;
-  username: string;
-  roleType: RoleType;
+  roleType: RoleType | "";
   field: string;
   bio: string;
   profileVisibility: ProfileVisibility;
@@ -18,24 +92,355 @@ type ProfileFormState = {
 
 const initialState: ProfileFormState = {
   displayName: "",
-  username: "",
-  roleType: "professional",
+  roleType: "",
   field: "",
   bio: "",
   profileVisibility: "public",
   mentorAvailable: false,
 };
 
+const initialMentorSettings: MentorSettingsState = {
+  mentorshipSummary: "",
+  mentoringFields: "",
+  mentoringLevels: [],
+  maximumActiveMentees: 3,
+  preferredFrequency: "flexible",
+  accepts3Month: true,
+  accepts6Month: true,
+  accepts1Year: true,
+  acceptsOngoing: false,
+  isAcceptingRequests: true,
+};
+
+const initialMentorshipPricing: MentorshipPricingState = {
+  "3_months": {
+    paymentMode: "free",
+    price: "",
+  },
+  "6_months": {
+    paymentMode: "free",
+    price: "",
+  },
+  "1_year": {
+    paymentMode: "free",
+    price: "",
+  },
+  ongoing: {
+    paymentMode: "free",
+    price: "",
+  },
+};
+
+// Keep pre-launch mentor payment setup hidden until paid mentorship is approved.
+// Existing private drafts remain stored; the backend checkout gate is unchanged.
+const PUBLIC_PAID_MENTORSHIPS_ENABLED =
+  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
+const PAYMENT_SETUP_UI_ENABLED = PUBLIC_PAID_MENTORSHIPS_ENABLED;
+
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
-const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const AVATAR_OUTPUT_SIZE = 512;
+// A little extra image coverage lets people reposition both horizontally and vertically
+// without ever leaving empty space inside the circular crop.
+const AVATAR_MIN_ZOOM = 1.2;
+const ALLOWED_AVATAR_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+type AvatarImageSource = HTMLImageElement | ImageBitmap;
+
+function getAvatarImageDimensions(
+  image: AvatarImageSource
+) {
+  if (image instanceof HTMLImageElement) {
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+  }
+
+  return {
+    width: image.width,
+    height: image.height,
+  };
+}
+
+function drawCroppedAvatar(
+  context: CanvasRenderingContext2D,
+  image: AvatarImageSource,
+  outputSize: number,
+  cropX: number,
+  cropY: number,
+  zoom: number
+) {
+  const dimensions =
+    getAvatarImageDimensions(image);
+
+  const baseScale = Math.max(
+    outputSize / dimensions.width,
+    outputSize / dimensions.height
+  );
+
+  const scale = baseScale * zoom;
+  const renderedWidth = dimensions.width * scale;
+  const renderedHeight = dimensions.height * scale;
+
+  const maxHorizontalOffset = Math.max(
+    0,
+    (renderedWidth - outputSize) / 2
+  );
+
+  const maxVerticalOffset = Math.max(
+    0,
+    (renderedHeight - outputSize) / 2
+  );
+
+  const horizontalOffset =
+    ((cropX - 50) / 50) * maxHorizontalOffset;
+
+  const verticalOffset =
+    ((cropY - 50) / 50) * maxVerticalOffset;
+
+  context.clearRect(0, 0, outputSize, outputSize);
+
+  context.drawImage(
+    image,
+    (outputSize - renderedWidth) / 2 - horizontalOffset,
+    (outputSize - renderedHeight) / 2 - verticalOffset,
+    renderedWidth,
+    renderedHeight
+  );
+}
+
+async function loadAvatarImage(
+  file: File
+): Promise<AvatarImageSource> {
+  let bytes: ArrayBuffer;
+
+  try {
+    bytes = await file.arrayBuffer();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    throw new Error(
+      `Unable to read profile picture bytes: ${message}`
+    );
+  }
+
+  if (bytes.byteLength < 4) {
+    throw new Error(
+      "The selected profile picture is empty or incomplete."
+    );
+  }
+
+  const signature = new Uint8Array(
+    bytes,
+    0,
+    Math.min(4, bytes.byteLength)
+  );
+
+  const isJpeg =
+    signature[0] === 0xff &&
+    signature[1] === 0xd8 &&
+    signature[2] === 0xff;
+
+  const normalizedType =
+    isJpeg
+      ? "image/jpeg"
+      : file.type || "application/octet-stream";
+
+  const normalizedBlob = new Blob(
+    [bytes],
+    {
+      type: normalizedType,
+    }
+  );
+
+  if (
+    typeof window !== "undefined" &&
+    "createImageBitmap" in window
+  ) {
+    try {
+      return await createImageBitmap(
+        normalizedBlob
+      );
+    } catch {
+      // Fall through to the DOM image decoder.
+    }
+  }
+
+  const objectUrl =
+    URL.createObjectURL(normalizedBlob);
+
+  try {
+    return await new Promise<HTMLImageElement>(
+      (resolve, reject) => {
+        const image = new Image();
+
+        image.onload = () => resolve(image);
+
+        image.onerror = () =>
+          reject(
+            new Error(
+              `Unable to decode profile picture. File: ${file.name}, type: ${normalizedType}, size: ${bytes.byteLength} bytes.`
+            )
+          );
+
+        image.src = objectUrl;
+      }
+    );
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+async function createProcessedAvatarFile(
+  file: File,
+  cropX: number,
+  cropY: number,
+  zoom: number
+) {
+  const image = await loadAvatarImage(file);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_OUTPUT_SIZE;
+  canvas.height = AVATAR_OUTPUT_SIZE;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error(
+      "Your browser could not prepare the profile picture."
+    );
+  }
+
+  drawCroppedAvatar(
+    context,
+    image,
+    AVATAR_OUTPUT_SIZE,
+    cropX,
+    cropY,
+    zoom
+  );
+
+  let quality = 0.9;
+  let blob: Blob | null = null;
+
+  while (quality >= 0.5) {
+    blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(
+        resolve,
+        "image/webp",
+        quality
+      );
+    });
+
+    if (
+      blob &&
+      blob.size <= MAX_AVATAR_SIZE_BYTES
+    ) {
+      break;
+    }
+
+    quality -= 0.1;
+  }
+
+  if (!blob) {
+    throw new Error(
+      "The profile picture could not be processed."
+    );
+  }
+
+  if (blob.size > MAX_AVATAR_SIZE_BYTES) {
+    throw new Error(
+      "The processed profile picture is still larger than 2 MB."
+    );
+  }
+
+  const processedFile = new File(
+    [blob],
+    "profile-avatar.webp",
+    {
+      type: "image/webp",
+      lastModified: Date.now(),
+    }
+  );
+
+  if (
+    typeof ImageBitmap !== "undefined" &&
+    image instanceof ImageBitmap
+  ) {
+    image.close();
+  }
+
+  return processedFile;
+}
 
 export function ProfileForm() {
   const [form, setForm] = useState<ProfileFormState>(initialState);
+  const [mentorSettings, setMentorSettings] =
+    useState<MentorSettingsState>(initialMentorSettings);
+  const [mentorshipPricing, setMentorshipPricing] =
+    useState<MentorshipPricingState>(
+      initialMentorshipPricing
+    );
+  const [
+    mentorPaymentAccount,
+    setMentorPaymentAccount,
+  ] = useState<MentorPaymentAccountSummary | null>(
+    null
+  );
+  const [payoutBanks, setPayoutBanks] =
+    useState<PaystackBankOption[]>([]);
+  const [payoutBankCode, setPayoutBankCode] =
+    useState("");
+  const [payoutAccountName, setPayoutAccountName] =
+    useState("");
+  const [payoutAccountNumber, setPayoutAccountNumber] =
+    useState("");
+  const [
+    isPayoutAccountNumberVisible,
+    setIsPayoutAccountNumberVisible,
+  ] = useState(false);
+  const [isLoadingPayoutBanks, setIsLoadingPayoutBanks] =
+    useState(false);
+  const [isSavingPayoutAccount, setIsSavingPayoutAccount] =
+    useState(false);
+  const [payoutMessage, setPayoutMessage] =
+    useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] =
+    useState<File | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [avatarCropX, setAvatarCropX] =
+    useState(50);
+  const [avatarCropY, setAvatarCropY] =
+    useState(50);
+  const [avatarZoom, setAvatarZoom] =
+    useState(AVATAR_MIN_ZOOM);
+  // Keep the latest crop synchronously available across high-frequency pointer events.
+  const avatarTransformRef = useRef({
+    cropX: 50,
+    cropY: 50,
+    zoom: AVATAR_MIN_ZOOM,
+  });
+  const avatarCanvasRef =
+    useRef<HTMLCanvasElement | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarImageRef = useRef<AvatarImageSource | null>(null);
+  const [avatarImageDimensions, setAvatarImageDimensions] =
+    useState<{ width: number; height: number } | null>(null);
+  const avatarPointersRef = useRef(
+    new Map<number, { x: number; y: number }>()
+  );
+  const avatarPinchDistanceRef = useRef<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -67,30 +472,173 @@ export function ProfileForm() {
 
         setCurrentUserId(userId);
 
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("display_name, username, role_type, field, bio, profile_visibility, mentor_available, avatar_url")
-          .eq("id", userId)
-          .maybeSingle();
+        const [
+          { data: profileData, error: profileError },
+          { data: mentorData, error: mentorError },
+          {
+            data: paymentAccountData,
+            error: paymentAccountError,
+          },
+          {
+            data: paymentOfferData,
+            error: paymentOfferError,
+          },
+          {
+            data: paymentDraftData,
+            error: paymentDraftError,
+          },
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select(
+              "display_name, role_type, field, bio, profile_visibility, mentor_available, avatar_url"
+            )
+            .eq("id", userId)
+            .maybeSingle(),
+          supabase
+            .from("mentor_profiles")
+            .select(
+              "mentorship_summary, mentoring_fields, mentoring_levels, maximum_active_mentees, preferred_frequency, accepts_3_month, accepts_6_month, accepts_1_year, accepts_ongoing, is_accepting_requests"
+            )
+            .eq("mentor_id", userId)
+            .maybeSingle(),
+          supabase
+            .from("mentor_payment_accounts")
+            .select(
+              "status, can_receive_payments"
+            )
+            .eq("mentor_id", userId)
+            .maybeSingle(),
+          supabase
+            .from("mentorship_payment_offers")
+            .select(
+              "duration, payment_mode, price_amount_minor, currency, is_active"
+            )
+            .eq("mentor_id", userId),
+          supabase
+            .from("mentorship_payment_offer_drafts")
+            .select("duration, payment_mode, price_amount_minor, currency")
+            .eq("mentor_id", userId),
+        ]);
 
-        if (error) throw error;
+        if (profileError) throw profileError;
+        if (mentorError) throw mentorError;
+        if (paymentAccountError) throw paymentAccountError;
+        if (paymentOfferError) throw paymentOfferError;
+        if (paymentDraftError) throw paymentDraftError;
 
-        if (data) {
+        setMentorPaymentAccount(
+          paymentAccountData
+            ? paymentAccountData as MentorPaymentAccountSummary
+            : null
+        );
+
+        setMentorshipPricing(() => {
+          const next: MentorshipPricingState = {
+            "3_months": {
+              paymentMode: "free",
+              price: "",
+            },
+            "6_months": {
+              paymentMode: "free",
+              price: "",
+            },
+            "1_year": {
+              paymentMode: "free",
+              price: "",
+            },
+            ongoing: {
+              paymentMode: "free",
+              price: "",
+            },
+          };
+
+          // Persisted drafts take priority in the setup UI, without modifying
+          // existing active offers or their associated mentorship contracts.
+          const visiblePricing = PUBLIC_PAID_MENTORSHIPS_ENABLED
+            ? (paymentOfferData ?? [])
+            : [...(paymentOfferData ?? []), ...(paymentDraftData ?? [])];
+          for (const offer of visiblePricing) {
+            const duration =
+              offer.duration as MentorshipDuration;
+
+            if (!(duration in next)) continue;
+
+            next[duration] = {
+              paymentMode:
+                offer.payment_mode as MentorshipPaymentMode,
+              price:
+                offer.payment_mode === "paid"
+                  ? String(
+                      Number(offer.price_amount_minor) / 100
+                    )
+                  : "",
+            };
+          }
+
+          return next;
+        });
+
+        if (profileData) {
           setForm({
-            displayName: data.display_name ?? "",
-            username: data.username ?? "",
-            roleType: data.role_type ?? "professional",
-            field: data.field ?? "",
-            bio: data.bio ?? "",
-            profileVisibility: data.profile_visibility ?? "public",
-            mentorAvailable: Boolean(data.mentor_available),
+            displayName: profileData.display_name ?? "",
+            roleType: profileData.role_type ?? "",
+            field: profileData.field ?? "",
+            bio: profileData.bio ?? "",
+            profileVisibility:
+              profileData.profile_visibility ?? "public",
+            mentorAvailable: Boolean(profileData.mentor_available),
           });
 
-          setAvatarPath(data.avatar_url ?? null);
+          setAvatarPath(profileData.avatar_url ?? null);
 
-          if (data.avatar_url) {
-            await refreshAvatarPreview(data.avatar_url);
+          if (profileData.avatar_url) {
+            await refreshAvatarPreview(profileData.avatar_url);
           }
+        }
+
+        if (mentorData) {
+          const loadedFrequency: MentorshipFrequency =
+            mentorData.preferred_frequency === "weekly" ||
+            mentorData.preferred_frequency === "fortnightly" ||
+            mentorData.preferred_frequency === "monthly"
+              ? mentorData.preferred_frequency
+              : "flexible";
+
+          const loadedLevels = Array.isArray(
+            mentorData.mentoring_levels
+          )
+            ? mentorData.mentoring_levels.filter(
+                (level): level is RoleType =>
+                  level === "student" ||
+                  level === "professional" ||
+                  level === "institution"
+              )
+            : [];
+
+          setMentorSettings({
+            mentorshipSummary:
+              mentorData.mentorship_summary ?? "",
+            mentoringFields: Array.isArray(
+              mentorData.mentoring_fields
+            )
+              ? mentorData.mentoring_fields.join(", ")
+              : "",
+            mentoringLevels: loadedLevels,
+            maximumActiveMentees:
+              mentorData.maximum_active_mentees ?? 3,
+            preferredFrequency: loadedFrequency,
+            accepts3Month:
+              Boolean(mentorData.accepts_3_month),
+            accepts6Month:
+              Boolean(mentorData.accepts_6_month),
+            accepts1Year:
+              Boolean(mentorData.accepts_1_year),
+            acceptsOngoing:
+              Boolean(mentorData.accepts_ongoing),
+            isAcceptingRequests:
+              Boolean(mentorData.is_accepting_requests),
+          });
         }
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Unable to load profile.");
@@ -102,8 +650,278 @@ export function ProfileForm() {
     void loadProfile();
   }, []);
 
-  function updateField<K extends keyof ProfileFormState>(key: K, value: ProfileFormState[K]) {
+  function updateField<K extends keyof ProfileFormState>(
+    key: K,
+    value: ProfileFormState[K]
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function getMentorPaymentFunctionErrorMessage(
+    error: unknown,
+    fallback: string
+  ) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "context" in error
+    ) {
+      const context = (
+        error as { context?: unknown }
+      ).context;
+
+      if (context instanceof Response) {
+        try {
+          const payload =
+            await context.clone().json() as {
+              error?: unknown;
+            };
+
+          if (
+            typeof payload.error === "string" &&
+            payload.error
+          ) {
+            return (
+              mentorPaymentErrorMessages[
+                payload.error
+              ] ??
+              fallback
+            );
+          }
+        } catch {
+          // Fall through to the normal action error.
+        }
+      }
+    }
+
+    return getActionErrorMessage(
+      error,
+      fallback
+    );
+  }
+
+  function updateMentorshipPricing(
+    duration: MentorshipDuration,
+    field: "paymentMode" | "price",
+    value: string
+  ) {
+    setMentorshipPricing((current) => ({
+      ...current,
+      [duration]: {
+        ...current[duration],
+        [field]: value,
+      },
+    }));
+  }
+
+  function parseMentorshipPriceMinor(
+    duration: MentorshipDuration
+  ) {
+    const pricing = mentorshipPricing[duration];
+
+    if (pricing.paymentMode === "free") {
+      return 0;
+    }
+
+    const normalized = pricing.price.trim();
+
+    if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
+      throw new Error(
+        "Paid mentorship prices must be valid Rand amounts with no more than two decimal places."
+      );
+    }
+
+    const amountMinor = Math.round(
+      Number(normalized) * 100
+    );
+
+    if (
+      !Number.isSafeInteger(amountMinor) ||
+      amountMinor <= 0
+    ) {
+      throw new Error(
+        "Paid mentorship prices must be greater than R0."
+      );
+    }
+
+    return amountMinor;
+  }
+
+  async function loadPayoutBanks() {
+    if (
+      !PUBLIC_PAID_MENTORSHIPS_ENABLED ||
+      !isSupabaseConfigured() ||
+      isLoadingPayoutBanks ||
+      payoutBanks.length > 0
+    ) {
+      return;
+    }
+
+    setIsLoadingPayoutBanks(true);
+    setPayoutMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } =
+        await supabase.functions.invoke(
+          "mentor-payment-settings",
+          {
+            body: {
+              action: "list_banks",
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const result =
+        (data ?? {}) as MentorPaymentSettingsResponse;
+
+      if (
+        result.ok !== true ||
+        !Array.isArray(result.banks)
+      ) {
+        throw new Error(
+          result.error ??
+            "Unable to load supported banks."
+        );
+      }
+
+      setPayoutBanks(result.banks);
+    } catch (error) {
+      setPayoutMessage(
+        await getMentorPaymentFunctionErrorMessage(
+          error,
+          "Unable to load payout banks."
+        )
+      );
+    } finally {
+      setIsLoadingPayoutBanks(false);
+    }
+  }
+
+  async function savePayoutAccount() {
+    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED || !isSupabaseConfigured()) return;
+
+    const bankCode = payoutBankCode.trim();
+    const accountName = payoutAccountName.trim();
+    const accountNumber = payoutAccountNumber.trim();
+
+    if (!bankCode) {
+      setPayoutMessage("Select your bank.");
+      return;
+    }
+
+    if (accountName.length < 2) {
+      setPayoutMessage(
+        "Enter the account holder name."
+      );
+      return;
+    }
+
+    if (!/^\d{6,20}$/.test(accountNumber)) {
+      setPayoutMessage(
+        "Enter a valid bank account number using digits only."
+      );
+      return;
+    }
+
+    setIsSavingPayoutAccount(true);
+    setPayoutMessage(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } =
+        await supabase.functions.invoke(
+          "mentor-payment-settings",
+          {
+            body: {
+              action: "configure_account",
+              bankCode,
+              accountName,
+              accountNumber,
+            },
+          }
+        );
+
+      if (error) throw error;
+
+      const result =
+        (data ?? {}) as MentorPaymentSettingsResponse;
+
+      if (result.ok !== true) {
+        throw new Error(
+          result.error ??
+            "Unable to save payout account."
+        );
+      }
+
+      setMentorPaymentAccount({
+        status: "active",
+        can_receive_payments: true,
+      });
+      setPayoutAccountNumber("");
+      setIsPayoutAccountNumberVisible(false);
+      setPayoutMessage(
+        "Payout account is ready to receive mentorship payments."
+      );
+    } catch (error) {
+      setPayoutMessage(
+        await getMentorPaymentFunctionErrorMessage(
+          error,
+          "Unable to save payout account."
+        )
+      );
+    } finally {
+      setIsSavingPayoutAccount(false);
+    }
+  }
+
+  useEffect(() => {
+    if (
+      PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+      form.mentorAvailable &&
+      currentUserId &&
+      payoutBanks.length === 0
+    ) {
+      void loadPayoutBanks();
+    }
+  }, [
+    form.mentorAvailable,
+    currentUserId,
+    payoutBanks.length,
+  ]);
+
+  function updateMentorSetting<K extends keyof MentorSettingsState>(
+    key: K,
+    value: MentorSettingsState[K]
+  ) {
+    setMentorSettings((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function toggleMentoringLevel(level: RoleType) {
+    setMentorSettings((current) => ({
+      ...current,
+      mentoringLevels: current.mentoringLevels.includes(level)
+        ? current.mentoringLevels.filter(
+            (currentLevel) => currentLevel !== level
+          )
+        : [...current.mentoringLevels, level],
+    }));
+  }
+
+  function parseMentoringFields(value: string) {
+    return Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((field) => field.trim())
+          .filter(Boolean)
+      )
+    );
   }
 
   async function refreshAvatarPreview(path: string | null) {
@@ -123,14 +941,305 @@ export function ProfileForm() {
     setAvatarPreviewUrl(data?.signedUrl ?? null);
   }
 
-  function validateAvatarFile(file: File) {
-    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
-      return "Profile picture must be a JPG, PNG, WebP, or GIF image.";
+  // Keep a decoded image while a photo is selected, rather than decoding on every drag.
+  useEffect(() => {
+    let cancelled = false;
+    avatarImageRef.current = null;
+    setAvatarImageDimensions(null);
+
+    if (selectedAvatarFile) {
+      void loadAvatarImage(selectedAvatarFile)
+        .then((image) => {
+          if (cancelled) {
+            if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
+              image.close();
+            }
+            return;
+          }
+          avatarImageRef.current = image;
+          setAvatarImageDimensions(getAvatarImageDimensions(image));
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAvatarError("Unable to read this photo. Please choose a valid JPG, PNG, WebP, or GIF image.");
+          }
+        });
     }
 
-    if (file.size > MAX_AVATAR_SIZE_BYTES) {
-      return "Profile picture is too large. Maximum size is 2 MB.";
+    return () => {
+      cancelled = true;
+      const image = avatarImageRef.current;
+      avatarImageRef.current = null;
+      if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
+        image.close();
+      }
+    };
+  }, [selectedAvatarFile]);
+
+  useEffect(() => {
+    const image = avatarImageRef.current;
+    const canvas = avatarCanvasRef.current;
+    if (!selectedAvatarFile || !avatarImageDimensions || !image || !canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    drawCroppedAvatar(
+      context,
+      image,
+      canvas.width,
+      avatarCropX,
+      avatarCropY,
+      avatarZoom
+    );
+  }, [selectedAvatarFile, avatarImageDimensions, avatarCropX, avatarCropY, avatarZoom]);
+
+  function updateAvatarCropTransform(next: {
+    cropX: number;
+    cropY: number;
+    zoom: number;
+  }) {
+    avatarTransformRef.current = next;
+    setAvatarCropX(next.cropX);
+    setAvatarCropY(next.cropY);
+    setAvatarZoom(next.zoom);
+  }
+
+  function resetAvatarCropTransform() {
+    updateAvatarCropTransform({
+      cropX: 50,
+      cropY: 50,
+      zoom: AVATAR_MIN_ZOOM,
+    });
+  }
+
+  function getAvatarPanLimits(
+    dimensions: { width: number; height: number },
+    canvas: HTMLCanvasElement,
+    zoom: number
+  ) {
+    const scale = Math.max(
+      canvas.width / dimensions.width,
+      canvas.height / dimensions.height
+    ) * zoom;
+
+    return {
+      maxX: Math.max(0, (dimensions.width * scale - canvas.width) / 2),
+      maxY: Math.max(0, (dimensions.height * scale - canvas.height) / 2),
+    };
+  }
+
+  function clampAvatarCrop(value: number) {
+    return Math.max(0, Math.min(100, value));
+  }
+
+  function moveAvatarCropByPixels(
+    deltaX: number,
+    deltaY: number,
+    canvas: HTMLCanvasElement
+  ) {
+    const dimensions = avatarImageDimensions;
+    const bounds = canvas.getBoundingClientRect();
+    if (!dimensions || !bounds.width || !bounds.height) return;
+
+    const current = avatarTransformRef.current;
+    const { maxX, maxY } = getAvatarPanLimits(dimensions, canvas, current.zoom);
+
+    // Drag the image in the same direction as the finger, on both axes.
+    const nextX = maxX > 0
+      ? clampAvatarCrop(current.cropX - (deltaX * canvas.width / bounds.width) * 50 / maxX)
+      : 50;
+    const nextY = maxY > 0
+      ? clampAvatarCrop(current.cropY - (deltaY * canvas.height / bounds.height) * 50 / maxY)
+      : 50;
+
+    updateAvatarCropTransform({ ...current, cropX: nextX, cropY: nextY });
+  }
+
+  function avatarPointerDistance() {
+    const points = Array.from(avatarPointersRef.current.values());
+    if (points.length !== 2) return null;
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  }
+
+  function avatarPointerMidpoint() {
+    const points = Array.from(avatarPointersRef.current.values());
+    if (points.length !== 2) return null;
+    return {
+      x: (points[0].x + points[1].x) / 2,
+      y: (points[0].y + points[1].y) / 2,
+    };
+  }
+
+  function handleAvatarPointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!avatarImageDimensions || isAvatarWorking) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const pointers = avatarPointersRef.current;
+    if (pointers.size >= 2 || pointers.has(event.pointerId)) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      avatarPinchDistanceRef.current = avatarPointerDistance();
     }
+  }
+
+  function handleAvatarPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    const pointers = avatarPointersRef.current;
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
+
+    const previousMidpoint = pointers.size === 2 ? avatarPointerMidpoint() : null;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.size === 2) {
+      const distance = avatarPointerDistance();
+      const midpoint = avatarPointerMidpoint();
+      const previousDistance = avatarPinchDistanceRef.current;
+      const dimensions = avatarImageDimensions;
+      const canvas = event.currentTarget;
+      const bounds = canvas.getBoundingClientRect();
+
+      if (
+        distance !== null && previousDistance !== null &&
+        previousDistance > 0 && midpoint && previousMidpoint &&
+        dimensions && bounds.width > 0 && bounds.height > 0
+      ) {
+        const current = avatarTransformRef.current;
+        const nextZoom = Math.max(
+          AVATAR_MIN_ZOOM,
+          Math.min(2.5, current.zoom * distance / previousDistance)
+        );
+        // Use the *applied* zoom ratio so the focal point stays steady at limits.
+        const ratio = nextZoom / current.zoom;
+        const before = getAvatarPanLimits(dimensions, canvas, current.zoom);
+        const after = getAvatarPanLimits(dimensions, canvas, nextZoom);
+
+        // Image offsets grow with zoom. Correct for the previous finger midpoint
+        // and the midpoint's own movement, anchoring the touched image detail.
+        const focusX = (previousMidpoint.x - bounds.left) * canvas.width / bounds.width - canvas.width / 2;
+        const focusY = (previousMidpoint.y - bounds.top) * canvas.height / bounds.height - canvas.height / 2;
+        const movementX = (midpoint.x - previousMidpoint.x) * canvas.width / bounds.width;
+        const movementY = (midpoint.y - previousMidpoint.y) * canvas.height / bounds.height;
+        const oldOffsetX = ((current.cropX - 50) / 50) * before.maxX;
+        const oldOffsetY = ((current.cropY - 50) / 50) * before.maxY;
+        const nextOffsetX = oldOffsetX * ratio + (ratio - 1) * focusX - movementX;
+        const nextOffsetY = oldOffsetY * ratio + (ratio - 1) * focusY - movementY;
+
+        updateAvatarCropTransform({
+          cropX: after.maxX > 0 ? clampAvatarCrop(50 + nextOffsetX * 50 / after.maxX) : 50,
+          cropY: after.maxY > 0 ? clampAvatarCrop(50 + nextOffsetY * 50 / after.maxY) : 50,
+          zoom: nextZoom,
+        });
+      }
+
+      avatarPinchDistanceRef.current = distance;
+      return;
+    }
+
+    // Drag normally with one finger, mouse, or stylus.
+    moveAvatarCropByPixels(
+      event.clientX - previous.x,
+      event.clientY - previous.y,
+      event.currentTarget
+    );
+  }
+
+  function handleAvatarPointerEnd(event: React.PointerEvent<HTMLCanvasElement>) {
+    avatarPointersRef.current.delete(event.pointerId);
+    avatarPinchDistanceRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleAvatarPointerCaptureLost(event: React.PointerEvent<HTMLCanvasElement>) {
+    avatarPointersRef.current.delete(event.pointerId);
+    avatarPinchDistanceRef.current = null;
+  }
+
+  function handleAvatarArrowKey(event: React.KeyboardEvent<HTMLCanvasElement>) {
+    const movement: Record<string, [number, number]> = {
+      ArrowLeft: [-12, 0],
+      ArrowRight: [12, 0],
+      ArrowUp: [0, -12],
+      ArrowDown: [0, 12],
+    };
+    if (!avatarImageDimensions || isAvatarWorking) return;
+    if (event.key === "+" || event.key === "=" || event.key === "-") {
+      event.preventDefault();
+      const current = avatarTransformRef.current;
+      updateAvatarCropTransform({
+        ...current,
+        zoom: Math.max(AVATAR_MIN_ZOOM, Math.min(2.5, current.zoom + (event.key === "-" ? -0.1 : 0.1))),
+      });
+      return;
+    }
+    const delta = movement[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    moveAvatarCropByPixels(delta[0], delta[1], event.currentTarget);
+  }
+
+  async function handleAvatarSelection(
+    file: File | null
+  ) {
+    setMessage(null);
+    setAvatarError(null);
+
+    if (!file) {
+      setSelectedAvatarFile(null);
+      avatarPointersRef.current.clear();
+      avatarPinchDistanceRef.current = null;
+      setAvatarImageDimensions(null);
+      resetAvatarCropTransform();
+      return;
+    }
+
+    const validationError =
+      validateAvatarFile(file);
+
+    if (validationError) {
+      setSelectedAvatarFile(null);
+      setAvatarError(validationError);
+      return;
+    }
+
+    try {
+      // Read the picker-backed file immediately while the
+      // browser still has access to its underlying bytes.
+      const bytes = await file.arrayBuffer();
+
+      const safeFile = new File(
+        [bytes],
+        file.name || "profile-picture",
+        {
+          type: file.type || "application/octet-stream",
+          lastModified: file.lastModified || Date.now(),
+        }
+      );
+
+      avatarPointersRef.current.clear();
+      avatarPinchDistanceRef.current = null;
+      setAvatarImageDimensions(null);
+      setSelectedAvatarFile(safeFile);
+      resetAvatarCropTransform();
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      setSelectedAvatarFile(null);
+
+      setAvatarError(
+        `Unable to read this photo. Please try another image. (${detail})`
+      );
+    }
+  }
+
+  function validateAvatarFile(file: File) {
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      return "Format not supported. Please upload a JPG, PNG, WebP, or GIF image.";
+    }
+
 
     return null;
   }
@@ -138,28 +1247,48 @@ export function ProfileForm() {
   async function uploadAvatar() {
     if (!currentUserId || !selectedAvatarFile || !isSupabaseConfigured()) return;
 
-    const validationError = validateAvatarFile(selectedAvatarFile);
+    const validationError =
+      validateAvatarFile(
+        selectedAvatarFile
+      );
 
     if (validationError) {
-      setMessage(validationError);
+      setAvatarError(validationError);
       return;
     }
 
     setIsAvatarWorking(true);
     setMessage(null);
+    setAvatarError(null);
 
-    const supabase = getSupabaseBrowserClient();
+    const supabase =
+      getSupabaseBrowserClient();
     const oldAvatarPath = avatarPath;
-    const safeFileName = selectedAvatarFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const newAvatarPath = `${currentUserId}/${crypto.randomUUID()}-${safeFileName}`;
 
     try {
-      const { error: uploadError } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(newAvatarPath, selectedAvatarFile, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const processedAvatarFile =
+        await createProcessedAvatarFile(
+          selectedAvatarFile,
+          avatarCropX,
+          avatarCropY,
+          avatarZoom
+        );
+
+      const newAvatarPath =
+        `${currentUserId}/${crypto.randomUUID()}-profile-avatar.webp`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from(AVATAR_BUCKET)
+          .upload(
+            newAvatarPath,
+            processedAvatarFile,
+            {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: "image/webp",
+            }
+          );
 
       if (uploadError) throw uploadError;
 
@@ -173,6 +1302,8 @@ export function ProfileForm() {
         throw profileError;
       }
 
+      window.dispatchEvent(new Event("fc:profile-updated"));
+
       if (oldAvatarPath && oldAvatarPath !== newAvatarPath) {
         const { error: oldDeleteError } = await supabase.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
         if (oldDeleteError) throw oldDeleteError;
@@ -180,10 +1311,23 @@ export function ProfileForm() {
 
       setAvatarPath(newAvatarPath);
       setSelectedAvatarFile(null);
+      resetAvatarCropTransform();
       await refreshAvatarPreview(newAvatarPath);
       setMessage(oldAvatarPath ? "Profile picture replaced. Old picture was deleted." : "Profile picture uploaded.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to upload profile picture.");
+      const detail = error instanceof Error ? error.message : "";
+      if (detail.includes("larger than 2 MB")) {
+        setAvatarError("Size too big. Please upload a photo that is 2 MB or less.");
+      } else if (
+        detail.includes("could not be processed") ||
+        detail.includes("Unable to decode profile picture") ||
+        detail.includes("Unable to read profile picture bytes") ||
+        detail.includes("empty or incomplete")
+      ) {
+        setAvatarError("Unable to process this photo. Please try another JPG, PNG, WebP, or GIF image.");
+      } else {
+        setAvatarError(getActionErrorMessage(error, "upload profile picture"));
+      }
     } finally {
       setIsAvatarWorking(false);
     }
@@ -210,6 +1354,8 @@ export function ProfileForm() {
 
       if (profileError) throw profileError;
 
+      window.dispatchEvent(new Event("fc:profile-updated"));
+
       const { error: storageError } = await supabase.storage.from(AVATAR_BUCKET).remove([pathToDelete]);
 
       if (storageError) throw storageError;
@@ -217,9 +1363,10 @@ export function ProfileForm() {
       setAvatarPath(null);
       setAvatarPreviewUrl(null);
       setSelectedAvatarFile(null);
+      setAvatarError(null);
       setMessage("Profile picture deleted.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to delete profile picture.");
+      setMessage(getActionErrorMessage(error, "delete profile picture"));
     } finally {
       setIsAvatarWorking(false);
     }
@@ -232,6 +1379,93 @@ export function ProfileForm() {
     if (!form.displayName.trim()) {
       setMessage("Display name is required.");
       return;
+    }
+
+    if (!form.roleType) {
+      setMessage("Choose your role before saving your profile.");
+      return;
+    }
+
+    if (form.mentorAvailable) {
+      const mentoringFields = parseMentoringFields(
+        mentorSettings.mentoringFields
+      );
+
+      if (mentoringFields.length === 0) {
+        setMessage(
+          "Add at least one field in which you can provide mentorship."
+        );
+        return;
+      }
+
+      if (mentorSettings.mentoringLevels.length === 0) {
+        setMessage(
+          "Select at least one level of mentee you are willing to mentor."
+        );
+        return;
+      }
+
+      if (
+        !Number.isInteger(
+          mentorSettings.maximumActiveMentees
+        ) ||
+        mentorSettings.maximumActiveMentees < 1 ||
+        mentorSettings.maximumActiveMentees > 50
+      ) {
+        setMessage(
+          "Maximum active mentees must be a whole number between 1 and 50."
+        );
+        return;
+      }
+
+      const payoutReady =
+        mentorPaymentAccount?.status === "active" &&
+        mentorPaymentAccount.can_receive_payments;
+
+      const paidDurations = [
+        ["3_months", mentorSettings.accepts3Month],
+        ["6_months", mentorSettings.accepts6Month],
+        ["1_year", mentorSettings.accepts1Year],
+      ] as const;
+
+      for (const [duration, accepted] of paidDurations) {
+        if (
+          PAYMENT_SETUP_UI_ENABLED &&
+          accepted &&
+          mentorshipPricing[duration].paymentMode ===
+            "paid"
+        ) {
+          if (PUBLIC_PAID_MENTORSHIPS_ENABLED && !payoutReady) {
+            setMessage(
+              "Set up a payout account before offering paid mentorship."
+            );
+            return;
+          }
+
+          try {
+            parseMentorshipPriceMinor(duration);
+          } catch (error) {
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "Enter a valid mentorship price."
+            );
+            return;
+          }
+        }
+      }
+
+      if (
+        !mentorSettings.accepts3Month &&
+        !mentorSettings.accepts6Month &&
+        !mentorSettings.accepts1Year &&
+        !mentorSettings.acceptsOngoing
+      ) {
+        setMessage(
+          "Select at least one mentorship period."
+        );
+        return;
+      }
     }
 
     if (!isSupabaseConfigured()) {
@@ -254,74 +1488,299 @@ export function ProfileForm() {
         return;
       }
 
-      const { error } = await supabase.from("profiles").upsert({
-        id: userId,
-        display_name: form.displayName.trim(),
-        username: form.username.trim() || null,
-        role_type: form.roleType,
-        field: form.field.trim() || null,
-        bio: form.bio.trim() || null,
-        profile_visibility: form.profileVisibility,
-        mentor_available: form.mentorAvailable,
-        avatar_url: avatarPath,
-      });
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: userId,
+          display_name: form.displayName.trim(),
+          role_type: form.roleType,
+          field: form.field.trim() || null,
+          bio: form.bio.trim() || null,
+          profile_visibility: form.profileVisibility,
+          mentor_available: form.mentorAvailable,
+          avatar_url: avatarPath,
+        });
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      setMessage("Profile saved.");
+      window.dispatchEvent(new Event("fc:profile-updated"));
+
+      if (form.mentorAvailable) {
+        const { error: mentorError } = await supabase
+          .from("mentor_profiles")
+          .upsert({
+            mentor_id: userId,
+            mentorship_summary:
+              mentorSettings.mentorshipSummary.trim() || null,
+            mentoring_fields: parseMentoringFields(
+              mentorSettings.mentoringFields
+            ),
+            mentoring_levels:
+              mentorSettings.mentoringLevels,
+            maximum_active_mentees:
+              mentorSettings.maximumActiveMentees,
+            preferred_frequency:
+              mentorSettings.preferredFrequency,
+            accepts_3_month:
+              mentorSettings.accepts3Month,
+            accepts_6_month:
+              mentorSettings.accepts6Month,
+            accepts_1_year:
+              mentorSettings.accepts1Year,
+            accepts_ongoing:
+              mentorSettings.acceptsOngoing,
+            is_accepting_requests:
+              mentorSettings.isAcceptingRequests,
+          });
+
+        if (mentorError) throw mentorError;
+
+        // Keep production offers untouched during pre-launch preparation.
+        // Mentor-entered pricing is stored privately until payment activation.
+        if (!PUBLIC_PAID_MENTORSHIPS_ENABLED && PAYMENT_SETUP_UI_ENABLED) {
+          const draftRows = ([
+            ["3_months", mentorSettings.accepts3Month],
+            ["6_months", mentorSettings.accepts6Month],
+            ["1_year", mentorSettings.accepts1Year],
+            ["ongoing", mentorSettings.acceptsOngoing],
+          ] as const).map(([duration, accepted]) => {
+            const paymentMode = accepted && duration !== "ongoing"
+              ? mentorshipPricing[duration].paymentMode
+              : "free";
+            return {
+              mentor_id: userId,
+              duration,
+              payment_mode: paymentMode,
+              price_amount_minor: paymentMode === "paid"
+                ? parseMentorshipPriceMinor(duration)
+                : 0,
+              currency: "ZAR",
+            };
+          });
+          const { error: draftError } = await supabase
+            .from("mentorship_payment_offer_drafts")
+            .upsert(draftRows, { onConflict: "mentor_id,duration" });
+          if (draftError) throw draftError;
+        } else if (PUBLIC_PAID_MENTORSHIPS_ENABLED) {
+          const offerRows = [
+          {
+            duration: "3_months" as const,
+            accepted: mentorSettings.accepts3Month,
+          },
+          {
+            duration: "6_months" as const,
+            accepted: mentorSettings.accepts6Month,
+          },
+          {
+            duration: "1_year" as const,
+            accepted: mentorSettings.accepts1Year,
+          },
+          {
+            duration: "ongoing" as const,
+            accepted: mentorSettings.acceptsOngoing,
+          },
+        ].map(({ duration, accepted }) => {
+          const paymentMode =
+            duration === "ongoing" || !accepted
+              ? "free"
+              : mentorshipPricing[duration].paymentMode;
+
+          return {
+            mentor_id: userId,
+            duration,
+            payment_mode: paymentMode,
+            price_amount_minor:
+              paymentMode === "paid"
+                ? parseMentorshipPriceMinor(duration)
+                : 0,
+            currency: "ZAR",
+            is_active: accepted,
+          };
+        });
+
+        const { error: offerError } =
+          await supabase
+            .from("mentorship_payment_offers")
+            .upsert(offerRows, {
+              onConflict: "mentor_id,duration",
+            });
+
+          if (offerError) throw offerError;
+        }
+      } else {
+        const { error: mentorDisableError } = await supabase
+          .from("mentor_profiles")
+          .update({
+            is_accepting_requests: false,
+          })
+          .eq("mentor_id", userId);
+
+        if (mentorDisableError) throw mentorDisableError;
+
+        const { error: offerDisableError } =
+          await supabase
+            .from("mentorship_payment_offers")
+            .update({ is_active: false })
+            .eq("mentor_id", userId);
+
+        if (offerDisableError) {
+          throw offerDisableError;
+        }
+      }
+
+      setMessage(
+        form.mentorAvailable
+          ? PUBLIC_PAID_MENTORSHIPS_ENABLED
+            ? "Profile and mentor settings saved."
+            : "Profile saved. Any paid mentorship prices were saved as private drafts; checkout is still disabled."
+          : "Profile saved."
+      );
+      // Final onboarding only after the whole mentor/profile save succeeds.
+      window.dispatchEvent(new Event("fc:profile-saved"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to save profile.");
+      setMessage(getActionErrorMessage(error, "save profile"));
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-xl border p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Profile setup</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Complete the basic profile fields needed for the FieldsConnect MVP. Privileged roles are not editable here.
-        </p>
-      </div>
-
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 rounded-xl border bg-white p-3 sm:gap-4 sm:p-6"
+    >
       {isLoading ? (
         <p className="text-sm text-gray-600">Loading profile...</p>
       ) : (
         <>
-          <section className="flex flex-col gap-3 rounded-xl border p-4">
-            <h2 className="text-lg font-semibold">Profile picture</h2>
+          <section className="flex min-w-0 flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
+            <h2 className="text-lg font-semibold">
+              Profile picture
+            </h2>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500">
-                {avatarPreviewUrl ? (
-                  <img alt="Profile preview" className="h-full w-full object-cover" src={avatarPreviewUrl} />
-                ) : (
-                  <span>No photo</span>
+            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="flex shrink-0 flex-col items-center gap-2 sm:items-start">
+                <div className={`flex items-center justify-center overflow-hidden rounded-full border bg-gray-50 text-sm text-gray-500 ${selectedAvatarFile ? "h-56 w-56" : "h-32 w-32"}`}>
+                  {selectedAvatarFile ? (
+                    <canvas
+                      ref={avatarCanvasRef}
+                      aria-label="Profile picture crop. Drag to reposition in any direction, pinch to zoom at the finger midpoint, or use arrow and plus/minus keys."
+                      role="img"
+                      tabIndex={0}
+                      className="h-full w-full cursor-grab touch-none select-none outline-offset-4 active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                      height={256}
+                      width={256}
+                      onPointerDown={handleAvatarPointerDown}
+                      onPointerMove={handleAvatarPointerMove}
+                      onPointerUp={handleAvatarPointerEnd}
+                      onPointerCancel={handleAvatarPointerEnd}
+                      onLostPointerCapture={handleAvatarPointerCaptureLost}
+                      onKeyDown={handleAvatarArrowKey}
+                    />
+                  ) : avatarPreviewUrl ? (
+                    <img
+                      alt="Profile preview"
+                      className="h-full w-full object-cover"
+                      src={avatarPreviewUrl}
+                    />
+                  ) : (
+                    <span>No photo</span>
+                  )}
+                </div>
+                {selectedAvatarFile && (
+                  <p className="text-center text-xs text-gray-600 sm:text-left">
+                    Drag in any direction · Pinch to zoom at your fingers
+                  </p>
                 )}
               </div>
 
-              <div className="flex flex-col gap-3">
-                <input
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="rounded-lg border px-3 py-2 text-sm"
-                  type="file"
-                  onChange={(event) => setSelectedAvatarFile(event.target.files?.[0] ?? null)}
-                />
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div className="flex w-full min-w-0 items-center justify-center">
+                  <input
+                    ref={avatarFileInputRef}
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    aria-label="Choose profile picture file"
+                    className="sr-only"
+                    tabIndex={-1}
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0] ?? null;
+                      // Allow selecting the same photo again after a failed attempt.
+                      event.currentTarget.value = "";
+                      void handleAvatarSelection(file);
+                    }}
+                  />
+                  <div className="relative inline-flex items-center">
+                    <button
+                      type="button"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900"
+                      disabled={isAvatarWorking}
+                      onClick={() => avatarFileInputRef.current?.click()}
+                    >
+                      Choose file
+                    </button>
+                    {(selectedAvatarFile || avatarError) && (
+                      <button
+                        type="button"
+                        aria-label="Cancel photo selection"
+                        title="Cancel and restore original picture"
+                        className="absolute left-full ml-2 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+                        disabled={isAvatarWorking}
+                        onClick={() => {
+                          if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
+                          void handleAvatarSelection(null);
+                        }}
+                      >
+                        <span aria-hidden="true" className="text-xl leading-none">×</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-                <div className="flex flex-wrap gap-2">
+                {selectedAvatarFile && (
+                  <div className="hidden min-w-0 gap-3 rounded-xl border bg-gray-50 p-3 sm:grid">
+                    <label className="grid min-w-0 gap-1 text-sm font-medium">
+                      Zoom
+                      <input
+                        aria-label="Profile picture zoom"
+                        className="w-full"
+                        max={2.5}
+                        min={AVATAR_MIN_ZOOM}
+                        onChange={(event) => {
+                          const current = avatarTransformRef.current;
+                          updateAvatarCropTransform({
+                            ...current,
+                            zoom: Number(event.target.value),
+                          });
+                        }}
+                        step={0.05}
+                        type="range"
+                        value={avatarZoom}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <div className={`grid min-w-0 gap-2 ${avatarPath ? "grid-cols-2" : "grid-cols-1"}`}>
                   <button
-                    className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    disabled={!selectedAvatarFile || isAvatarWorking}
+                    className="w-full min-w-0 rounded-lg bg-black px-2 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={
+                      !selectedAvatarFile ||
+                      isAvatarWorking
+                    }
                     onClick={uploadAvatar}
                     type="button"
                   >
-                    {avatarPath ? "Replace picture" : "Upload picture"}
+                    {isAvatarWorking
+                      ? "Processing..."
+                      : avatarPath
+                        ? "Replace picture"
+                        : "Upload picture"}
                   </button>
 
                   {avatarPath && (
                     <button
-                      className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                      className="w-full min-w-0 rounded-lg border border-red-300 px-2 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
                       disabled={isAvatarWorking}
                       onClick={deleteAvatar}
                       type="button"
@@ -331,85 +1790,686 @@ export function ProfileForm() {
                   )}
                 </div>
 
-                <p className="text-xs text-gray-500">JPG, PNG, WebP, or GIF. Maximum size: 2 MB.</p>
+                {avatarError && (
+                  <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+                    {avatarError}
+                  </p>
+                )}
               </div>
             </div>
           </section>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Display name
             <input
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.displayName}
               onChange={(event) => updateField("displayName", event.target.value)}
               required
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
-            Username
-            <input
-              className="rounded-lg border px-3 py-2"
-              value={form.username}
-              onChange={(event) => updateField("username", event.target.value)}
-              placeholder="Optional"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Role type
             <select
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.roleType}
               onChange={(event) => updateField("roleType", event.target.value as RoleType)}
             >
+              <option value="">Select your role</option>
               <option value="student">Student</option>
               <option value="professional">Professional</option>
               <option value="institution">Institution</option>
             </select>
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Field
             <input
-              className="rounded-lg border px-3 py-2"
+              className="w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.field}
               onChange={(event) => updateField("field", event.target.value)}
               placeholder="Example: Pharmacy, Engineering, Finance"
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
             Bio
             <textarea
-              className="min-h-28 rounded-lg border px-3 py-2"
+              className="min-h-28 w-full min-w-0 rounded-lg border px-3 py-2"
               value={form.bio}
               onChange={(event) => updateField("bio", event.target.value)}
               placeholder="Briefly introduce yourself."
             />
           </label>
 
-          <label className="flex flex-col gap-2 text-sm font-medium">
-            Profile visibility
-            <select
-              className="rounded-lg border px-3 py-2"
-              value={form.profileVisibility}
-              onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
-            >
-              <option value="public">Public</option>
-              <option value="connections">Connections only</option>
-              <option value="private">Private</option>
-            </select>
-          </label>
+          <div className="flex min-w-0 flex-col gap-2">
+            <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+              Profile visibility
+              <select
+                className="w-full min-w-0 rounded-lg border px-3 py-2"
+                value={form.profileVisibility}
+                aria-describedby={
+                  form.profileVisibility === "private"
+                    ? "private-profile-visibility-help"
+                    : form.profileVisibility === "public"
+                      ? "public-profile-visibility-help"
+                      : undefined
+                }
+                onChange={(event) => updateField("profileVisibility", event.target.value as ProfileVisibility)}
+              >
+                <option value="public">Public</option>
+                <option value="connections">Connections only</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+            {form.profileVisibility === "public" && (
+              <p
+                id="public-profile-visibility-help"
+                role="status"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
+              >
+                Other members can view your public profile and published skills, as well as library files.
+              </p>
+            )}
+            {form.profileVisibility === "private" && (
+              <p
+                id="private-profile-visibility-help"
+                role="status"
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-700"
+              >
+                Your profile will appear under search results but your profile details, skills and library files cannot be viewed.
+              </p>
+            )}
+          </div>
 
-          <label className="flex gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={form.mentorAvailable}
-              onChange={() => updateField("mentorAvailable", !form.mentorAvailable)}
-            />
-            I am available as a mentor.
-          </label>
+          <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border p-3 sm:gap-4 sm:p-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Mentorship
+              </h2>
+            </div>
+
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={form.mentorAvailable}
+                onChange={() =>
+                  updateField(
+                    "mentorAvailable",
+                    !form.mentorAvailable
+                  )
+                }
+              />
+
+              <span>
+                <span className="font-medium">
+                  I am available as a mentor
+                </span>
+
+              </span>
+            </label>
+
+            {form.mentorAvailable && (
+              <div className="flex w-full min-w-0 flex-col gap-4 border-t pt-4">
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                  Mentorship summary
+                  <textarea
+                    className="min-h-24 w-full min-w-0 rounded-lg border px-3 py-2"
+                    maxLength={1000}
+                    value={mentorSettings.mentorshipSummary}
+                    onChange={(event) =>
+                      updateMentorSetting(
+                        "mentorshipSummary",
+                        event.target.value
+                      )
+                    }
+                    placeholder="Describe your experience, approach and the support you can provide."
+                  />
+                  <span className="text-xs font-normal text-gray-500">
+                    Optional. Maximum 1,000 characters.
+                  </span>
+                </label>
+
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                  Mentoring fields
+                  <input
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
+                    value={mentorSettings.mentoringFields}
+                    onChange={(event) =>
+                      updateMentorSetting(
+                        "mentoringFields",
+                        event.target.value
+                      )
+                    }
+                    placeholder="Pharmacy, Manufacturing, Leadership"
+                  />
+                  <span className="text-xs font-normal text-gray-500">
+                    Separate multiple fields with commas.
+                  </span>
+                </label>
+
+                <fieldset className="flex w-full min-w-0 flex-col gap-2">
+                  <legend className="text-sm font-medium">
+                    Mentee levels
+                  </legend>
+
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        ["student", "Students"],
+                        ["professional", "Professionals"],
+                        ["institution", "Institutions"],
+                      ] as const
+                    ).map(([level, label]) => (
+                      <label
+                        key={level}
+                        className={`flex min-w-0 items-center gap-2 rounded-lg border px-2 py-2 text-sm sm:px-3 ${level === "institution" ? "col-span-2 sm:col-span-1" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={mentorSettings.mentoringLevels.includes(
+                            level
+                          )}
+                          onChange={() =>
+                            toggleMentoringLevel(level)
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                  Preferred contact frequency
+                  <select
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
+                    value={mentorSettings.preferredFrequency}
+                    onChange={(event) =>
+                      updateMentorSetting(
+                        "preferredFrequency",
+                        event.target.value as MentorshipFrequency
+                      )
+                    }
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">
+                      Every two weeks
+                    </option>
+                    <option value="monthly">Monthly</option>
+                    <option value="flexible">Flexible</option>
+                  </select>
+                </label>
+
+                <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                  Maximum active mentees
+                  <input
+                    className="w-full min-w-0 rounded-lg border px-3 py-2"
+                    min={1}
+                    max={50}
+                    step={1}
+                    type="number"
+                    value={mentorSettings.maximumActiveMentees}
+                    onChange={(event) =>
+                      updateMentorSetting(
+                        "maximumActiveMentees",
+                        Number(event.target.value)
+                      )
+                    }
+                  />
+                  <span className="text-xs font-normal text-gray-500">
+                    Choose a whole number between 1 and 50.
+                  </span>
+                </label>
+
+                <fieldset className="flex w-full min-w-0 flex-col gap-2">
+                  <legend className="text-sm font-medium">
+                    Mentorship periods accepted
+                  </legend>
+
+                  <div className="grid min-w-0 grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={mentorSettings.accepts3Month}
+                        onChange={() =>
+                          updateMentorSetting(
+                            "accepts3Month",
+                            !mentorSettings.accepts3Month
+                          )
+                        }
+                      />
+                      3 months
+                    </label>
+
+                    <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={mentorSettings.accepts6Month}
+                        onChange={() =>
+                          updateMentorSetting(
+                            "accepts6Month",
+                            !mentorSettings.accepts6Month
+                          )
+                        }
+                      />
+                      6 months
+                    </label>
+
+                    <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={mentorSettings.accepts1Year}
+                        onChange={() =>
+                          updateMentorSetting(
+                            "accepts1Year",
+                            !mentorSettings.accepts1Year
+                          )
+                        }
+                      />
+                      1 year
+                    </label>
+
+                    <label className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={mentorSettings.acceptsOngoing}
+                        onChange={() =>
+                          updateMentorSetting(
+                            "acceptsOngoing",
+                            !mentorSettings.acceptsOngoing
+                          )
+                        }
+                      />
+                      Full-time / ongoing
+                    </label>
+                  </div>
+                </fieldset>
+
+                {PAYMENT_SETUP_UI_ENABLED ? (
+                <section className="flex w-full min-w-0 flex-col gap-3 rounded-xl border bg-gray-50 p-3 sm:gap-4 sm:p-4">
+                  <div>
+                    <h3 className="font-semibold">
+                      Mentorship payments
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Choose free or paid programme pricing and review your payout setup.
+                      {PUBLIC_PAID_MENTORSHIPS_ENABLED
+                        ? " Approved paid requests use Paystack checkout."
+                        : " Paid prices are private drafts until Paystack and FieldsConnect approve live transactions."}
+                    </p>
+                  </div>
+
+                  <div className="w-full min-w-0 rounded-xl border bg-white p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold">
+                        Payout account
+                      </h4>
+                      <span className="rounded-full border px-3 py-1 text-xs font-medium">
+                        {mentorPaymentAccount?.status ===
+                          "active" &&
+                        mentorPaymentAccount.can_receive_payments
+                          ? PUBLIC_PAID_MENTORSHIPS_ENABLED
+                            ? "Payout account configured"
+                            : "Payout account on record"
+                          : mentorPaymentAccount?.status ===
+                              "pending_verification"
+                            ? "Pending verification"
+                            : "Not configured"}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 rounded-lg border border-dashed p-3 text-xs leading-5 text-gray-600">
+                      Your banking details are encrypted in transit and securely processed by our payment provider. FieldsConnect does not store banking details.
+                    </p>
+
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
+                    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                        Bank
+                        <select
+                          className="w-full min-w-0 rounded-lg border bg-white px-3 py-2"
+                          disabled={isLoadingPayoutBanks}
+                          value={payoutBankCode}
+                          onChange={(event) =>
+                            setPayoutBankCode(
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="">
+                            {isLoadingPayoutBanks
+                              ? "Loading banks..."
+                              : "Select bank"}
+                          </option>
+                          {payoutBanks.map((bank) => (
+                            <option
+                              key={bank.code}
+                              value={bank.code}
+                            >
+                              {bank.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                        Account holder name
+                        <input
+                          className="w-full min-w-0 rounded-lg border bg-white px-3 py-2"
+                          autoComplete="name"
+                          maxLength={120}
+                          value={payoutAccountName}
+                          onChange={(event) =>
+                            setPayoutAccountName(
+                              event.target.value
+                            )
+                          }
+                          placeholder="Name registered with your bank"
+                        />
+                      </label>
+
+                      <label className="flex min-w-0 flex-col gap-2 text-sm font-medium">
+                        Bank account number
+                        <div className="relative min-w-0">
+                          <input
+                            className="w-full min-w-0 rounded-lg border bg-white px-3 py-2 pr-12"
+                            autoComplete="off"
+                            inputMode="numeric"
+                            maxLength={20}
+                            type={
+                              isPayoutAccountNumberVisible
+                                ? "text"
+                                : "password"
+                            }
+                            value={payoutAccountNumber}
+                            onChange={(event) =>
+                              setPayoutAccountNumber(
+                                event.target.value.replace(
+                                  /\D/g,
+                                  ""
+                                )
+                              )
+                            }
+                            placeholder="Enter account number"
+                          />
+                          <button
+                            aria-label={
+                              isPayoutAccountNumberVisible
+                                ? "Hide bank account number"
+                                : "Show bank account number"
+                            }
+                            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-gray-600 hover:text-black"
+                            onClick={() =>
+                              setIsPayoutAccountNumberVisible(
+                                (current) => !current
+                              )
+                            }
+                            title={
+                              isPayoutAccountNumberVisible
+                                ? "Hide account number"
+                                : "Show account number"
+                            }
+                            type="button"
+                          >
+                            {isPayoutAccountNumberVisible ? (
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  d="M3 3l18 18M10.6 10.7a2 2 0 002.7 2.7M9.9 4.3A10.7 10.7 0 0112 4c5.5 0 9.2 5.1 9.2 5.1a13.8 13.8 0 01-3.3 3.8M6.2 6.2C4 7.7 2.8 9.1 2.8 9.1S6.5 14.2 12 14.2c1 0 1.9-.2 2.7-.5"
+                                  stroke="currentColor"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1.7"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                aria-hidden="true"
+                                className="h-5 w-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  d="M2.8 12S6.5 6.9 12 6.9 21.2 12 21.2 12 17.5 17.1 12 17.1 2.8 12 2.8 12z"
+                                  stroke="currentColor"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1.7"
+                                />
+                                <circle
+                                  cx="12"
+                                  cy="12"
+                                  r="2.3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <span className="text-xs font-normal text-gray-500">
+                          Use the eye icon to verify the number before saving.
+                        </span>
+                      </label>
+
+                      <button
+                        className="w-fit rounded-lg border bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        disabled={isSavingPayoutAccount}
+                        onClick={() =>
+                          void savePayoutAccount()
+                        }
+                        type="button"
+                      >
+                        {isSavingPayoutAccount
+                          ? "Saving payout account..."
+                          : mentorPaymentAccount?.status ===
+                                "active" &&
+                              mentorPaymentAccount.can_receive_payments
+                            ? "Update payout account"
+                            : "Save payout account"}
+                      </button>
+
+                      {payoutMessage && (
+                        <p className="text-sm text-gray-700">
+                          {payoutMessage}
+                        </p>
+                      )}
+                    </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-gray-600">
+                        Bank account linking and changes will open after FieldsConnect verifies
+                        its Paystack business activation, settlement details and production
+                        credentials. Existing payout records are retained. Do not enter bank
+                        account numbers in mentorship feedback or profile text.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="w-full min-w-0 rounded-xl border bg-white p-3 sm:p-4">
+                    <h4 className="text-sm font-semibold">
+                      Mentorship pricing
+                    </h4>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      Prices are total programme prices in ZAR,
+                      not hourly rates. Ongoing mentorship is
+                      free-only in this version.
+                    </p>
+
+                    <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
+                      {(
+                        [
+                          [
+                            "3_months",
+                            "3 months",
+                            mentorSettings.accepts3Month,
+                          ],
+                          [
+                            "6_months",
+                            "6 months",
+                            mentorSettings.accepts6Month,
+                          ],
+                          [
+                            "1_year",
+                            "1 year",
+                            mentorSettings.accepts1Year,
+                          ],
+                          [
+                            "ongoing",
+                            "Full-time / ongoing",
+                            mentorSettings.acceptsOngoing,
+                          ],
+                        ] as const
+                      )
+                        .filter(
+                          ([, , accepted]) => accepted
+                        )
+                        .map(
+                          ([
+                            duration,
+                            label,
+                          ]) => {
+                            const isOngoing =
+                              duration === "ongoing";
+                            const pricing =
+                              mentorshipPricing[
+                                duration
+                              ];
+
+                            return (
+                              <div
+                                key={duration}
+                                className="grid w-full min-w-0 grid-cols-1 gap-3 rounded-lg border p-3 lg:grid-cols-[minmax(0,1fr)_140px_180px] lg:items-end"
+                              >
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {label}
+                                  </p>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    {isOngoing
+                                      ? "Free only"
+                                      : pricing.paymentMode ===
+                                          "paid"
+                                        ? "Paid mentorship"
+                                        : "Free mentorship"}
+                                  </p>
+                                </div>
+
+                                <label className="flex min-w-0 flex-col gap-2 text-xs font-medium">
+                                  Type
+                                  <select
+                                    className="rounded-lg border bg-white px-3 py-2 text-sm"
+                                    disabled={isOngoing}
+                                    value={
+                                      isOngoing
+                                        ? "free"
+                                        : pricing.paymentMode
+                                    }
+                                    onChange={(
+                                      event
+                                    ) =>
+                                      updateMentorshipPricing(
+                                        duration,
+                                        "paymentMode",
+                                        event.target.value
+                                      )
+                                    }
+                                  >
+                                    <option value="free">
+                                      Free
+                                    </option>
+                                    <option
+                                      value="paid"
+                                      disabled={
+                                        PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                                        !(
+                                          mentorPaymentAccount?.status ===
+                                            "active" &&
+                                          mentorPaymentAccount.can_receive_payments
+                                        )
+                                      }
+                                    >
+                                      Paid
+                                    </option>
+                                  </select>
+                                </label>
+
+                                <label className="flex min-w-0 flex-col gap-2 text-xs font-medium">
+                                  Programme price
+                                  <div className="flex w-full min-w-0 items-center rounded-lg border bg-white px-3">
+                                    <span className="text-sm text-gray-500">
+                                      R
+                                    </span>
+                                    <input
+                                      className="min-w-0 flex-1 px-2 py-2 text-sm outline-none disabled:bg-gray-50"
+                                      disabled={
+                                        isOngoing ||
+                                        pricing.paymentMode !==
+                                          "paid"
+                                      }
+                                      inputMode="decimal"
+                                      min="0.01"
+                                      step="0.01"
+                                      type="number"
+                                      value={pricing.price}
+                                      onChange={(
+                                        event
+                                      ) =>
+                                        updateMentorshipPricing(
+                                          duration,
+                                          "price",
+                                          event.target.value
+                                        )
+                                      }
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </label>
+                              </div>
+                            );
+                          }
+                        )}
+                    </div>
+
+                    {!(
+                      mentorPaymentAccount?.status === "active" &&
+                      mentorPaymentAccount.can_receive_payments
+                    ) && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Set up a payout account to enable paid
+                        mentorship pricing.
+                      </p>
+                    )}
+                  </div>
+                </section>
+                ) : (
+                <section className="w-full min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4" aria-label="Mentorship payments launch status">
+                  <h3 className="font-semibold">Paid mentorship option coming soon</h3>
+                </section>
+                )}
+
+                <label className="flex items-center gap-3 rounded-lg border px-3 py-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={mentorSettings.isAcceptingRequests}
+                    onChange={() =>
+                      updateMentorSetting(
+                        "isAcceptingRequests",
+                        !mentorSettings.isAcceptingRequests
+                      )
+                    }
+                  />
+                  <span className="font-medium">
+                    Accept new mentorship requests
+                  </span>
+                </label>
+              </div>
+            )}
+          </section>
 
           <button
             className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -421,7 +2481,7 @@ export function ProfileForm() {
         </>
       )}
 
-      {message && <p className="text-sm text-gray-700">{message}</p>}
+      {message && <p className={getMessageAlertClass(message)}>{message}</p>}
     </form>
   );
 }

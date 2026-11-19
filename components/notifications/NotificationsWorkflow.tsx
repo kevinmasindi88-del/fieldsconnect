@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 
 type Notification = {
   id: string;
@@ -13,8 +15,46 @@ type Notification = {
     | "connection_accepted"
     | "new_message"
     | "post_liked"
-    | "post_commented";
-  entity_type: "connection" | "conversation" | "message" | "post" | "comment";
+    | "post_commented"
+    | "post_mentioned"
+    | "comment_mentioned"
+    | "mentioned_post_edited"
+    | "comment_liked"
+    | "moderation_warning"
+    | "moderation_action"
+    | "moderation_report"
+    | "moderation_assignment"
+    | "moderation_outcome"
+    | "moderation_escalation"
+    | "account_suspension"
+  | "new_fc_feedback"
+  | "fc_feedback_assignment"
+  | "fc_team_activated"
+  | "fc_team_recruitment_accepted"
+  | "fc_team_recruitment"
+  | "fc_team_removed"
+  | "fc_team_leave_declined"
+  | "fc_team_leave_approved"
+  | "fc_team_leave_requested"
+  | "fc_feedback_unassigned"
+    | "suspension_revoked"
+    | "mentorship_completion_feedback"
+    | "fc_news_review_requested"
+    | "fc_news_changes_requested"
+    | "fc_news_approved"
+    | "fc_news_published"
+    | "skill_published"
+    | "skill_updated";
+  entity_type:
+    | "connection"
+    | "conversation"
+    | "message"
+    | "post"
+    | "comment"
+    | "moderation_ticket"
+    | "mentorship"
+    | "fc_news"
+    | "skill";
   entity_id: string | null;
   title: string;
   body: string | null;
@@ -28,9 +68,16 @@ type Profile = {
   avatar_url: string | null;
 };
 
+type CommentReference = {
+  id: string;
+  post_id: string;
+};
+
 export function NotificationsWorkflow() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [commentReferences, setCommentReferences] = useState<CommentReference[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -38,6 +85,10 @@ export function NotificationsWorkflow() {
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
+
+  const postIdByCommentId = useMemo(() => {
+    return new Map(commentReferences.map((comment) => [comment.id, comment.post_id]));
+  }, [commentReferences]);
 
   const unreadCount = notifications.filter((notification) => !notification.read_at).length;
 
@@ -67,6 +118,7 @@ export function NotificationsWorkflow() {
       const [
         { data: notificationData, error: notificationError },
         { data: profileData, error: profileError },
+        { data: commentData, error: commentError },
       ] = await Promise.all([
         supabase
           .from("notifications")
@@ -78,13 +130,44 @@ export function NotificationsWorkflow() {
           .from("profiles")
           .select("id, display_name, avatar_url")
           .is("deleted_at", null),
+        supabase
+          .from("comments")
+          .select("id, post_id")
+          .is("deleted_at", null),
       ]);
 
       if (notificationError) throw notificationError;
       if (profileError) throw profileError;
+      if (commentError) throw commentError;
 
-      setNotifications((notificationData ?? []) as Notification[]);
-      setProfiles((profileData ?? []) as Profile[]);
+      const currentNotifications = (notificationData ?? []) as Notification[];
+      const readableProfiles = (profileData ?? []) as Profile[];
+      const knownProfileIds = new Set(readableProfiles.map((profile) => profile.id));
+      const missingActorIds = Array.from(new Set(
+        currentNotifications
+          .map((notification) => notification.actor_id)
+          .filter((id): id is string => Boolean(id && !knownProfileIds.has(id)))
+      ));
+
+      // Private profiles aren't directly readable through the profiles table.
+      // Resolve only the identity allowed for discovery (name, not private content).
+      // Keep normal notifications working even when an actor has been removed.
+      const resolvedActorProfiles: Profile[] = [];
+      for (let index = 0; index < missingActorIds.length; index += 100) {
+        const { data: actorCards, error: actorCardsError } = await supabase.rpc(
+          "get_discoverable_member_cards",
+          { target_ids: missingActorIds.slice(index, index + 100) }
+        );
+        if (actorCardsError) {
+          console.warn("Unable to resolve notification actor names:", actorCardsError);
+          break;
+        }
+        resolvedActorProfiles.push(...((actorCards ?? []) as Profile[]));
+      }
+
+      setNotifications(currentNotifications);
+      setProfiles([...readableProfiles, ...resolvedActorProfiles]);
+      setCommentReferences((commentData ?? []) as CommentReference[]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load notifications.");
     } finally {
@@ -117,6 +200,76 @@ export function NotificationsWorkflow() {
     }
   }
 
+  async function openNotificationPath(notification: Notification, path: string) {
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      if (!notification.read_at) {
+        const supabase = getSupabaseBrowserClient();
+        const { error } = await supabase
+          .from("notifications")
+          .update({ read_at: new Date().toISOString() })
+          .eq("id", notification.id);
+
+        if (error) throw error;
+      }
+
+      router.push(path);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to open notification.");
+      setIsWorking(false);
+    }
+  }
+
+  async function openMessageNotification(notification: Notification) {
+    if (isWorking) return;
+    setIsWorking(true);
+    setMessage(null);
+
+    try {
+      if (!notification.actor_id) {
+        throw new Error("The sender is no longer available.");
+      }
+
+      const supabase = getSupabaseBrowserClient();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Please log in to open your messages.");
+
+      // Only accepted connections belonging to this signed-in member can
+      // be opened. Never trust a connection ID supplied by notification text.
+      const { data: connectionData, error: connectionError } = await supabase
+        .from("connections")
+        .select("id, requester_id, recipient_id")
+        .eq("status", "accepted")
+        .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`);
+      if (connectionError) throw connectionError;
+
+      const match = (connectionData ?? []).find((connection) =>
+        (connection.requester_id === userId &&
+          connection.recipient_id === notification.actor_id) ||
+        (connection.recipient_id === userId &&
+          connection.requester_id === notification.actor_id)
+      );
+
+      if (!match) {
+        throw new Error("This conversation is no longer available. Check your Connections.");
+      }
+
+      await openNotificationPath(
+        notification,
+        `/messages?connection=${encodeURIComponent(match.id)}`
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to open this conversation."
+      );
+      setIsWorking(false);
+    }
+  }
+
   async function markAllAsRead() {
     setIsWorking(true);
     setMessage(null);
@@ -138,18 +291,321 @@ export function NotificationsWorkflow() {
     }
   }
 
-  return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-3xl font-semibold">Notifications</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Stay updated on connection activity, messages, likes, and comments.
-          </p>
-        </div>
+  function getNotificationPostId(notification: Notification) {
+    if (notification.entity_type === "post") {
+      return notification.entity_id;
+    }
 
+    if (notification.entity_type === "comment" && notification.entity_id) {
+      return postIdByCommentId.get(notification.entity_id) ?? null;
+    }
+
+    return null;
+  }
+
+  function getActorName(notification: Notification) {
+    if (!notification.actor_id) return "Someone";
+    return profileById.get(notification.actor_id)?.display_name ?? "Someone";
+  }
+
+  function getNotificationTitle(notification: Notification) {
+    const actorName = getActorName(notification);
+
+    switch (notification.notification_type) {
+      case "post_liked":
+        return `${actorName} liked your post`;
+      case "post_commented":
+        return `${actorName} commented on your post`;
+      case "post_mentioned":
+        return `${actorName} mentioned you in a post`;
+      case "comment_mentioned":
+        return `${actorName} mentioned you in a comment`;
+      case "mentioned_post_edited":
+        return `${actorName} edited a post you were mentioned in`;
+      case "comment_liked":
+        return `${actorName} liked your comment`;
+      case "connection_request":
+        return `${actorName} sent you a connection request`;
+      case "connection_accepted":
+        return `${actorName} accepted your connection request`;
+      case "new_message":
+        return `${actorName} sent you a message`;
+      case "skill_published":
+        return `${actorName} published a skill`;
+      case "skill_updated":
+        return `${actorName} updated a skill`;
+      case "fc_news_published":
+        return "FC News";
+      case "fc_news_review_requested":
+        return "FC News review requested";
+      case "fc_news_changes_requested":
+        return "FC News changes requested";
+      case "fc_news_approved":
+        return "FC News approved";
+      case "moderation_escalation":
+        return "Moderation ticket escalated";
+      case "account_suspension":
+        return notification.title || "FieldsConnect account suspended";
+      case "suspension_revoked":
+        return notification.title || "FieldsConnect suspension ended";
+      default:
+        return notification.title;
+    }
+  }
+
+  function renderNotificationBody(notification: Notification, postId: string | null) {
+    const actorName = getActorName(notification);
+
+    if (notification.notification_type === "connection_request") {
+      return (
+        <>
+          {actorName} sent you a connection{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(notification, "/connections")}
+            type="button"
+          >
+            request
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (
+      notification.entity_type === "moderation_ticket" &&
+      notification.entity_id &&
+      [
+        "moderation_report",
+        "moderation_assignment",
+        "moderation_escalation",
+      ].includes(notification.notification_type)
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/moderation/review/${notification.entity_id}`
+              )
+            }
+            type="button"
+          >
+            Open ticket
+          </button>
+        </>
+      );
+    }
+    if (
+      notification.notification_type === "fc_news_published" &&
+      postId
+    ) {
+      return (
+        <>
+          New FC News{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/post/${postId}`
+              )
+            }
+            type="button"
+          >
+            post
+          </button>
+        </>
+      );
+    }
+
+    if (
+      notification.entity_type === "fc_news" &&
+      notification.entity_id &&
+      [
+        "fc_news_review_requested",
+        "fc_news_changes_requested",
+        "fc_news_approved",
+      ].includes(notification.notification_type)
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                "/feedback/team"
+              )
+            }
+            type="button"
+          >
+            Open FC News
+          </button>
+        </>
+      );
+    }
+
+    if (
+      (notification.notification_type === "skill_published" ||
+        notification.notification_type === "skill_updated") &&
+      notification.actor_id
+    ) {
+      return (
+        <>
+          {notification.body}{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/profile/${notification.actor_id}`
+              )
+            }
+            type="button"
+          >
+            View profile
+          </button>
+        </>
+      );
+    }
+
+    if (!postId) {
+      return notification.body;
+    }
+
+    if (notification.notification_type === "comment_mentioned") {
+      return (
+        <>
+          {actorName} mentioned you in a{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(
+              notification,
+              `/post/${postId}#comment-${notification.entity_id}`
+            )}
+            type="button"
+          >
+            comment
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "post_mentioned") {
+      return (
+        <>
+          {actorName} mentioned you in a{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/post/${postId}`
+              )
+            }
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "mentioned_post_edited") {
+      return (
+        <>
+          {actorName} edited a{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() =>
+              openNotificationPath(
+                notification,
+                `/post/${postId}`
+              )
+            }
+            type="button"
+          >
+            post
+          </button>{" "}
+          you were mentioned in.
+        </>
+      );
+    }
+
+    if (notification.notification_type === "post_liked") {
+      return (
+        <>
+          {actorName} liked your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "post_commented") {
+      return (
+        <>
+          {actorName} commented on your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
+            type="button"
+          >
+            post
+          </button>
+          .
+        </>
+      );
+    }
+
+    if (notification.notification_type === "comment_liked") {
+      return (
+        <>
+          {actorName} liked your{" "}
+          <button
+            className="font-medium text-blue-700 underline underline-offset-2 disabled:opacity-50"
+            disabled={isWorking}
+            onClick={() => openNotificationPath(notification, `/post/${postId}`)}
+            type="button"
+          >
+            comment
+          </button>
+          .
+        </>
+      );
+    }
+
+    return notification.body;
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:p-8">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <button
-          className="w-fit rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="min-h-10 w-full rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50 sm:w-fit"
           disabled={unreadCount === 0 || isWorking}
           onClick={markAllAsRead}
           type="button"
@@ -167,52 +623,197 @@ export function NotificationsWorkflow() {
           No notifications yet.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:gap-3">
           {notifications.map((notification) => {
             const actor = notification.actor_id ? profileById.get(notification.actor_id) : null;
             const isUnread = !notification.read_at;
+            const postId = getNotificationPostId(notification);
+
+            if (notification.notification_type === "new_message") {
+              return (
+                <button
+                  key={notification.id}
+                  aria-label={`Open conversation: ${getNotificationTitle(notification)}`}
+                  className={`flex w-full min-w-0 gap-2.5 rounded-xl border p-3 text-left transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : "bg-white"}`}
+                  disabled={isWorking}
+                  onClick={() => void openMessageNotification(notification)}
+                  type="button"
+                >
+                  <ProfileAvatar
+                    avatarPath={actor?.avatar_url}
+                    displayName={actor?.display_name ?? notification.title}
+                    size={40}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <span className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">
+                        {getNotificationTitle(notification)}
+                      </span>
+                      {isUnread && (
+                        <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:py-1 sm:text-xs">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    {notification.body && (
+                      <span className="text-sm leading-snug text-gray-700">
+                        {notification.body}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-500">
+                      {formatDate(notification.created_at)}
+                    </span>
+                    <span className="text-xs font-semibold text-blue-700">
+                      Open conversation
+                    </span>
+                  </div>
+                </button>
+              );
+            }
 
             return (
               <article
                 key={notification.id}
-                className={`flex gap-3 rounded-xl border p-4 ${isUnread ? "bg-gray-50" : ""}`}
+                className={`flex min-w-0 gap-2.5 rounded-xl border p-3 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
               >
-                <ProfileAvatar
-                  avatarPath={actor?.avatar_url}
-                  displayName={actor?.display_name ?? notification.title}
-                  size={40}
-                />
+                {notification.notification_type ===
+                "fc_news_published" ? (
+                  <FcLogoAvatar size={40} />
+                ) : (
+                  <ProfileAvatar
+                    avatarPath={actor?.avatar_url}
+                    displayName={
+                      actor?.display_name ??
+                      notification.title
+                    }
+                    size={40}
+                  />
+                )}
 
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{notification.title}</h2>
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <h2 className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">
+                        {getNotificationTitle(notification)}
+                      </h2>
                       {isUnread && (
-                        <span className="rounded-full border px-2 py-1 text-xs font-medium">
+                        <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium sm:py-1 sm:text-xs">
                           New
                         </span>
                       )}
                     </div>
 
                     {notification.body && (
-                      <p className="mt-1 text-sm text-gray-700">{notification.body}</p>
+                      <p className="mt-1 text-sm leading-snug text-gray-700">
+                        {renderNotificationBody(notification, postId)}
+                      </p>
                     )}
 
-                    <p className="mt-2 text-xs text-gray-500">
-                      {formatDate(notification.created_at)}
-                    </p>
+                    {notification.notification_type ===
+                      "mentorship_completion_feedback" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/mentorships/${notification.entity_id}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View mentorship
+                        </button>
+                      )}
+
+                    {notification.notification_type ===
+                      "new_fc_feedback" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/feedback/manage?submission=${notification.entity_id}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View feedback
+                        </button>
+                      )}
+                    {notification.notification_type ===
+                      "fc_team_recruitment" && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          View invitation
+                        </button>
+                      )}
+                    {notification.notification_type ===
+                      "fc_team_recruitment_accepted" && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          Review and activate
+                        </button>
+                      )}
+
+                    {notification.notification_type ===
+                      "fc_team_activated" && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push("/feedback/team")
+                          }
+                          type="button"
+                        >
+                          View FC Team
+                        </button>
+                      )}
+
+                    {notification.notification_type ===
+                      "fc_feedback_assignment" &&
+                      notification.entity_id && (
+                        <button
+                          className="mt-3 inline-flex w-fit rounded-lg border px-3 py-2 text-sm font-medium text-gray-900 transition hover:bg-gray-50"
+                          onClick={() =>
+                            router.push(
+                              `/feedback/manage?ticket=${encodeURIComponent(
+                                notification.entity_id!
+                              )}`
+                            )
+                          }
+                          type="button"
+                        >
+                          View assignment
+                        </button>
+                      )}
+
                   </div>
 
-                  {isUnread && (
-                    <button
-                      className="w-fit rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
-                      disabled={isWorking}
-                      onClick={() => markAsRead(notification.id)}
-                      type="button"
-                    >
-                      Mark as read
-                    </button>
-                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-gray-500">
+                      {formatDate(notification.created_at)}
+                    </p>
+
+                    {isUnread && (
+                      <button
+                        className="min-h-9 shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 sm:text-sm"
+                        disabled={isWorking}
+                        onClick={() => markAsRead(notification.id)}
+                        type="button"
+                      >
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
