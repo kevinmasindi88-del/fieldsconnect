@@ -1,10 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 
-type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string };
+type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video"; tiktokValidation?: "valid" | "unavailable" | "unknown"; vimeoPlayerUrl?: string };
+
+function isVimeoLink(rawUrl: string | null): boolean {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === "https:" &&
+      ["vimeo.com", "www.vimeo.com", "player.vimeo.com"].includes(parsed.hostname.toLowerCase());
+  } catch { return false; }
+}
+
+function isFacebookLink(rawUrl: string | null): boolean {
+  if (!rawUrl) return false;
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase();
+    return ["facebook.com", "www.facebook.com", "m.facebook.com",
+      "web.facebook.com", "mbasic.facebook.com", "fb.watch", "www.fb.watch",
+      "fb.com", "www.fb.com"].includes(hostname);
+  } catch { return false; }
+}
 
 export function extractFirstPostUrl(body: string): string | null {
   const match = body.match(/https?:\/\/[^\s<>"']+/i);
@@ -19,9 +38,11 @@ export function extractFirstPostUrl(body: string): string | null {
 
 
 type ExternalVideo = {
-  provider: "YouTube" | "Vimeo";
+  provider: "YouTube" | "Vimeo" | "TikTok" | "Instagram" | "Facebook";
   playerUrl: string;
   thumbnailUrl?: string;
+  vertical?: boolean;
+  displayLabel?: string;
 };
 
 // Only recognized HTTPS links from exact provider hostnames become iframes.
@@ -56,8 +77,9 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
   if (youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
     return {
       provider: "YouTube",
-      playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&autoplay=1",
+      playerUrl: "https://www.youtube-nocookie.com/embed/" + youtubeId + "?rel=0&controls=1&fs=1&playsinline=1",
       thumbnailUrl: "https://i.ytimg.com/vi/" + youtubeId + "/hqdefault.jpg",
+      vertical: segments.length === 2 && segments[0] === "shorts",
     };
   }
 
@@ -71,56 +93,293 @@ export function getExternalVideo(rawUrl: string | null): ExternalVideo | null {
   if (vimeoId && /^[0-9]{1,12}$/.test(vimeoId)) {
     return {
       provider: "Vimeo",
-      playerUrl: "https://player.vimeo.com/video/" + vimeoId + "?dnt=1&autoplay=1",
+      playerUrl: "https://player.vimeo.com/video/" + vimeoId + "?dnt=1&autoplay=0",
     };
+  }
+
+  // TikTok's official player supports public video IDs from standard post URLs.
+  // Short share links with no media ID fall back to the existing link card.
+  if (["tiktok.com", "www.tiktok.com", "m.tiktok.com"].includes(host)) {
+    let videoId: string | null = null;
+    if (segments.length === 3 && segments[0].startsWith("@") && segments[1] === "video") {
+      videoId = segments[2];
+    } else if (segments.length === 3 && segments[0] === "player" && segments[1] === "v1") {
+      videoId = segments[2];
+    }
+    if (videoId && /^[0-9]{15,23}$/.test(videoId)) {
+      return {
+        provider: "TikTok",
+        playerUrl: "https://www.tiktok.com/player/v1/" + videoId + "?autoplay=0",
+        vertical: true,
+      };
+    }
+  }
+
+  // Official Instagram embed pages can show eligible public Reels and media
+  // posts. A /p/ URL may be a video, image, or carousel.
+  if (["instagram.com", "www.instagram.com", "m.instagram.com"].includes(host)) {
+    const kind = segments[0] === "reels" ? "reel" : segments[0];
+    const shortcode = segments.length === 2 ? segments[1] : null;
+    if (
+      ["reel", "p", "tv"].includes(kind) &&
+      shortcode && /^[a-zA-Z0-9_-]{5,30}$/.test(shortcode)
+    ) {
+      return {
+        provider: "Instagram",
+        playerUrl: "https://www.instagram.com/" + kind + "/" + shortcode + "/embed/",
+        vertical: true,
+        displayLabel: kind === "reel" ? "Instagram Reel" : "Instagram post",
+      };
+    }
+  }
+
+  // Facebook's official video plugin accepts the public video URL as its href.
+  // Restrict to known Reel, Watch and video permalink shapes.
+  if (["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"].includes(host)) {
+    let publicVideoUrl: string | null = null;
+    let isReel = false;
+    if (segments.length === 2 && segments[0] === "reel" && /^[0-9]{5,25}$/.test(segments[1])) {
+      publicVideoUrl = "https://www.facebook.com/reel/" + segments[1] + "/";
+      isReel = true;
+    } else if ((url.pathname === "/watch/" || url.pathname === "/watch" || url.pathname === "/video.php")) {
+      const videoId = url.searchParams.get("v");
+      if (videoId && /^[0-9]{5,25}$/.test(videoId)) {
+        publicVideoUrl = "https://www.facebook.com/watch/?v=" + videoId;
+      }
+    } else if (segments.length >= 2 && segments.length <= 4 && segments[segments.length - 2] === "videos") {
+      const videoId = segments[segments.length - 1];
+      const author = segments.slice(0, -2);
+      if (
+        /^[0-9]{5,25}$/.test(videoId) &&
+        author.every((part) => /^[a-zA-Z0-9_.-]{1,100}$/.test(part))
+      ) {
+        publicVideoUrl = "https://www.facebook.com/" +
+          [...author, "videos", videoId].join("/") + "/";
+      }
+    }
+    if (publicVideoUrl) {
+      return {
+        provider: "Facebook",
+        playerUrl: "https://www.facebook.com/plugins/video.php?href=" +
+          encodeURIComponent(publicVideoUrl) + "&show_text=false&width=560",
+        vertical: isReel,
+        displayLabel: isReel ? "Facebook Reel" : "Facebook video",
+      };
+    }
   }
 
   return null;
 }
 
-function ExternalVideoCard({
-  video, originalUrl, preview,
-}: { video: ExternalVideo; originalUrl: string; preview: LinkPreview | null }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const thumbnail = video.thumbnailUrl ?? preview?.image;
+
+function ExternalVideoCard({ video, preview, originalUrl }: { video: ExternalVideo; preview: LinkPreview | null; originalUrl: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  // Do not translate deprecated MediaError codes (1–4) into TikTok's distinct
+  // onPlayerError codes (1001/2001/3001). Preserve the actual error source.
+  const [playerError, setPlayerError] = useState<
+    { source: "player" | "media"; code: number } | null
+  >(null);
+  const isTikTok = video.provider === "TikTok";
+  const unavailable = isTikTok && playerError !== null;
+  const errorMessage = playerError?.source === "player" && playerError.code === 1001
+    ? "TikTok cannot find or embed this post."
+    : playerError?.source === "player" && playerError.code === 2001
+      ? "TikTok could not serve this video right now."
+      : playerError?.source === "media" && playerError.code === 2
+        ? "The embedded video encountered a network error."
+        : playerError?.source === "media" && playerError.code === 3
+          ? "The embedded video could not be decoded."
+          : playerError?.source === "media" && playerError.code === 4
+            ? "This video format isn't supported by the embedded player."
+            : "This TikTok video cannot play in the embedded player.";
+  // Strip the lengthy sharing and tracking parameters when offering a source link.
+  const sourceUrl = isTikTok ? (() => {
+    try {
+      const parsed = new URL(originalUrl);
+      parsed.search = "";
+      parsed.hash = "";
+      return parsed.href;
+    } catch { return originalUrl; }
+  })() : originalUrl;
+
+  useEffect(() => {
+    if (!isTikTok) return;
+    // TikTok officially reports player failures through postMessage. Check
+    // origin and iframe source so other embedded content cannot trigger this.
+    const handleTikTokMessage = (event: MessageEvent) => {
+      if (!["https://www.tiktok.com", "https://tiktok.com"].includes(event.origin) ||
+          event.source !== iframeRef.current?.contentWindow) return;
+      const data: unknown = event.data;
+      if (!data || typeof data !== "object") return;
+      const msg = data as { type?: unknown; value?: unknown; "x-tiktok-player"?: unknown };
+      if (msg["x-tiktok-player"] !== true) return;
+      // Deprecated onError reports browser MediaError.code (1–4), NOT the
+      // TikTok onPlayerError 3001 playback code. Keep them separate.
+      if (msg.type === "onError") {
+        const mediaCode = Number(msg.value);
+        if ([1, 2, 3, 4].includes(mediaCode)) {
+          setPlayerError((current) => current?.source === "player"
+            ? current
+            : { source: "media", code: mediaCode });
+        }
+        return;
+      }
+      if (msg.type !== "onPlayerError") return;
+      const detail = msg.value;
+      if (!detail || typeof detail !== "object") return;
+      const error = detail as { errorCode?: unknown };
+      // INVALID_VIDEO, SERVER_ERROR, PLAYBACK_ERROR. Autoplay denial (3002)
+      // must never replace a usable player.
+      const code = Number(error.errorCode);
+      if ([1001, 2001, 3001].includes(code)) setPlayerError({ source: "player", code });
+    };
+    window.addEventListener("message", handleTikTokMessage);
+    return () => window.removeEventListener("message", handleTikTokMessage);
+  }, [isTikTok]);
+
+  useEffect(() => {
+    // ESC exits browser fullscreen; keep the inline layout in sync.
+    const onFullscreenChange = () => {
+      if (document.fullscreenElement !== containerRef.current) setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return;
+    // On devices without Element Fullscreen API, the viewport overlay still
+    // provides an enlarged player and can be dismissed with Escape.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [expanded]);
+
+  async function expandVideo() {
+    setExpanded(true);
+    try {
+      await containerRef.current?.requestFullscreen?.();
+    } catch {
+      // Keep the viewport-sized fallback when fullscreen is unavailable/denied.
+    }
+  }
+
+  async function collapseVideo() {
+    if (document.fullscreenElement === containerRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // Also allow the CSS overlay to close if the browser denies exit.
+      }
+    }
+    setExpanded(false);
+  }
+
+  // A TikTok delivery failure should not reserve the full vertical video's
+  // height. Keep the post readable and provide a retry for transient errors.
+  if (unavailable) {
+    return (
+      <div className="min-w-0 w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="flex min-h-44 flex-col items-center justify-center gap-3 bg-gray-950 px-4 py-5 text-center text-white">
+          <p className="max-w-sm text-sm font-medium leading-relaxed">{errorMessage}</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setPlayerError(null); }}
+              className="rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              Retry
+            </button>
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-950 transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              Watch on TikTok
+            </a>
+          </div>
+          {playerError && (
+            <p className="text-xs text-gray-400">
+              {playerError.source === "player" ? "TikTok player error " : "Browser media error "}
+              {playerError.code}
+            </p>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
+          <p className="line-clamp-2 break-words text-sm font-semibold text-gray-900">
+            {preview?.title || video.displayLabel || "TikTok video"}
+          </p>
+          {preview?.description && (
+            <p className="line-clamp-2 break-words text-xs text-gray-600">{preview.description}</p>
+          )}
+          <p className="truncate text-xs text-gray-500">{preview?.domain || "tiktok.com"}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Keep the full video visible: standard clips are 16:9; Shorts and Reels
+  // are 9:16. The iframe itself fills the box without object-cover cropping.
+  const inlineRatio = video.vertical
+    ? "mx-auto aspect-[9/16] max-w-[380px]"
+    : "aspect-video";
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
-      {isPlaying ? (
-        <div className="relative aspect-video w-full bg-black">
-          <iframe
-            className="absolute inset-0 h-full w-full"
-            title={video.provider + " video player"}
-            src={video.playerUrl}
-            loading="lazy"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          aria-label={"Play " + video.provider + " video"}
-          className="group relative flex aspect-video w-full items-center justify-center overflow-hidden bg-gray-900 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-          onClick={() => setIsPlaying(true)}
+    <div className="min-w-0 w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div
+        ref={containerRef}
+        className={expanded
+          ? "fixed inset-0 z-[100] flex items-center justify-center bg-black"
+          : "min-w-0 w-full"}
+      >
+        <div className={expanded
+          ? "relative h-full w-full bg-black"
+          : "relative w-full overflow-hidden bg-black " + inlineRatio}
         >
-          {thumbnail && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbnail} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-95" />
+        <iframe
+          ref={iframeRef}
+          title={video.provider + " video player"}
+          src={video.playerUrl}
+          className="absolute inset-0 h-full w-full border-0"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+        <button
+          aria-label={expanded ? "Close expanded video" : "Expand video"}
+          title={expanded ? "Close expanded video" : "Expand video"}
+          type="button"
+          onClick={() => { void (expanded ? collapseVideo() : expandVideo()); }}
+          className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-lg bg-black/65 text-white shadow-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {expanded ? (
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6 18 18M18 6 6 18" />
+            </svg>
+          ) : (
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" />
+            </svg>
           )}
-          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-black/75 shadow-lg transition-transform group-hover:scale-105" aria-hidden="true">
-            <svg className="ml-1 h-8 w-8" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 14 8-14 8V4Z" /></svg>
-          </span>
-          <span className="absolute bottom-3 left-3 rounded bg-black/75 px-2 py-1 text-xs font-medium text-white">Play from {video.provider}</span>
         </button>
-      )}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{preview?.title ?? video.provider + " video"}</span>
-        {isPlaying && (
-          <button type="button" className="text-xs font-medium text-gray-600 underline underline-offset-2 hover:text-gray-950" onClick={() => setIsPlaying(false)}>Close player</button>
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 px-3 py-3">
+        <p className="line-clamp-2 break-words text-sm font-semibold text-gray-900">
+          {preview?.title || video.displayLabel || video.provider + " video"}
+        </p>
+        {preview?.description && (
+          <p className="line-clamp-2 break-words text-xs leading-relaxed text-gray-600">
+            {preview.description}
+          </p>
         )}
-        <a href={originalUrl} target="_blank" rel="noopener noreferrer nofollow" className="shrink-0 text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">Open on {video.provider}</a>
+        <p className="truncate text-xs text-gray-500">{preview?.domain || video.provider}</p>
       </div>
     </div>
   );
@@ -198,7 +457,33 @@ export function PostRichContent({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [expanded, setExpanded] = useState(false);
   const targetLink = linkUrl ?? extractFirstPostUrl(body);
-  const externalVideo = getExternalVideo(targetLink);
+  const isFacebook = isFacebookLink(targetLink);
+  // Meta-validated share/v, share/r and fb.watch links do not always contain
+  // a raw video ID. Use Meta's own video player when public oEmbed succeeds.
+  const facebookSharedVideo = preview?.facebookEmbedKind === "video" && preview.facebookEmbedUrl
+    ? {
+        provider: "Facebook" as const,
+        playerUrl: preview.facebookEmbedUrl,
+        displayLabel: "Facebook video",
+        vertical: Boolean(targetLink && /\/share\/r\//i.test(targetLink)),
+      }
+    : null;
+  // Vanity URLs cannot supply an ID until Vimeo resolves their metadata.
+  // Accept only the allowlisted player URL returned by our server endpoint.
+  const resolvedVimeoVideo = isVimeoLink(targetLink) && preview?.vimeoPlayerUrl &&
+    (() => {
+      try {
+        const parsed = new URL(preview.vimeoPlayerUrl);
+        return parsed.protocol === "https:" && parsed.hostname === "player.vimeo.com" &&
+          /^\/video\/[0-9]{1,12}$/.test(parsed.pathname);
+      } catch { return false; }
+    })()
+    ? {
+        provider: "Vimeo" as const,
+        playerUrl: preview.vimeoPlayerUrl,
+      }
+    : null;
+  const externalVideo = resolvedVimeoVideo ?? getExternalVideo(targetLink) ?? facebookSharedVideo;
 
   useEffect(() => {
     let cancelled = false;
@@ -215,7 +500,9 @@ export function PostRichContent({
   useEffect(() => {
     let cancelled = false;
     setPreview(null);
-    if (!targetLink || !targetLink.startsWith("https://") || externalVideo?.provider === "YouTube") return;
+    // Request safe, authenticated link metadata for both normal links and
+    // recognized videos so embedded players retain the same rich preview text.
+    if (!targetLink || !targetLink.startsWith("https://")) return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabaseBrowserClient();
     void supabase.auth.getSession().then(({ data }) => {
@@ -228,7 +515,7 @@ export function PostRichContent({
       .then((data: LinkPreview | null) => { if (!cancelled) setPreview(data); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [targetLink, externalVideo?.provider]);
+  }, [targetLink]);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -252,16 +539,40 @@ export function PostRichContent({
         </>
       )}
       {targetLink && externalVideo && (
-        <ExternalVideoCard key={targetLink} video={externalVideo} originalUrl={targetLink} preview={preview} />
+        <ExternalVideoCard key={targetLink} video={externalVideo} preview={preview} originalUrl={targetLink} />
       )}
-      {targetLink && !externalVideo && (
+      {targetLink && !externalVideo && preview?.facebookEmbedKind === "post" && preview.facebookEmbedUrl && (
+        <div className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {/* This source is constructed by our server only after Meta validates a public post. */}
+          <iframe
+            title="Facebook post preview"
+            src={preview.facebookEmbedUrl}
+            className="h-[480px] w-full border-0"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="encrypted-media; picture-in-picture"
+          />
+          <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="block min-w-0 truncate border-t border-gray-100 px-3 py-2 text-xs font-medium text-blue-700 hover:underline">
+            Facebook post · View source
+          </a>
+        </div>
+      )}
+      {targetLink && !externalVideo && !(preview?.facebookEmbedKind === "post" && preview.facebookEmbedUrl) && (
         <a href={targetLink} target="_blank" rel="noopener noreferrer nofollow" className="group block min-w-0 overflow-hidden rounded-xl border bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50">
-          {preview?.image && (
+          {preview?.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview.image} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="max-h-48 w-full object-cover" />
-          )}
+          ) : isFacebook ? (
+            <div className="flex h-28 items-center justify-center bg-[#eef3ff] text-[#1877f2]" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor">
+                <path d="M22 12a10 10 0 1 0-11.56 9.88v-6.98H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.1 0 2.25.2 2.25.2v2.47h-1.27c-1.24 0-1.63.77-1.63 1.56V12h2.77l-.44 2.9h-2.33v6.98A10 10 0 0 0 22 12Z"/>
+              </svg>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-1 p-3">
-            <span className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:text-blue-700">{preview?.title ?? "Open external link"}</span>
+            <span className="line-clamp-2 text-sm font-semibold text-gray-900 group-hover:text-blue-700">
+              {preview?.title || (isFacebook ? "Facebook post" : "Open external link")}
+            </span>
             {preview?.description && <span className="line-clamp-2 text-xs text-gray-600">{preview.description}</span>}
             <span className="truncate text-xs text-blue-700">{preview?.domain ?? (() => { try { return new URL(targetLink).hostname; } catch { return targetLink; } })()} · Visit link ↗</span>
           </div>

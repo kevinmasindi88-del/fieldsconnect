@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { resolveTimelineAuthorProfiles } from "@/lib/timeline/visible-author-profiles";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { PostRichContent, MentionedText } from "@/components/timeline/PostRichContent";
 import { TrashIcon } from "@/components/timeline/ActionIcons";
@@ -149,7 +150,14 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
         setPost((postData as Post | null) ?? null);
         setComments((commentData ?? []) as Comment[]);
-        setProfiles((profileData ?? []) as Profile[]);
+        const authorProfiles = await resolveTimelineAuthorProfiles(
+          (profileData ?? []) as Profile[],
+          [
+            ...(postData ? [postData.author_id] : []),
+            ...(commentData ?? []).map((comment) => comment.author_id),
+          ]
+        );
+        setProfiles(authorProfiles);
         setPostMentions(
           (postMentionData ?? []) as PostMention[]
         );
