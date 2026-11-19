@@ -93,6 +93,13 @@ type LibraryDocument = {
   is_published: boolean;
 };
 
+type ProfileConnection = {
+  id: string;
+  requester_id: string;
+  recipient_id: string;
+  status: "pending" | "accepted" | "declined" | "cancelled";
+};
+
 type PublicProfileViewProps = {
   profileId: string;
 };
@@ -117,6 +124,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   }, [profileId]);
   const returnHref = fromMentorshipHub ? "/mentorships" : "/connections";
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [hasFullProfileAccess, setHasFullProfileAccess] = useState(false);
+  const [connection, setConnection] = useState<ProfileConnection | null>(null);
   const [mentorProfile, setMentorProfile] =
     useState<MentorProfile | null>(null);
   const [mentorRating, setMentorRating] = useState<MentorRatingSummary | null>(null);
@@ -214,6 +223,21 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
 
         setCurrentUserId(userId);
 
+        // Accepted connections unlock private profiles. Track pending requests
+        // to render Connect / Request pending / Accept on private profile pages.
+        const { data: connectionRows, error: connectionError } = await supabase
+          .from("connections")
+          .select("id, requester_id, recipient_id, status")
+          .in("requester_id", [userId, profileId])
+          .in("recipient_id", [userId, profileId])
+          .order("created_at", { ascending: false });
+        if (connectionError) throw connectionError;
+        const currentConnection =
+          (connectionRows ?? []).find((item) =>
+            item.status === "accepted" || item.status === "pending"
+          ) ?? connectionRows?.[0] ?? null;
+        setConnection(currentConnection as ProfileConnection | null);
+
         const [
           { data: profileData, error: profileError },
           { data: mentorData, error: mentorError },
@@ -279,6 +303,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           const card = (cards ?? [])[0];
           if (card?.profile_visibility === "private") {
             setProfile(card as Profile);
+            setHasFullProfileAccess(false);
             setMentorProfile(null);
             setPaymentOffers([]);
             setSkills([]);
@@ -287,6 +312,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           }
         }
         setProfile((profileData ?? null) as Profile | null);
+        setHasFullProfileAccess(Boolean(profileData));
         setMentorProfile(
           (mentorData ?? null) as MentorProfile | null
         );
@@ -547,6 +573,82 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     return durations;
   }
 
+  async function connectFromPrivateProfile() {
+    if (!currentUserId || !isSupabaseConfigured() || isWorking ||
+      connection?.status === "pending" || connection?.status === "accepted") return;
+    setIsWorking(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      let connectionId: string;
+      if (connection && (connection.status === "declined" || connection.status === "cancelled")) {
+        const { data, error } = await supabase.from("connections")
+          .update({
+            requester_id: currentUserId, recipient_id: profileId,
+            status: "pending", responded_at: null,
+            created_at: new Date().toISOString(),
+          })
+          .eq("id", connection.id).select("id").single();
+        if (error) throw error;
+        connectionId = data.id;
+      } else {
+        const { data, error } = await supabase.from("connections")
+          .insert({ requester_id: currentUserId, recipient_id: profileId, status: "pending" })
+          .select("id").single();
+        if (error) throw error;
+        connectionId = data.id;
+      }
+      setConnection({
+        id: connectionId, requester_id: currentUserId,
+        recipient_id: profileId, status: "pending",
+      });
+      // Notification failure does not invalidate a successful connection request.
+      const { data: actor } = await supabase.from("profiles")
+        .select("display_name").eq("id", currentUserId).maybeSingle();
+      const { error: notifyError } = await supabase.from("notifications").insert({
+        recipient_id: profileId, actor_id: currentUserId,
+        notification_type: "connection_request", entity_type: "connection",
+        entity_id: connectionId, title: "New connection request",
+        body: (actor?.display_name ?? "Someone") + " sent you a connection request.",
+      });
+      if (notifyError) console.error("Unable to notify connection request:", notifyError);
+      setMessage("Connection request sent.");
+    } catch (error) {
+      setMessage(getActionErrorMessage(error, "send connection request"));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  async function acceptPrivateProfileRequest() {
+    if (!currentUserId || !isSupabaseConfigured() || isWorking ||
+      connection?.status !== "pending" || connection.recipient_id !== currentUserId) return;
+    setIsWorking(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.from("connections")
+        .update({ status: "accepted", responded_at: new Date().toISOString() })
+        .eq("id", connection.id)
+        .eq("recipient_id", currentUserId)
+        .eq("status", "pending").select("id").single();
+      if (error) throw error;
+      const { data: actor } = await supabase.from("profiles")
+        .select("display_name").eq("id", currentUserId).maybeSingle();
+      const { error: notifyError } = await supabase.from("notifications").insert({
+        recipient_id: connection.requester_id, actor_id: currentUserId,
+        notification_type: "connection_accepted", entity_type: "connection",
+        entity_id: connection.id, title: "Connection request accepted",
+        body: (actor?.display_name ?? "Someone") + " accepted your connection request.",
+      });
+      if (notifyError) console.error("Unable to notify accepted connection:", notifyError);
+      window.location.reload();
+    } catch (error) {
+      setMessage(getActionErrorMessage(error, "accept connection request"));
+      setIsWorking(false);
+    }
+  }
+
   async function submitMentorshipRequest(
     event: React.FormEvent<HTMLFormElement>
   ) {
@@ -718,7 +820,14 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
     );
   }
 
-  if (profile.profile_visibility === "private" && profile.id !== currentUserId) {
+  if (profile.profile_visibility === "private" &&
+      profile.id !== currentUserId && !hasFullProfileAccess) {
+    const outgoingPending = connection?.status === "pending" &&
+      connection.requester_id === currentUserId;
+    const incomingPending = connection?.status === "pending" &&
+      connection.recipient_id === currentUserId;
+    const acceptedButUnavailable = connection?.status === "accepted";
+
     return (
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6 sm:p-8">
         <Link className="w-fit text-sm font-medium text-gray-600 hover:text-black" href={returnHref}>
@@ -728,9 +837,30 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           <h1 className="text-xl font-semibold">{profile.display_name}</h1>
           <p className="mt-2 text-sm font-medium text-gray-700">Private profile</p>
           <p className="mt-2 text-sm text-gray-600">
-            This member's profile, skills and library are not available to view.
-            You can find and request a connection through Find People.
+            {acceptedButUnavailable
+              ? "You are connected, but this profile's details are temporarily unavailable."
+              : "Connect with this member to view their profile details, published skills and shared Library resources."}
           </p>
+          {message && <p className={getMessageAlertClass(message)}>{message}</p>}
+          <div className="mt-4">
+            {outgoingPending ? (
+              <span className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-medium text-gray-700">
+                Request pending
+              </span>
+            ) : incomingPending ? (
+              <button type="button" onClick={() => void acceptPrivateProfileRequest()}
+                disabled={isWorking}
+                className="min-h-11 rounded-lg bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {isWorking ? "Accepting..." : "Accept connection"}
+              </button>
+            ) : acceptedButUnavailable ? null : (
+              <button type="button" onClick={() => void connectFromPrivateProfile()}
+                disabled={isWorking}
+                className="min-h-11 rounded-lg bg-black px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {isWorking ? "Sending..." : "Connect"}
+              </button>
+            )}
+          </div>
         </div>
       </section>
     );
