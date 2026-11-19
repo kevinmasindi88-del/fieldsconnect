@@ -1,5 +1,9 @@
-import { ResetPasswordWorkflow } from "@/components/auth/ResetPasswordWorkflow";
+import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function ResetPasswordPage() {
-  return <ResetPasswordWorkflow />;
+  return (
+    <main className="min-h-screen p-8">
+      <AuthForm mode="reset" />
+    </main>
+  );
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { resolveTimelineAuthorProfiles } from "@/lib/timeline/visible-author-profiles";
 import { FcLogoAvatar } from "@/components/branding/FcLogoAvatar";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
 import { PostRichContent, MentionedText, extractFirstPostUrl, getExternalVideo, compressTimelineImage } from "@/components/timeline/PostRichContent";
@@ -168,6 +169,8 @@ function EditingPostImageThumbnail({ imagePath }: { imagePath: string }) {
 export function TimelineWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const profilesRef = useRef<Profile[]>([]);
+  const pendingAuthorIdsRef = useRef<Set<string>>(new Set());
   const [posts, setPosts] = useState<Post[]>([]);
   const [fcNewsPublications, setFcNewsPublications] =
     useState<FcNewsPublication[]>([]);
@@ -214,6 +217,28 @@ export function TimelineWorkflow() {
     );
   }, [fcNewsPublications]);
 
+  async function refreshNewAuthorIdentities(authorIds: string[]) {
+    const known = new Set(profilesRef.current.map((profile) => profile.id));
+    const missing = [...new Set(authorIds)].filter(
+      (id) => id && !known.has(id) && !pendingAuthorIdsRef.current.has(id)
+    );
+    if (missing.length === 0) return;
+
+    missing.forEach((id) => pendingAuthorIdsRef.current.add(id));
+    try {
+      const discovered = await resolveTimelineAuthorProfiles([], missing);
+      if (discovered.length > 0) {
+        const byId = new Map(profilesRef.current.map((profile) => [profile.id, profile]));
+        discovered.forEach((profile) => byId.set(profile.id, profile));
+        const updated = [...byId.values()];
+        profilesRef.current = updated;
+        setProfiles(updated);
+      }
+    } finally {
+      missing.forEach((id) => pendingAuthorIdsRef.current.delete(id));
+    }
+  }
+
   async function loadPosts() {
     if (!isSupabaseConfigured()) return;
 
@@ -258,6 +283,7 @@ export function TimelineWorkflow() {
     );
 
     setPosts((postResult.data ?? []) as Post[]);
+    void refreshNewAuthorIdentities((postResult.data ?? []).map((post) => post.author_id));
   }
 
   async function loadFcNewsPublications() {
@@ -296,6 +322,7 @@ export function TimelineWorkflow() {
     }
 
     setComments((data ?? []) as Comment[]);
+    void refreshNewAuthorIdentities((data ?? []).map((comment) => comment.author_id));
   }
 
   async function loadReactions() {
@@ -401,7 +428,15 @@ export function TimelineWorkflow() {
       if (postMentionError) throw postMentionError;
       if (commentMentionError) throw commentMentionError;
 
-      setProfiles((profileData ?? []) as Profile[]);
+      const authorProfiles = await resolveTimelineAuthorProfiles(
+        (profileData ?? []) as Profile[],
+        [
+          ...(postData ?? []).map((post) => post.author_id),
+          ...(commentData ?? []).map((comment) => comment.author_id),
+        ]
+      );
+      profilesRef.current = authorProfiles;
+      setProfiles(authorProfiles);
       setCommentMentions((commentMentionData ?? []) as CommentMention[]);
       setPostMentions(
         (postMentionData ?? []) as PostMention[]
