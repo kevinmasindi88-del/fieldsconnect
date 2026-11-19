@@ -634,7 +634,7 @@ export function NotificationsWorkflow() {
                 <button
                   key={notification.id}
                   aria-label={`Open conversation: ${getNotificationTitle(notification)}`}
-                  className={`flex w-full min-w-0 gap-2.5 rounded-xl border p-3 text-left transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : "bg-white"}`}
+                  className={`flex w-full min-w-0 gap-2.5 rounded-xl border p-3 text-left transition-colors duration-200 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-60 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-100" : "bg-white"}`}
                   disabled={isWorking}
                   onClick={() => void openMessageNotification(notification)}
                   type="button"
@@ -674,7 +674,7 @@ export function NotificationsWorkflow() {
             return (
               <article
                 key={notification.id}
-                className={`flex min-w-0 gap-2.5 rounded-xl border p-3 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-50" : ""}`}
+                className={`flex min-w-0 gap-2.5 rounded-xl border p-3 transition-colors duration-200 sm:gap-3 sm:p-4 ${isUnread ? "bg-gray-100" : "bg-white"}`}
               >
                 {notification.notification_type ===
                 "fc_news_published" ? (
