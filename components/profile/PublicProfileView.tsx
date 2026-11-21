@@ -1052,9 +1052,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             </p>
           ) : getAcceptedDurations().length === 0 ? (
             <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
-              This mentor has no free mentorship periods available right now.
-              Paid mentorship requests are paused until the FieldsConnect
-              payment launch is approved.
+              No mentorship periods are currently available to request.
             </p>
           ) : (
             <form
