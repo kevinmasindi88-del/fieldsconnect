@@ -1265,7 +1265,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         )}
       </section>
 
-      <section className="rounded-xl border p-4">
+      <section className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border p-4">
         <h2 className="text-lg font-semibold sm:text-xl">Visible library documents</h2>
 
         {documents.length === 0 ? (
@@ -1273,63 +1273,20 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             No library documents are visible yet.
           </p>
         ) : (
-          <div className="mt-3 grid gap-3">
+          <div className="mt-3 grid min-w-0 gap-2">
             {documents.map((document) => (
-              <article
+              <button
                 key={document.id}
-                className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
+                type="button"
+                disabled={isWorking}
+                onClick={() => openDocument(document)}
+                className="block w-full min-w-0 max-w-full rounded-lg border px-3 py-3 text-left text-sm font-medium leading-snug text-gray-900 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50"
+                title={document.title}
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold leading-snug sm:text-base">{document.title}</h3>
-
-                    <span className="rounded-full border px-2 py-1 text-xs">
-                      {document.resource_type === "external_link"
-                        ? "Online link"
-                        : "File"}
-                    </span>
-
-                    <span className="rounded-full border px-2 py-1 text-xs">
-                      {document.visibility === "public"
-                        ? "Public"
-                        : "Connections"}
-                    </span>
-                  </div>
-
-                  {document.description && <p className="mt-2 text-sm leading-snug text-gray-700">{document.description}</p>}
-
-                  {document.resource_type === "external_link" ? (
-                    <div className="mt-2 space-y-1 text-xs text-gray-500">
-                      <p>
-                        Online resource
-                        {document.source_publisher
-                          ? ` - ${document.source_publisher}`
-                          : ""}
-                      </p>
-
-                      {document.source_title && (
-                        <p>{document.source_title}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-gray-500">
-                      {document.file_name ?? "Uploaded file"} -{" "}
-                      {document.file_size_bytes !== null
-                        ? formatBytes(document.file_size_bytes)
-                        : "Unknown size"}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  className="w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  disabled={isWorking}
-                  onClick={() => openDocument(document)}
-                  type="button"
-                >
-                  Open
-                </button>
-              </article>
+                <span className="block min-w-0 break-words [overflow-wrap:anywhere]">
+                  {document.title}
+                </span>
+              </button>
             ))}
           </div>
         )}
