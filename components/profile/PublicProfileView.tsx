@@ -104,10 +104,6 @@ type PublicProfileViewProps = {
   profileId: string;
 };
 
-// Opt-in for the approved public payment launch, never for test-mode payouts alone.
-const PUBLIC_PAID_MENTORSHIPS_ENABLED =
-  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
-
 const initialMentorshipRequestForm: MentorshipRequestForm = {
   mentorshipField: "",
   mentorshipLevel: "",
@@ -503,11 +499,6 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       offer.price_amount_minor === 0
     ) {
       return "Free";
-    }
-
-    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED) {
-      // Do not advertise paid offers while production payouts are not approved.
-      return null;
     }
 
     return new Intl.NumberFormat("en-ZA", {
