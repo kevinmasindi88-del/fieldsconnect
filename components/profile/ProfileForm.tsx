@@ -2291,11 +2291,6 @@ export function ProfileForm() {
                     <h4 className="text-sm font-semibold">
                       Mentorship pricing
                     </h4>
-                    <p className="mt-1 text-xs leading-5 text-gray-500">
-                      Prices are total programme prices in ZAR,
-                      not hourly rates. Ongoing mentorship is
-                      free-only in this version.
-                    </p>
 
                     <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
                       {(
@@ -2441,43 +2436,6 @@ export function ProfileForm() {
                       )}
                   </div>
 
-                  {!PUBLIC_PAID_MENTORSHIPS_ENABLED && (
-                    <section aria-label="Proposed paid mentorship transaction" className="min-w-0 rounded-xl border border-blue-200 bg-white p-3 sm:p-4">
-                      <h4 className="font-semibold">Paid mentorship flow</h4>
-                      <ol className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">01 · Mentee</span><strong className="mt-1 block">Pays FieldsConnect</strong><span className="mt-1 block text-xs text-gray-600">Completes secure checkout for the agreed mentorship price.</span></li>
-                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">02 · FieldsConnect</span><strong className="mt-1 block">Accounts for funds</strong><span className="mt-1 block text-xs text-gray-600">Platform share 15%; mentor share 85%, subject to refund and dispute rules.</span></li>
-                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">03 · Mentor</span><strong className="mt-1 block">Receives payout</strong><span className="mt-1 block text-xs text-gray-600">Settlement via the approved provider arrangement after eligibility checks.</span></li>
-                      </ol>
-                      {(() => {
-                        const selected = ([
-                          ["3_months", "3-month programme", mentorSettings.accepts3Month],
-                          ["6_months", "6-month programme", mentorSettings.accepts6Month],
-                          ["1_year", "1-year programme", mentorSettings.accepts1Year],
-                        ] as const).find(([duration, , accepted]) =>
-                          accepted && mentorshipPricing[duration].paymentMode === "paid" &&
-                          Number(mentorshipPricing[duration].price) > 0
-                        );
-                        if (!selected) return <p className="mt-3 text-xs text-gray-600">Select Paid and enter a programme price above to preview the 15% / 85% breakdown.</p>;
-                        const [duration, title] = selected;
-                        const totalCents = Math.round(Number(mentorshipPricing[duration].price) * 100);
-                        if (!Number.isSafeInteger(totalCents) || totalCents <= 0) return null;
-                        const fcCents = Math.round(totalCents * 0.15);
-                        const money = (cents: number) =>
-                          new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
-                        return (
-                          <div className="mt-3 rounded-lg border p-3 text-sm">
-                            <p className="font-semibold">{title} · Illustrative allocation</p>
-                            <dl className="mt-2 grid gap-2 sm:grid-cols-3">
-                              <div><dt className="text-xs text-gray-600">Mentee pays FC</dt><dd className="font-semibold">{money(totalCents)}</dd></div>
-                              <div><dt className="text-xs text-gray-600">FieldsConnect (15%)</dt><dd className="font-semibold">{money(fcCents)}</dd></div>
-                              <div><dt className="text-xs text-gray-600">Mentor (85%)</dt><dd className="font-semibold">{money(totalCents - fcCents)}</dd></div>
-                            </dl>
-                          </div>
-                        );
-                      })()}
-                    </section>
-                  )}
                 </section>
                 ) : (
                 <section className="w-full min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4" aria-label="Mentorship payments launch status">
