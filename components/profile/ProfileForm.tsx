@@ -136,6 +136,8 @@ const initialMentorshipPricing: MentorshipPricingState = {
 const PUBLIC_PAID_MENTORSHIPS_ENABLED =
   process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
 const PAYMENT_SETUP_UI_ENABLED = true;
+// Paid mentorship offers and requests operate independently of live checkout.
+const PAID_MENTORSHIP_OFFERS_ENABLED = true;
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
@@ -555,7 +557,7 @@ export function ProfileForm() {
 
           // Persisted drafts take priority in the setup UI, without modifying
           // existing active offers or their associated mentorship contracts.
-          const visiblePricing = PUBLIC_PAID_MENTORSHIPS_ENABLED
+          const visiblePricing = PAID_MENTORSHIP_OFFERS_ENABLED
             ? (paymentOfferData ?? [])
             : [...(paymentOfferData ?? []), ...(paymentDraftData ?? [])];
           for (const offer of visiblePricing) {
@@ -1537,7 +1539,7 @@ export function ProfileForm() {
 
         // Keep production offers untouched during pre-launch preparation.
         // Mentor-entered pricing is stored privately until payment activation.
-        if (!PUBLIC_PAID_MENTORSHIPS_ENABLED && PAYMENT_SETUP_UI_ENABLED) {
+        if (!PAID_MENTORSHIP_OFFERS_ENABLED && PAYMENT_SETUP_UI_ENABLED) {
           const draftRows = ([
             ["3_months", mentorSettings.accepts3Month],
             ["6_months", mentorSettings.accepts6Month],
@@ -1561,7 +1563,7 @@ export function ProfileForm() {
             .from("mentorship_payment_offer_drafts")
             .upsert(draftRows, { onConflict: "mentor_id,duration" });
           if (draftError) throw draftError;
-        } else if (PUBLIC_PAID_MENTORSHIPS_ENABLED) {
+        } else if (PAID_MENTORSHIP_OFFERS_ENABLED) {
           const offerRows = [
           {
             duration: "3_months" as const,
