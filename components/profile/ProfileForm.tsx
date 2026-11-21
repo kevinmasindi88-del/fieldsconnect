@@ -1632,7 +1632,7 @@ export function ProfileForm() {
         form.mentorAvailable
           ? PUBLIC_PAID_MENTORSHIPS_ENABLED
             ? "Profile and mentor settings saved."
-            : "Profile saved. Any paid mentorship prices were saved as private drafts; checkout is still disabled."
+            : "Profile and mentor settings saved."
           : "Profile saved."
       );
       // Final onboarding only after the whole mentor/profile save succeeds.
@@ -2094,10 +2094,7 @@ export function ProfileForm() {
                       Mentorship payments
                     </h3>
                     <p className="mt-1 text-sm text-gray-600">
-                      Choose free or paid programme pricing for your private mentor offer.
-                      {PUBLIC_PAID_MENTORSHIPS_ENABLED
-                        ? " Approved paid requests use Paystack checkout."
-                        : " Prices are private drafts for provider review. No payment can be made until launch approval."}
+                      Choose free or paid programme pricing.
                     </p>
                   </div>
 
@@ -2435,33 +2432,18 @@ export function ProfileForm() {
                         )}
                     </div>
 
-                    {!PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
-                      <p className="mt-3 text-xs leading-5 text-gray-600">
-                        Prices are saved as private drafts only. Live checkout,
-                        bank setup and mentor payouts are not enabled.
-                      </p>
-                    ) : !(
-                      mentorPaymentAccount?.status === "active" &&
-                      mentorPaymentAccount.can_receive_payments
-                    ) ? (
-                      <p className="mt-3 text-xs text-gray-500">
-                        Set up a payout account to enable paid mentorship pricing.
-                      </p>
-                    ) : null}
+                    {PUBLIC_PAID_MENTORSHIPS_ENABLED &&
+                      !(mentorPaymentAccount?.status === "active" &&
+                        mentorPaymentAccount.can_receive_payments) && (
+                        <p className="mt-3 text-xs text-gray-500">
+                          Set up a payout account to enable paid mentorship pricing.
+                        </p>
+                      )}
                   </div>
 
                   {!PUBLIC_PAID_MENTORSHIPS_ENABLED && (
                     <section aria-label="Proposed paid mentorship transaction" className="min-w-0 rounded-xl border border-blue-200 bg-white p-3 sm:p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="font-semibold">Proposed paid mentorship flow</h4>
-                        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-                          Illustration only · Payments disabled
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-gray-600">
-                        For payment-provider review. A paid mentorship would proceed only after
-                        both participants agree to the programme and the payment provider approves live transactions.
-                      </p>
+                      <h4 className="font-semibold">Paid mentorship flow</h4>
                       <ol className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
                         <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">01 · Mentee</span><strong className="mt-1 block">Pays FieldsConnect</strong><span className="mt-1 block text-xs text-gray-600">Completes secure checkout for the agreed mentorship price.</span></li>
                         <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">02 · FieldsConnect</span><strong className="mt-1 block">Accounts for funds</strong><span className="mt-1 block text-xs text-gray-600">Platform share 15%; mentor share 85%, subject to refund and dispute rules.</span></li>
@@ -2491,7 +2473,6 @@ export function ProfileForm() {
                               <div><dt className="text-xs text-gray-600">FieldsConnect (15%)</dt><dd className="font-semibold">{money(fcCents)}</dd></div>
                               <div><dt className="text-xs text-gray-600">Mentor (85%)</dt><dd className="font-semibold">{money(totalCents - fcCents)}</dd></div>
                             </dl>
-                            <p className="mt-2 text-xs text-gray-600">Illustrative only; provider fees, tax, refunds, disputes and payout timing require final agreed terms.</p>
                           </div>
                         );
                       })()}
