@@ -1280,9 +1280,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                 className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <h3 className="min-w-0 break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere] sm:text-base">{document.title}</h3>
-
+                  <h3 className="min-w-0 break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere] sm:text-base">{document.title}</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className="rounded-full border px-2 py-1 text-xs">
                       {document.resource_type === "external_link"
                         ? "Online link"
