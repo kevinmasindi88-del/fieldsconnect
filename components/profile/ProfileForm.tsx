@@ -131,11 +131,11 @@ const initialMentorshipPricing: MentorshipPricingState = {
   },
 };
 
-// Keep pre-launch mentor payment setup hidden until paid mentorship is approved.
+// Allow private pricing drafts and demonstration while live payment execution remains disabled.
 // Existing private drafts remain stored; the backend checkout gate is unchanged.
 const PUBLIC_PAID_MENTORSHIPS_ENABLED =
   process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
-const PAYMENT_SETUP_UI_ENABLED = PUBLIC_PAID_MENTORSHIPS_ENABLED;
+const PAYMENT_SETUP_UI_ENABLED = true;
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
@@ -2094,10 +2094,10 @@ export function ProfileForm() {
                       Mentorship payments
                     </h3>
                     <p className="mt-1 text-sm text-gray-600">
-                      Choose free or paid programme pricing and review your payout setup.
+                      Choose free or paid programme pricing for your private mentor offer.
                       {PUBLIC_PAID_MENTORSHIPS_ENABLED
                         ? " Approved paid requests use Paystack checkout."
-                        : " Paid prices are private drafts until Paystack and FieldsConnect approve live transactions."}
+                        : " Prices are private drafts for provider review. No payment can be made until launch approval."}
                     </p>
                   </div>
 
@@ -2435,16 +2435,68 @@ export function ProfileForm() {
                         )}
                     </div>
 
-                    {!(
+                    {!PUBLIC_PAID_MENTORSHIPS_ENABLED ? (
+                      <p className="mt-3 text-xs leading-5 text-gray-600">
+                        Prices are saved as private drafts only. Live checkout,
+                        bank setup and mentor payouts are not enabled.
+                      </p>
+                    ) : !(
                       mentorPaymentAccount?.status === "active" &&
                       mentorPaymentAccount.can_receive_payments
-                    ) && (
+                    ) ? (
                       <p className="mt-3 text-xs text-gray-500">
-                        Set up a payout account to enable paid
-                        mentorship pricing.
+                        Set up a payout account to enable paid mentorship pricing.
                       </p>
-                    )}
+                    ) : null}
                   </div>
+
+                  {!PUBLIC_PAID_MENTORSHIPS_ENABLED && (
+                    <section aria-label="Proposed paid mentorship transaction" className="min-w-0 rounded-xl border border-blue-200 bg-white p-3 sm:p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="font-semibold">Proposed paid mentorship flow</h4>
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
+                          Illustration only · Payments disabled
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-gray-600">
+                        For payment-provider review. A paid mentorship would proceed only after
+                        both participants agree to the programme and the payment provider approves live transactions.
+                      </p>
+                      <ol className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">01 · Mentee</span><strong className="mt-1 block">Pays FieldsConnect</strong><span className="mt-1 block text-xs text-gray-600">Completes secure checkout for the agreed mentorship price.</span></li>
+                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">02 · FieldsConnect</span><strong className="mt-1 block">Accounts for funds</strong><span className="mt-1 block text-xs text-gray-600">Platform share 15%; mentor share 85%, subject to refund and dispute rules.</span></li>
+                        <li className="rounded-lg border bg-gray-50 p-3"><span className="block text-xs font-bold text-blue-700">03 · Mentor</span><strong className="mt-1 block">Receives payout</strong><span className="mt-1 block text-xs text-gray-600">Settlement via the approved provider arrangement after eligibility checks.</span></li>
+                      </ol>
+                      {(() => {
+                        const selected = ([
+                          ["3_months", "3-month programme", mentorSettings.accepts3Month],
+                          ["6_months", "6-month programme", mentorSettings.accepts6Month],
+                          ["1_year", "1-year programme", mentorSettings.accepts1Year],
+                        ] as const).find(([duration, , accepted]) =>
+                          accepted && mentorshipPricing[duration].paymentMode === "paid" &&
+                          Number(mentorshipPricing[duration].price) > 0
+                        );
+                        if (!selected) return <p className="mt-3 text-xs text-gray-600">Select Paid and enter a programme price above to preview the 15% / 85% breakdown.</p>;
+                        const [duration, title] = selected;
+                        const totalCents = Math.round(Number(mentorshipPricing[duration].price) * 100);
+                        if (!Number.isSafeInteger(totalCents) || totalCents <= 0) return null;
+                        const fcCents = Math.round(totalCents * 0.15);
+                        const money = (cents: number) =>
+                          new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(cents / 100);
+                        return (
+                          <div className="mt-3 rounded-lg border p-3 text-sm">
+                            <p className="font-semibold">{title} · Illustrative allocation</p>
+                            <dl className="mt-2 grid gap-2 sm:grid-cols-3">
+                              <div><dt className="text-xs text-gray-600">Mentee pays FC</dt><dd className="font-semibold">{money(totalCents)}</dd></div>
+                              <div><dt className="text-xs text-gray-600">FieldsConnect (15%)</dt><dd className="font-semibold">{money(fcCents)}</dd></div>
+                              <div><dt className="text-xs text-gray-600">Mentor (85%)</dt><dd className="font-semibold">{money(totalCents - fcCents)}</dd></div>
+                            </dl>
+                            <p className="mt-2 text-xs text-gray-600">Illustrative only; provider fees, tax, refunds, disputes and payout timing require final agreed terms.</p>
+                          </div>
+                        );
+                      })()}
+                    </section>
+                  )}
                 </section>
                 ) : (
                 <section className="w-full min-w-0 rounded-xl border bg-gray-50 p-3 sm:p-4" aria-label="Mentorship payments launch status">
