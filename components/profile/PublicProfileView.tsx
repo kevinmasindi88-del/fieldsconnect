@@ -492,11 +492,10 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
   ) {
     const offer = getActivePaymentOffer(duration);
 
-    // An inactive or missing offer does not remove an accepted free period.
-    // Paid offers are hidden during the provider review, but free requests
-    // must remain available independently of historical/inactive offers.
     if (!offer) {
-      return "Free";
+      return paymentOffers.length === 0
+        ? "Free"
+        : null;
     }
 
     if (
