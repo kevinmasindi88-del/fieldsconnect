@@ -1277,11 +1277,11 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             {documents.map((document) => (
               <article
                 key={document.id}
-                className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
+                className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold leading-snug sm:text-base">{document.title}</h3>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h3 className="min-w-0 break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere] sm:text-base">{document.title}</h3>
 
                     <span className="rounded-full border px-2 py-1 text-xs">
                       {document.resource_type === "external_link"
@@ -1296,10 +1296,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                     </span>
                   </div>
 
-                  {document.description && <p className="mt-2 text-sm leading-snug text-gray-700">{document.description}</p>}
-
                   {document.resource_type === "external_link" ? (
-                    <div className="mt-2 space-y-1 text-xs text-gray-500">
+                    <div className="mt-2 min-w-0 space-y-1 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
                       <p>
                         Online resource
                         {document.source_publisher
@@ -1312,7 +1310,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                       )}
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 min-w-0 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
                       {document.file_name ?? "Uploaded file"} -{" "}
                       {document.file_size_bytes !== null
                         ? formatBytes(document.file_size_bytes)
