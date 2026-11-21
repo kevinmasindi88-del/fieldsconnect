@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
+import { MentorshipRequestPanel } from "@/components/mentorship/MentorshipRequestPanel";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -220,6 +221,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     isMentorshipHistoryOpen,
     setIsMentorshipHistoryOpen,
   ] = useState(false);
+  const [requestedMentor, setRequestedMentor] = useState<Profile | null>(null);
 
   // Support previously issued Paystack callback URLs.
   useEffect(() => {
@@ -1867,12 +1869,15 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                           showMentorRating
                           mentorRating={mentorRatingsById[profile.id] ?? null}
                         >
-                          <Link
+                          <button
+                            type="button"
                             className="inline-flex min-h-10 items-center rounded-xl bg-gray-950 px-3 py-2 text-sm font-medium text-white"
-                            href={`/profile/${profile.id}?from=mentorships#mentorship-request`}
+                            aria-controls="mentorship-request-form"
+                            aria-expanded={requestedMentor?.id === profile.id}
+                            onClick={() => setRequestedMentor(profile)}
                           >
                             Request mentorship
-                          </Link>
+                          </button>
                         </ConnectionCard>
                         ))}
                       </div>
@@ -1890,6 +1895,19 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                   )}
                 </div>
               </ConnectionSection>
+
+              {requestedMentor && (
+                <MentorshipRequestPanel
+                  key={requestedMentor.id}
+                  mentorId={requestedMentor.id}
+                  mentorName={requestedMentor.display_name}
+                  currentUserId={currentUserId}
+                  onClose={() => setRequestedMentor(null)}
+                  onSent={() => {
+                    if (currentUserId) void loadMentorshipRequests(currentUserId);
+                  }}
+                />
+              )}
 
           <ConnectionSection title={`Incoming mentorship requests · ${incomingMentorshipRequests.length}`}>
             {incomingMentorshipRequests.length === 0 ? (
