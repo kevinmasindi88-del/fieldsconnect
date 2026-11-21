@@ -1296,20 +1296,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
                     </span>
                   </div>
 
-                  {document.resource_type === "external_link" ? (
-                    <div className="mt-2 min-w-0 space-y-1 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
-                      <p>
-                        Online resource
-                        {document.source_publisher
-                          ? ` - ${document.source_publisher}`
-                          : ""}
-                      </p>
-
-                      {document.source_title && (
-                        <p>{document.source_title}</p>
-                      )}
-                    </div>
-                  ) : (
+                  {document.resource_type === "uploaded_file" && (
                     <p className="mt-2 min-w-0 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
                       {document.file_name ?? "Uploaded file"} -{" "}
                       {document.file_size_bytes !== null
