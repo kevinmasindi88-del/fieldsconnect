@@ -227,19 +227,17 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
             {documents.map((document) => (
               <article
                 key={document.id}
-                className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
+                className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-center"
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{document.title}</h3>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h3 className="min-w-0 break-words font-semibold [overflow-wrap:anywhere]">{document.title}</h3>
                     <span className="rounded-full border px-2 py-1 text-xs">
                       {document.visibility === "public" ? "Public" : "Connections"}
                     </span>
                   </div>
 
-                  {document.description && <p className="mt-2 text-sm text-gray-700">{document.description}</p>}
-
-                  <p className="mt-2 text-xs text-gray-500">
+                  <p className="mt-2 break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
                     {document.file_name} - {formatBytes(document.file_size_bytes)}
                   </p>
                 </div>
