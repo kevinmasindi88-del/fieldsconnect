@@ -1021,11 +1021,6 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         ? targetRequest.proposed_payment_mode
         : targetRequest?.requested_payment_mode;
 
-    if (!PUBLIC_PAID_MENTORSHIPS_ENABLED && action === "accept" && effectivePaymentMode === "paid") {
-      setMessage("Paid mentorship is not available yet. Please use free mentorship or wait for the payments launch.");
-      return;
-    }
-
     setIsWorking(true);
     setMessage(null);
 
@@ -1541,9 +1536,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                       "awaiting_payment" && (
                       <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700">
                         <p>
-                          {PUBLIC_PAID_MENTORSHIPS_ENABLED
-                            ? "Payment is required before this mentorship becomes active."
-                            : "Payments are temporarily unavailable until FieldsConnect completes its payment launch approval. This existing order may expire without payment."}
+                          Payment is required before this mentorship becomes active.
                         </p>
                         <p className="mt-1 text-xs text-gray-500">
                           Payment window ends{" "}
