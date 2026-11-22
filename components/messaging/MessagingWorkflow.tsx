@@ -61,6 +61,22 @@ const MESSAGE_PAGE_SIZE = 10;
 const MOBILE_THREAD_SCROLL_THRESHOLD = 8;
 const DESKTOP_THREAD_SCROLL_THRESHOLD = 8;
 
+// Short-lived memory-only index for revisiting Messages. Scoped by the
+// authenticated member so another login cannot display previous account data.
+// Always refresh in the background to catch new conversations and unread items.
+type MessagingIndexSnapshot = {
+  userId: string;
+  timestamp: number;
+  connections: Connection[];
+  profiles: Profile[];
+  conversations: Conversation[];
+  systemInboxMessages: SystemInboxMessage[];
+  unreadMessageNotifications: UnreadMessageNotification[];
+  channelActivity: Record<string, string>;
+};
+let cachedMessagingIndex: MessagingIndexSnapshot | null = null;
+const MESSAGE_INDEX_CACHE_MS = 2 * 60 * 1000;
+
 function ScrollableConversationList({
   children,
   className,
@@ -535,9 +551,7 @@ export function MessagingWorkflow() {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) throw sessionError;
-
       const userId = sessionData.session?.user.id;
-
       if (!userId) {
         setMessage("Please log in before using messages.");
         setIsLoading(false);
@@ -546,9 +560,23 @@ export function MessagingWorkflow() {
 
       setCurrentUserId(userId);
 
+      if (
+        cachedMessagingIndex?.userId === userId &&
+        Date.now() - cachedMessagingIndex.timestamp < MESSAGE_INDEX_CACHE_MS
+      ) {
+        setConnections(cachedMessagingIndex.connections);
+        setProfiles(cachedMessagingIndex.profiles);
+        setConversations(cachedMessagingIndex.conversations);
+        setSystemInboxMessages(cachedMessagingIndex.systemInboxMessages);
+        setUnreadMessageNotifications(cachedMessagingIndex.unreadMessageNotifications);
+        setChannelActivity(cachedMessagingIndex.channelActivity);
+        setIsLoading(false);
+      }
+
+      // The first batch is limited to this account's connections, unread
+      // items and inbox. Do not download every profile in the system.
       const [
         { data: connectionData, error: connectionError },
-        { data: profileData, error: profileError },
         { data: unreadNotificationData, error: unreadNotificationError },
         { data: systemInboxData, error: systemInboxError },
       ] = await Promise.all([
@@ -558,86 +586,112 @@ export function MessagingWorkflow() {
           .eq("status", "accepted")
           .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
         supabase
-          .from("profiles")
-          .select("id, display_name, username, role_type, field, avatar_url")
-          .is("deleted_at", null),
-        supabase
           .from("notifications")
           .select("id, actor_id, read_at")
+          .eq("recipient_id", userId)
           .eq("notification_type", "new_message")
           .is("read_at", null),
         supabase
           .from("system_inbox_messages")
-          .select(
-            "id, recipient_id, sender_label, title, body, created_at"
-          )
+          .select("id, recipient_id, sender_label, title, body, created_at")
           .eq("recipient_id", userId)
           .order("created_at", { ascending: false }),
       ]);
 
       if (connectionError) throw connectionError;
-      if (profileError) throw profileError;
       if (unreadNotificationError) throw unreadNotificationError;
       if (systemInboxError) throw systemInboxError;
 
       const acceptedConnections = (connectionData ?? []) as Connection[];
-      const visibleProfiles = (profileData ?? []) as Profile[];
-      const visibleProfileIds = new Set(visibleProfiles.map((profile) => profile.id));
-      const missingContactIds = Array.from(new Set(
-        acceptedConnections.map((connection) =>
+      const unreadRows = (unreadNotificationData ?? []) as UnreadMessageNotification[];
+      const inboxRows = (systemInboxData ?? []) as SystemInboxMessage[];
+
+      const connectionIds = acceptedConnections.map((connection) => connection.id);
+      const contactIds = Array.from(new Set([
+        userId,
+        ...acceptedConnections.map((connection) =>
           connection.requester_id === userId
             ? connection.recipient_id
             : connection.requester_id
-        )
-      )).filter((id) => !visibleProfileIds.has(id));
+        ),
+      ]));
 
-      // A private profile still has a discoverable name, but no readable
-      // profile details. Use only the restricted member-card identity.
-      const privateContacts: Profile[] = [];
-      for (let i = 0; i < missingContactIds.length; i += 100) {
-        const { data: cards, error: cardsError } = await supabase.rpc(
-          "get_discoverable_member_cards",
-          { target_ids: missingContactIds.slice(i, i + 100) }
-        );
-        if (cardsError) {
-          console.warn("Unable to resolve private contact names:", cardsError);
-          break;
-        }
-        privateContacts.push(...((cards ?? []) as Profile[]));
+      // Fetch only connected members' public profile details, and the
+      // conversations themselves, concurrently in this second network round.
+      const profileChunks: string[][] = [];
+      for (let i = 0; i < contactIds.length; i += 100) {
+        profileChunks.push(contactIds.slice(i, i + 100));
       }
+      const [profileBatches, conversationResult] = await Promise.all([
+        Promise.all(profileChunks.map(async (ids) => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("id, display_name, username, role_type, field, avatar_url")
+            .in("id", ids)
+            .is("deleted_at", null);
+          if (error) throw error;
+          return (data ?? []) as Profile[];
+        })),
+        connectionIds.length
+          ? supabase
+            .from("conversations")
+            .select("id, connection_id")
+            .in("connection_id", connectionIds)
+          : Promise.resolve({ data: [] as Conversation[], error: null }),
+      ]);
+      if (conversationResult.error) throw conversationResult.error;
+
+      const visibleProfiles = profileBatches.flat();
+      const visibleIds = new Set(visibleProfiles.map((profile) => profile.id));
+      const missingContactIds = contactIds.filter((id) => !visibleIds.has(id));
+
+      // Keep the existing private-profile identity policy exactly as before.
+      const privateChunks: string[][] = [];
+      for (let i = 0; i < missingContactIds.length; i += 100) {
+        privateChunks.push(missingContactIds.slice(i, i + 100));
+      }
+      const privateBatches = await Promise.all(privateChunks.map(async (ids) => {
+        const { data, error } = await supabase.rpc(
+          "get_discoverable_member_cards", { target_ids: ids }
+        );
+        if (error) {
+          console.warn("Unable to resolve private contact names:", error);
+          return [] as Profile[];
+        }
+        return (data ?? []) as Profile[];
+      }));
+
+      const contactProfiles = [...visibleProfiles, ...privateBatches.flat()];
+      const visibleConversations = (conversationResult.data ?? []) as Conversation[];
 
       setConnections(acceptedConnections);
-      setProfiles([...visibleProfiles, ...privateContacts]);
-      setSystemInboxMessages(
-        (systemInboxData ?? []) as SystemInboxMessage[]
-      );
-      setUnreadMessageNotifications(
-        (unreadNotificationData ?? []) as UnreadMessageNotification[]
-      );
-
-      const connectionIds = acceptedConnections.map((connection) => connection.id);
-
-      if (connectionIds.length === 0) {
-        setConversations([]);
-        setChannelActivity({});
-        setMessages([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: conversationData, error: conversationError } = await supabase
-        .from("conversations")
-        .select("id, connection_id")
-        .in("connection_id", connectionIds);
-
-      if (conversationError) throw conversationError;
-
-      const visibleConversations = (conversationData ?? []) as Conversation[];
+      setProfiles(contactProfiles);
+      setSystemInboxMessages(inboxRows);
+      setUnreadMessageNotifications(unreadRows);
       setConversations(visibleConversations);
-      await refreshChannelActivity(visibleConversations.map((item) => item.id));
-
       setMessages([]);
       setHasOlderMessages(false);
+
+      cachedMessagingIndex = {
+        userId,
+        timestamp: Date.now(),
+        connections: acceptedConnections,
+        profiles: contactProfiles,
+        conversations: visibleConversations,
+        systemInboxMessages: inboxRows,
+        unreadMessageNotifications: unreadRows,
+        channelActivity: cachedMessagingIndex?.userId === userId
+          ? cachedMessagingIndex.channelActivity : {},
+      };
+
+      // Channel ordering can refine in the background. Never hold the whole
+      // Messages page behind the extra last-message activity request.
+      setIsLoading(false);
+      if (visibleConversations.length > 0) {
+        void refreshChannelActivity(visibleConversations.map((item) => item.id));
+      } else {
+        setChannelActivity({});
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load messaging data.");
     } finally {
