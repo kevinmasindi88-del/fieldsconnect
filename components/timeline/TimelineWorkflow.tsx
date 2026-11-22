@@ -972,10 +972,6 @@ export function TimelineWorkflow() {
     return reactions.filter((reaction) => reaction.post_id === postId).length;
   }
 
-  function hasLiked(postId: string) {
-    return reactions.some((reaction) => reaction.post_id === postId && reaction.profile_id === currentUserId);
-  }
-
   function getCommentLikeCount(commentId: string) {
     return commentReactions.filter((reaction) => reaction.comment_id === commentId).length;
   }
