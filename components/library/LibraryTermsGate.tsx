@@ -107,29 +107,25 @@ export function LibraryTermsGate({
         return;
       }
 
-      const [
-        termsResult,
-        acceptanceResult,
-      ] = await Promise.all([
-        supabase.rpc(
-          "get_current_library_terms"
-        ),
-        supabase.rpc(
-          "has_accepted_current_library_terms",
-          {
-            candidate:
-              sessionData.session.user.id,
-          }
-        ),
-      ]);
+      // The current-terms document is needed to show the agreement, but
+      // established members only need a fresh server-side acceptance check
+      // to enter. Start both requests together and don't block accepted
+      // members while downloading terms they don't need to read again.
+      const termsRequest = supabase.rpc("get_current_library_terms");
+      const acceptanceResult = await supabase.rpc(
+        "has_accepted_current_library_terms",
+        { candidate: sessionData.session.user.id }
+      );
 
-      if (termsResult.error) {
-        throw termsResult.error;
+      if (acceptanceResult.error) throw acceptanceResult.error;
+
+      if (acceptanceResult.data === true) {
+        setHasAccepted(true);
+        return;
       }
 
-      if (acceptanceResult.error) {
-        throw acceptanceResult.error;
-      }
+      const termsResult = await termsRequest;
+      if (termsResult.error) throw termsResult.error;
 
       const currentTerms =
         Array.isArray(termsResult.data)
@@ -137,15 +133,11 @@ export function LibraryTermsGate({
           : null;
 
       if (!currentTerms) {
-        throw new Error(
-          "No current Library Terms version is available."
-        );
+        throw new Error("No current Library Terms version is available.");
       }
 
       setTerms(currentTerms as LibraryTerms);
-      setHasAccepted(
-        acceptanceResult.data === true
-      );
+      setHasAccepted(false);
     } catch (error) {
       setMessage(
         getErrorMessage(
