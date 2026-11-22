@@ -714,9 +714,15 @@ export function TimelineWorkflow() {
         };
         setReactions((current) => [...current, optimisticReaction]);
 
+        // A reaction may already exist in the database while the local timeline
+        // snapshot is stale. Resolve the unique (post_id, profile_id) conflict
+        // atomically instead of attempting a second INSERT.
         const { data: createdReaction, error } = await supabase
           .from("reactions")
-          .insert({ post_id: postId, profile_id: currentUserId, reaction_type: choice })
+          .upsert(
+            { post_id: postId, profile_id: currentUserId, reaction_type: choice },
+            { onConflict: "post_id,profile_id" }
+          )
           .select("id, post_id, profile_id, reaction_type")
           .single();
 
