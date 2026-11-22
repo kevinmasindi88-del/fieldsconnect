@@ -1,3 +1,7 @@
+// 22 Nov 2026: payment demo closed. This independent kill switch remains
+// active even if an old environment secret is left enabled.
+const PAID_MENTORSHIP_DEMO_CLOSED = true;
+
 import { createClient } from "@supabase/supabase-js";
 
 type InitializeRequest = {
@@ -137,7 +141,7 @@ Deno.serve(async (req: Request) => {
 
   // Paid mentorship is test-only until FC banking, Paystack KYC and policies are approved.
   // Default deny: this requires a deliberate server-side production launch opt-in.
-  if (Deno.env.get("FC_PAID_MENTORSHIPS_ENABLED") !== "true") {
+  if (PAID_MENTORSHIP_DEMO_CLOSED || Deno.env.get("FC_PAID_MENTORSHIPS_ENABLED") !== "true") {
     return jsonResponse({ ok: false, error: "payment_launch_deferred" }, 503);
   }
 
