@@ -6,6 +6,79 @@ import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/b
 
 type LinkPreview = { url: string; title: string; description?: string; image?: string; domain: string; facebookEmbedUrl?: string; facebookEmbedKind?: "post" | "video"; tiktokValidation?: "valid" | "unavailable" | "unknown"; vimeoPlayerUrl?: string };
 
+// Short-lived, in-memory caches allow media to appear immediately when a
+// member returns to the timeline, without persisting protected URLs in
+// localStorage or across browser restarts. Account IDs scope every entry.
+const signedImageCache = new Map<string, { url: string; expiresAt: number }>();
+const pendingSignedImages = new Map<string, Promise<string | null>>();
+const linkPreviewCache = new Map<string, { value: LinkPreview | null; expiresAt: number }>();
+const pendingLinkPreviews = new Map<string, Promise<LinkPreview | null>>();
+
+function rememberLimited<K, V>(cache: Map<K, V>, key: K, value: V) {
+  // Keep memory bounded on long sessions with hundreds of posts.
+  if (!cache.has(key) && cache.size >= 150) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, value);
+}
+
+async function cachedPostImageUrl(userId: string, imagePath: string): Promise<string | null> {
+  const key = JSON.stringify([userId, imagePath]);
+  const saved = signedImageCache.get(key);
+  if (saved && saved.expiresAt > Date.now()) return saved.url;
+  if (saved) signedImageCache.delete(key);
+  const pending = pendingSignedImages.get(key);
+  if (pending) return pending;
+
+  const task = (async () => {
+    const { data, error } = await getSupabaseBrowserClient()
+      .storage.from("timeline-images").createSignedUrl(imagePath, 3600);
+    if (error || !data?.signedUrl) return null;
+    // Signed URL expires after one hour. Only reuse it for five minutes;
+    // invalidated permissions are never cached persistently.
+    rememberLimited(signedImageCache, key, {
+      url: data.signedUrl,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+    return data.signedUrl;
+  })().catch(() => null).finally(() => pendingSignedImages.delete(key));
+
+  pendingSignedImages.set(key, task);
+  return task;
+}
+
+async function cachedLinkPreview(
+  userId: string,
+  url: string,
+  accessToken: string
+): Promise<LinkPreview | null> {
+  const key = JSON.stringify([userId, url]);
+  const saved = linkPreviewCache.get(key);
+  if (saved && saved.expiresAt > Date.now()) return saved.value;
+  if (saved) linkPreviewCache.delete(key);
+  const pending = pendingLinkPreviews.get(key);
+  if (pending) return pending;
+
+  const task = (async () => {
+    // The server still authorizes each uncached request. Never cache tokens.
+    const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+    const data = response.ok ? (await response.json() as LinkPreview) : null;
+    rememberLimited(linkPreviewCache, key, {
+      value: data,
+      expiresAt: Date.now() + (data ? 5 * 60 * 1000 : 30 * 1000),
+    });
+    return data;
+  })().catch(() => null).finally(() => pendingLinkPreviews.delete(key));
+
+  pendingLinkPreviews.set(key, task);
+  return task;
+}
+
+
 function isVimeoLink(rawUrl: string | null): boolean {
   if (!rawUrl) return false;
   try {
@@ -489,10 +562,16 @@ export function PostRichContent({
     let cancelled = false;
     setImageUrl(null);
     if (!imagePath || !isSupabaseConfigured()) return;
-    const supabase = getSupabaseBrowserClient();
-    void supabase.storage.from("timeline-images").createSignedUrl(imagePath, 3600)
-      .then(({ data, error }) => {
-        if (!cancelled && !error) setImageUrl(data?.signedUrl ?? null);
+    // A cached signed URL preserves the exact image source between page
+    // visits, letting the browser reuse the previously downloaded image.
+    void getSupabaseBrowserClient().auth.getSession()
+      .then(({ data }) => {
+        const userId = data.session?.user.id;
+        if (!userId || cancelled) return null;
+        return cachedPostImageUrl(userId, imagePath);
+      })
+      .then((url) => {
+        if (!cancelled) setImageUrl(url ?? null);
       });
     return () => { cancelled = true; };
   }, [imagePath]);
@@ -500,19 +579,17 @@ export function PostRichContent({
   useEffect(() => {
     let cancelled = false;
     setPreview(null);
-    // Request safe, authenticated link metadata for both normal links and
-    // recognized videos so embedded players retain the same rich preview text.
+    // Reuse recently fetched metadata on return visits. The authenticated
+    // endpoint is only called for cache misses or expired entries.
     if (!targetLink || !targetLink.startsWith("https://")) return;
     if (!isSupabaseConfigured()) return;
-    const supabase = getSupabaseBrowserClient();
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (!token || cancelled) return null;
-      return fetch(`/api/link-preview?url=${encodeURIComponent(targetLink)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    }).then((response) => response?.ok ? response.json() : null)
-      .then((data: LinkPreview | null) => { if (!cancelled) setPreview(data); })
+    void getSupabaseBrowserClient().auth.getSession()
+      .then(({ data }) => {
+        const session = data.session;
+        if (!session || cancelled) return null;
+        return cachedLinkPreview(session.user.id, targetLink, session.access_token);
+      })
+      .then((data) => { if (!cancelled) setPreview(data); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [targetLink]);
