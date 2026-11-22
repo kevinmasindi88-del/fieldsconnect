@@ -461,9 +461,10 @@ export function TimelineWorkflow() {
   }, []);
 
   useEffect(() => {
+    // Relative post ages do not need to rerender every media card each second.
     const intervalId = window.setInterval(() => {
-      setRelativeTimeNow(Date.now());
-    }, 1000);
+      if (!document.hidden) setRelativeTimeNow(Date.now());
+    }, 30_000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -542,17 +543,25 @@ export function TimelineWorkflow() {
   useEffect(() => {
     if (!currentUserId || !isSupabaseConfigured()) return;
 
-    const intervalId = window.setInterval(() => {
+    // Realtime channels above handle live activity. Keep only a lightweight
+    // fallback refresh for browsers with unreliable websocket connections.
+    // Never poll in background tabs.
+    function refreshIfVisible() {
+      if (document.hidden) return;
       void Promise.all([
         loadPosts(),
         loadComments(),
         loadReactions(),
         loadCommentReactions(),
       ]);
-    }, 3000);
+    }
+
+    const intervalId = window.setInterval(refreshIfVisible, 60_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
 
     return () => {
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [currentUserId]);
 
