@@ -5,8 +5,16 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 export type PostReactionType = "like" | "love" | "thanks" | "applause";
 
-const HOLD_DURATION_MS = 1500;
+const HOLD_DURATION_MS = 800;
 const MOVE_TOLERANCE_PX = 12;
+
+// Native emoji glyphs are multicolour images, so "color: blue" does not
+// recolour them. These filters retain emoji shading while tinting both
+// hand reactions into distinct blue shades. The red heart stays untouched.
+const reactionEmojiFilters: Partial<Record<PostReactionType, string>> = {
+  thanks: "grayscale(1) sepia(1) saturate(4) hue-rotate(170deg) brightness(1.16)",
+  applause: "grayscale(1) sepia(1) saturate(5) hue-rotate(187deg) brightness(0.92)",
+};
 
 const additionalReactions: Array<{ type: PostReactionType; emoji: string; label: string }> = [
   { type: "love", emoji: "❤️", label: "Love" },
@@ -130,7 +138,13 @@ export function PostReactionControl({
               title={choice.label}
               type="button"
             >
-              {choice.emoji}
+              <span
+                aria-hidden="true"
+                className="inline-block leading-none"
+                style={{ filter: reactionEmojiFilters[choice.type] }}
+              >
+                {choice.emoji}
+              </span>
             </button>
           ))}
         </div>
@@ -158,11 +172,17 @@ export function PostReactionControl({
         onPointerLeave={finishHold}
         onPointerMove={moveHold}
         onPointerUp={finishHold}
-        title="Tap to like · Hold 1.5 seconds for ❤️ 🙏 👏 · Arrow Down for reactions"
+        title="Tap to like · Hold 0.8 seconds for ❤️ 🙏 👏 · Arrow Down for reactions"
         type="button"
       >
         {selected ? (
-          <span aria-hidden="true" className="text-lg leading-none">{selected.emoji}</span>
+          <span
+            aria-hidden="true"
+            className="inline-block text-lg leading-none"
+            style={{ filter: reactionEmojiFilters[selected.type] }}
+          >
+            {selected.emoji}
+          </span>
         ) : (
           <svg aria-hidden="true" className="h-5 w-5" fill={reaction ? "currentColor" : "none"} viewBox="0 0 24 24">
             <path
