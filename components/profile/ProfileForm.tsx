@@ -131,13 +131,12 @@ const initialMentorshipPricing: MentorshipPricingState = {
   },
 };
 
-// Allow private pricing drafts and demonstration while live payment execution remains disabled.
-// Existing private drafts remain stored; the backend checkout gate is unchanged.
-const PUBLIC_PAID_MENTORSHIPS_ENABLED =
-  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
-const PAYMENT_SETUP_UI_ENABLED = true;
-// Paid mentorship offers and requests operate independently of live checkout.
-const PAID_MENTORSHIP_OFFERS_ENABLED = true;
+// Paystack demonstration concluded on 22 Nov 2026. Keep all paid controls
+// hidden and inoperative; existing prices, drafts and payout records remain stored.
+// Re-enabling requires a reviewed release and independent server-side approval.
+const PUBLIC_PAID_MENTORSHIPS_ENABLED = false;
+const PAYMENT_SETUP_UI_ENABLED = false;
+const PAID_MENTORSHIP_OFFERS_ENABLED = false;
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
