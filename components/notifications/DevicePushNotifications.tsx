@@ -213,9 +213,6 @@ export function DevicePushNotifications() {
 
       setDevicePushOptIn(user.id, true, p256dh);
       setPushState("enabled");
-      setMessage(
-        "Device notifications are enabled."
-      );
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -272,9 +269,6 @@ export function DevicePushNotifications() {
 
       setDevicePushOptIn(user.id, false);
       setPushState("disabled");
-      setMessage(
-        "Device notifications are disabled."
-      );
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -321,46 +315,33 @@ export function DevicePushNotifications() {
 
   return (
     <div className="rounded-xl border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">
-            Device notifications
-          </p>
-
-          <p className="mt-1 text-sm text-gray-600">
-            {pushState === "enabled"
-              ? "FieldsConnect can notify this device when important activity happens."
-              : "Get FieldsConnect alerts on this device even when you are not viewing the site."}
-          </p>
-        </div>
-
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold">Device notifications</p>
         {pushState === "enabled" ? (
           <button
-            className="rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
+            aria-label="Disable device notifications"
+            className="min-h-10 shrink-0 rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
             disabled={isWorking}
             onClick={disablePushNotifications}
             type="button"
           >
-            {isWorking
-              ? "Disabling..."
-              : "Disable"}
+            {isWorking ? "Disabling..." : "Disable"}
           </button>
         ) : (
           <button
-            className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            aria-label="Enable device notifications"
+            className="min-h-10 shrink-0 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             disabled={isWorking}
             onClick={enablePushNotifications}
             type="button"
           >
-            {isWorking
-              ? "Enabling..."
-              : "Enable device notifications"}
+            {isWorking ? "Enabling..." : "Enable"}
           </button>
         )}
       </div>
 
       {message && (
-        <p className="mt-3 text-sm text-gray-700">
+        <p className="mt-3 text-sm text-gray-700" role="alert">
           {message}
         </p>
       )}
