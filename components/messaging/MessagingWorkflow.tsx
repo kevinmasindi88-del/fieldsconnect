@@ -160,6 +160,8 @@ export function MessagingWorkflow() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
+  const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
+  const [conversationSearch, setConversationSearch] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -217,6 +219,26 @@ export function MessagingWorkflow() {
       return delta || a.id.localeCompare(b.id);
     });
   }, [systemInboxMessages, chatConnections, channelActivity, conversationByConnectionId]);
+
+  const filteredChannels = useMemo(() => {
+    const search = conversationSearch.trim().toLocaleLowerCase();
+    if (!search) return orderedChannels;
+
+    return orderedChannels.filter((channel) => {
+      if (channel.kind === "system") {
+        return channel.item.sender_label.toLocaleLowerCase().includes(search);
+      }
+
+      const connection = channel.connection;
+      const otherId = connection.requester_id === currentUserId
+        ? connection.recipient_id
+        : connection.requester_id;
+      const person = profileById.get(otherId);
+      return [person?.display_name, person?.username].some(
+        (name) => name?.toLocaleLowerCase().includes(search)
+      );
+    });
+  }, [orderedChannels, conversationSearch, currentUserId, profileById]);
 
   async function refreshChannelActivity(ids: string[]) {
     if (!isSupabaseConfigured() || ids.length === 0) return;
@@ -1033,6 +1055,40 @@ export function MessagingWorkflow() {
           </p>
         )}
 
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Messages</h2>
+          <button
+            aria-label={conversationSearchOpen ? "Close conversation search" : "Search conversations"}
+            aria-expanded={conversationSearchOpen}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            onClick={() => {
+              setConversationSearchOpen((open) => !open);
+              setConversationSearch("");
+            }}
+            title="Search conversations by name"
+            type="button"
+          >
+            <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="10.8" cy="10.8" r="6.5" />
+              <path strokeLinecap="round" d="m16 16 5 5" />
+            </svg>
+          </button>
+        </div>
+
+        {conversationSearchOpen && (
+          <div className="mb-3">
+            <input
+              aria-label="Search conversations by name"
+              autoFocus
+              className="w-full min-w-0 rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              onChange={(event) => setConversationSearch(event.target.value)}
+              placeholder="Search people by name..."
+              type="search"
+              value={conversationSearch}
+            />
+          </div>
+        )}
+
         {isLoading ? (
           <p className="text-sm text-gray-600">
             Loading messages...
@@ -1042,21 +1098,25 @@ export function MessagingWorkflow() {
           <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
             No messages yet.
           </p>
+        ) : filteredChannels.length === 0 ? (
+          <p className="rounded-xl border border-dashed p-4 text-sm text-gray-600">
+            No conversations match your search.
+          </p>
         ) : (
           <>
             <ScrollableConversationList
               className="flex flex-col gap-2 lg:hidden"
-              itemCount={orderedChannels.length}
+              itemCount={filteredChannels.length}
               threshold={MOBILE_THREAD_SCROLL_THRESHOLD}
             >
-              {orderedChannels.map((channel) => renderChannelItem(channel, true))}
+              {filteredChannels.map((channel) => renderChannelItem(channel, true))}
             </ScrollableConversationList>
             <ScrollableConversationList
               className="hidden flex-col gap-3 lg:flex"
-              itemCount={orderedChannels.length}
+              itemCount={filteredChannels.length}
               threshold={DESKTOP_THREAD_SCROLL_THRESHOLD}
             >
-              {orderedChannels.map((channel) => renderChannelItem(channel, false))}
+              {filteredChannels.map((channel) => renderChannelItem(channel, false))}
             </ScrollableConversationList>
           </>
         )}
