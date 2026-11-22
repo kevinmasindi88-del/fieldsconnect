@@ -60,23 +60,18 @@ export function restoreDevicePushForSignedInUser(
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id !== userId) return false;
 
-    const registration = await navigator.serviceWorker.getRegistration();
-    const subscription = await registration?.pushManager.getSubscription();
-    if (!subscription) return false;
-
     const saved = window.localStorage.getItem(preferenceKey(userId));
+    // A user's explicit choice remains authoritative across logouts.
     if (saved === "false") return false;
 
-    if (
-      saved === "true" &&
-      window.localStorage.getItem(subscriptionKey(userId)) !==
-        subscription.toJSON().keys?.p256dh
-    ) {
-      return false;
-    }
+    let registration = await navigator.serviceWorker.getRegistration();
+    let subscription = await registration?.pushManager.getSubscription();
 
     if (saved !== "true") {
-      // Adopt only a legacy subscription already owned by this account.
+      // Keep legacy adoption conservative: another member's subscription
+      // on a shared device must never enable notifications for this member.
+      if (!subscription) return false;
+
       const { data: owned, error } = await supabase
         .from("push_subscriptions")
         .select("id")
@@ -86,8 +81,34 @@ export function restoreDevicePushForSignedInUser(
 
       if (error) throw error;
       if (!owned) return false;
-
       setDevicePushOptIn(userId, true, subscription.toJSON().keys?.p256dh);
+    }
+
+    // Logout removes the server-side mapping for privacy. The browser may
+    // also discard its subscription after a browser or application update.
+    // An existing opt-in must be restored automatically, not treated as a
+    // new "disabled" choice merely because the subscription disappeared.
+    if (!registration) {
+      registration = await navigator.serviceWorker.register("/sw.js");
+    }
+
+    if (!subscription) {
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) return false;
+
+      const paddedKey = vapidPublicKey +
+        "=".repeat((4 - (vapidPublicKey.length % 4)) % 4);
+      const rawKey = window.atob(
+        paddedKey.replace(/-/g, "+").replace(/_/g, "/")
+      );
+      const applicationServerKey = Uint8Array.from(
+        Array.from(rawKey, (character) => character.charCodeAt(0))
+      );
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
     }
 
     const keys = subscription.toJSON().keys;
@@ -114,6 +135,9 @@ export function restoreDevicePushForSignedInUser(
     );
 
     if (error) throw error;
+
+    // Renew stored key after the browser rotates/recreates the subscription.
+    setDevicePushOptIn(userId, true, keys.p256dh);
     return true;
   })();
 
