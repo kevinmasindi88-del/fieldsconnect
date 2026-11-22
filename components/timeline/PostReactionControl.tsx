@@ -100,11 +100,17 @@ export function PostReactionControl({
   }
 
   function clickLike() {
+    // Ignore the synthetic click fired when the original long press ends.
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
     }
-    setPickerOpen(false);
+    // A second tap on Like dismisses the open picker; never toggle the
+    // existing reaction or write to the database while closing it.
+    if (pickerOpen) {
+      setPickerOpen(false);
+      return;
+    }
     onReact("like");
   }
 
@@ -150,7 +156,7 @@ export function PostReactionControl({
         </div>
       )}
       <button
-        aria-label={reaction === "like" ? "Unlike post" : "Like post"}
+        aria-label={pickerOpen ? "Close reaction picker" : reaction === "like" ? "Unlike post" : "Like post"}
         aria-haspopup="true"
         aria-expanded={pickerOpen}
         aria-pressed={Boolean(reaction)}
