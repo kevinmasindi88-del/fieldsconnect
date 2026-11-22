@@ -10,6 +10,7 @@ import { ReportMenu } from "@/components/moderation/ReportMenu";
 import { PostRichContent, MentionedText, extractFirstPostUrl, getExternalVideo, compressTimelineImage } from "@/components/timeline/PostRichContent";
 import { MentionEditor, type MentionCandidate } from "@/components/timeline/MentionEditor";
 import { PencilIcon, TrashIcon } from "@/components/timeline/ActionIcons";
+import { PostReactionControl, type PostReactionType } from "@/components/timeline/PostReactionControl";
 import {
   getActionErrorMessage,
   getMessageAlertClass,
@@ -657,60 +658,65 @@ export function TimelineWorkflow() {
     }
   }
 
-  async function toggleLike(postId: string) {
-    if (
-      !currentUserId ||
-      !isSupabaseConfigured() ||
-      reactingPostId === postId
-    ) {
-      return;
-    }
+  async function setPostReaction(postId: string, choice: PostReactionType) {
+    if (!currentUserId || !isSupabaseConfigured() || reactingPostId === postId) return;
 
     setReactingPostId(postId);
     setMessage(null);
 
     const existing = reactions.find(
-      (reaction) =>
-        reaction.post_id === postId &&
-        reaction.profile_id === currentUserId
+      (reaction) => reaction.post_id === postId && reaction.profile_id === currentUserId
     );
 
     try {
       const supabase = getSupabaseBrowserClient();
 
-      if (existing) {
-        setReactions((current) =>
-          current.filter((reaction) => reaction.id !== existing.id)
-        );
+      if (existing?.reaction_type === choice) {
+        // Clicking the same reaction again removes it.
+        setReactions((current) => current.filter((reaction) => reaction.id !== existing.id));
 
-        const { error } = await supabase
-          .from("reactions")
-          .delete()
-          .eq("id", existing.id);
-
+        const { error } = await supabase.from("reactions").delete().eq("id", existing.id);
         if (error) {
           setReactions((current) => [...current, existing]);
           throw error;
         }
-      } else {
-        const optimisticId = `optimistic-${postId}-${currentUserId}`;
+      } else if (existing) {
+        // Update in place: preserve one reaction per member and avoid repeated notifications.
+        setReactions((current) => current.map((reaction) =>
+          reaction.id === existing.id ? { ...reaction, reaction_type: choice } : reaction
+        ));
 
+        const { data: savedReaction, error } = await supabase
+          .from("reactions")
+          .update({ reaction_type: choice })
+          .eq("id", existing.id)
+          .eq("profile_id", currentUserId)
+          .select("id, post_id, profile_id, reaction_type")
+          .single();
+
+        if (error) {
+          setReactions((current) => current.map((reaction) =>
+            reaction.id === existing.id ? existing : reaction
+          ));
+          throw error;
+        }
+
+        setReactions((current) => current.map((reaction) =>
+          reaction.id === existing.id ? (savedReaction as Reaction) : reaction
+        ));
+      } else {
+        const optimisticId = "optimistic-" + postId + "-" + currentUserId;
         const optimisticReaction: Reaction = {
           id: optimisticId,
           post_id: postId,
           profile_id: currentUserId,
-          reaction_type: "like",
+          reaction_type: choice,
         };
-
         setReactions((current) => [...current, optimisticReaction]);
 
         const { data: createdReaction, error } = await supabase
           .from("reactions")
-          .insert({
-            post_id: postId,
-            profile_id: currentUserId,
-            reaction_type: "like",
-          })
+          .insert({ post_id: postId, profile_id: currentUserId, reaction_type: choice })
           .select("id, post_id, profile_id, reaction_type")
           .single();
 
@@ -721,37 +727,24 @@ export function TimelineWorkflow() {
           throw error;
         }
 
-        setReactions((current) =>
-          current.map((reaction) =>
-            reaction.id === optimisticId
-              ? (createdReaction as Reaction)
-              : reaction
-          )
-        );
+        setReactions((current) => current.map((reaction) =>
+          reaction.id === optimisticId ? (createdReaction as Reaction) : reaction
+        ));
 
         const post = posts.find((item) => item.id === postId);
-
         if (post && post.author_id !== currentUserId) {
           const actor = profileById.get(currentUserId);
-
-          const { error: notificationError } = await supabase
-            .from("notifications")
-            .insert({
-              recipient_id: post.author_id,
-              actor_id: currentUserId,
-              notification_type: "post_liked",
-              entity_type: "post",
-              entity_id: post.id,
-              title: "Someone liked your post",
-              body: `${actor?.display_name ?? "Someone"} liked your post.`,
-            });
-
-          if (notificationError) {
-            console.error(
-              "Unable to create post-like notification:",
-              notificationError
-            );
-          }
+          const { error: notificationError } = await supabase.from("notifications").insert({
+            recipient_id: post.author_id,
+            actor_id: currentUserId,
+            notification_type: "post_liked",
+            entity_type: "post",
+            entity_id: post.id,
+            title: choice === "like" ? "Someone liked your post" : "Someone reacted to your post",
+            body: (actor?.display_name ?? "Someone") +
+              (choice === "like" ? " liked your post." : " reacted to your post."),
+          });
+          if (notificationError) console.error("Unable to create post-reaction notification:", notificationError);
         }
       }
     } catch (error) {
@@ -1209,7 +1202,10 @@ export function TimelineWorkflow() {
           const isFcNews = Boolean(fcNewsPublication);
           const postComments = getPostComments(post.id);
           const mentionedProfiles = getPostMentions(post.id);
-          const liked = hasLiked(post.id);
+          const ownPostReaction = reactions.find(
+            (reaction) => reaction.post_id === post.id && reaction.profile_id === currentUserId
+          );
+          const selectedPostReaction = (ownPostReaction?.reaction_type ?? null) as PostReactionType | null;
           const isOwnPost = post.author_id === currentUserId;
           const isEditing = editingPostId === post.id;
 
@@ -1373,36 +1369,12 @@ export function TimelineWorkflow() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  aria-label={liked ? "Unlike post" : "Like post"}
-                  aria-pressed={liked}
-                  className={[
-                    "inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50",
-                    liked
-                      ? "text-blue-700 hover:bg-blue-50"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-blue-700",
-                  ].join(" ")}
+                <PostReactionControl
+                  count={getPostLikeCount(post.id)}
                   disabled={reactingPostId === post.id}
-                  onClick={() => toggleLike(post.id)}
-                  title={liked ? "Unlike" : "Like"}
-                  type="button"
-                >
-                  <svg
-                    aria-hidden="true"
-                    className="h-5 w-5"
-                    fill={liked ? "currentColor" : "none"}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      d="M7 10v10H4V10h3Zm4.2-7c.8 0 1.5.7 1.5 1.5v3.1h4.8c1.4 0 2.4 1.3 2 2.6l-2.1 7.3c-.3.9-1.1 1.5-2.1 1.5H9V9.7l2-4.7c.1-.3.2-.7.2-1V3Z"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                    />
-                  </svg>
-                  <span>{getPostLikeCount(post.id)}</span>
-                </button>
+                  reaction={selectedPostReaction}
+                  onReact={(choice) => void setPostReaction(post.id, choice)}
+                />
                 <button
                   type="button"
                   aria-label={`${expandedComments[post.id] ? "Hide" : "Show"} comments on post (${postComments.length})`}
