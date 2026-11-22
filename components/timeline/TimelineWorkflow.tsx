@@ -74,6 +74,24 @@ type CommentMention = {
   mentioned_profile_id: string;
 };
 
+// Keep a short-lived account-scoped snapshot to make returning to the feed
+// immediate. Realtime updates and an authenticated refresh still reconcile
+// it with current visibility and content; nothing is saved across reloads.
+type TimelineSnapshot = {
+  userId: string;
+  loadedAt: number;
+  profiles: Profile[];
+  posts: Post[];
+  comments: Comment[];
+  reactions: Reaction[];
+  commentReactions: CommentReaction[];
+  publications: FcNewsPublication[];
+  postMentions: PostMention[];
+  commentMentions: CommentMention[];
+};
+let timelineSnapshot: TimelineSnapshot | null = null;
+const TIMELINE_CACHE_TTL_MS = 60_000;
+
 // Keep the separate video-link composer action restricted to known providers
 // and supported media URL shapes; don't accept profiles or arbitrary pages.
 function videoLinkProvider(raw: string): string | null {
@@ -383,6 +401,22 @@ export function TimelineWorkflow() {
 
       setCurrentUserId(userId);
 
+      if (
+        timelineSnapshot?.userId === userId &&
+        Date.now() - timelineSnapshot.loadedAt < TIMELINE_CACHE_TTL_MS
+      ) {
+        profilesRef.current = timelineSnapshot.profiles;
+        setProfiles(timelineSnapshot.profiles);
+        setPosts(timelineSnapshot.posts);
+        setComments(timelineSnapshot.comments);
+        setReactions(timelineSnapshot.reactions);
+        setCommentReactions(timelineSnapshot.commentReactions);
+        setFcNewsPublications(timelineSnapshot.publications);
+        setPostMentions(timelineSnapshot.postMentions);
+        setCommentMentions(timelineSnapshot.commentMentions);
+        setIsLoading(false);
+      }
+
       const [
         { data: profileData, error: profileError },
         { data: postData, error: postError },
@@ -429,26 +463,51 @@ export function TimelineWorkflow() {
       if (postMentionError) throw postMentionError;
       if (commentMentionError) throw commentMentionError;
 
+      const availableProfiles = (profileData ?? []) as Profile[];
+      const availablePosts = (postData ?? []) as Post[];
+      const availableComments = (commentData ?? []) as Comment[];
+      const availableReactions = (reactionData ?? []) as Reaction[];
+      const availableCommentReactions = (commentReactionData ?? []) as CommentReaction[];
+      const availablePublications = (publicationData ?? []) as FcNewsPublication[];
+      const availablePostMentions = (postMentionData ?? []) as PostMention[];
+      const availableCommentMentions = (commentMentionData ?? []) as CommentMention[];
+
+      // Render the feed as soon as its main queries return. Resolving
+      // additional restricted identities for private-profile authors is a
+      // separate step and must not hold all post media behind an extra RPC.
+      profilesRef.current = availableProfiles;
+      setProfiles(availableProfiles);
+      setPosts(availablePosts);
+      setComments(availableComments);
+      setReactions(availableReactions);
+      setCommentReactions(availableCommentReactions);
+      setFcNewsPublications(availablePublications);
+      setPostMentions(availablePostMentions);
+      setCommentMentions(availableCommentMentions);
+      setIsLoading(false);
+
       const authorProfiles = await resolveTimelineAuthorProfiles(
-        (profileData ?? []) as Profile[],
+        availableProfiles,
         [
-          ...(postData ?? []).map((post) => post.author_id),
-          ...(commentData ?? []).map((comment) => comment.author_id),
+          ...availablePosts.map((post) => post.author_id),
+          ...availableComments.map((comment) => comment.author_id),
         ]
       );
       profilesRef.current = authorProfiles;
       setProfiles(authorProfiles);
-      setCommentMentions((commentMentionData ?? []) as CommentMention[]);
-      setPostMentions(
-        (postMentionData ?? []) as PostMention[]
-      );
-      setFcNewsPublications(
-        (publicationData ?? []) as FcNewsPublication[]
-      );
-      setPosts((postData ?? []) as Post[]);
-      setComments((commentData ?? []) as Comment[]);
-      setReactions((reactionData ?? []) as Reaction[]);
-      setCommentReactions((commentReactionData ?? []) as CommentReaction[]);
+
+      timelineSnapshot = {
+        userId,
+        loadedAt: Date.now(),
+        profiles: authorProfiles,
+        posts: availablePosts,
+        comments: availableComments,
+        reactions: availableReactions,
+        commentReactions: availableCommentReactions,
+        publications: availablePublications,
+        postMentions: availablePostMentions,
+        commentMentions: availableCommentMentions,
+      };
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load timeline.");
     } finally {
