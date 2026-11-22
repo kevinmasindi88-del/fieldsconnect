@@ -168,6 +168,22 @@ const PUBLIC_PAID_MENTORSHIPS_ENABLED = false;
 
 const PEOPLE_SEARCH_PAGE_SIZE = 20;
 
+// Reuse the previous dashboard while validating it against live data.
+// In-memory only, account-scoped, and short-lived; this also makes switching
+// between Connect and Mentors instant on repeat visits.
+type ConnectionPageSnapshot = {
+  userId: string;
+  timestamp: number;
+  profiles: Profile[];
+  connections: Connection[];
+  mentorshipRequests: MentorshipRequest[];
+  mentorships: Mentorship[];
+  paymentOrders: PaymentOrder[];
+  skills: Skill[];
+};
+let cachedConnectionPage: ConnectionPageSnapshot | null = null;
+const CONNECTION_CACHE_TTL_MS = 2 * 60 * 1000;
+
 export function ConnectionWorkflow({ view = "connections" }: { view?: "connections" | "mentorship" }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -590,6 +606,21 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
 
       setCurrentUserId(userId);
 
+      if (
+        cachedConnectionPage?.userId === userId &&
+        Date.now() - cachedConnectionPage.timestamp < CONNECTION_CACHE_TTL_MS
+      ) {
+        // Show known data immediately while revalidating; no network wait on
+        // returning from Messages or switching to Mentors.
+        setProfiles(cachedConnectionPage.profiles);
+        setConnections(cachedConnectionPage.connections);
+        setMentorshipRequests(cachedConnectionPage.mentorshipRequests);
+        setMentorships(cachedConnectionPage.mentorships);
+        setPaymentOrders(cachedConnectionPage.paymentOrders);
+        setSkills(cachedConnectionPage.skills);
+        setIsLoading(false);
+      }
+
       const [
         { data: connectionsData, error: connectionsError },
         {
@@ -692,80 +723,72 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
         relatedProfileIds.add(order.mentee_id);
       });
 
-      let profilesData: Profile[] = [];
-
-      if (relatedProfileIds.size > 0) {
-        const {
-          data: relatedProfilesData,
-          error: relatedProfilesError,
-        } = await supabase
-          .from("profiles")
-          .select(
-            "id, display_name, username, role_type, field, bio, mentor_available, avatar_url"
+      const acceptedProfileIds = Array.from(new Set(
+        connectionRows
+          .filter((connection) => connection.status === "accepted")
+          .map((connection) =>
+            connection.requester_id === userId
+              ? connection.recipient_id
+              : connection.requester_id
           )
+      ));
+
+      // Both lists depend on the first batch, but not on each other.
+      // Fetch profiles and published connection skills concurrently rather
+      // than serialising them over two network round trips.
+      const [relatedProfilesResult, relatedSkillsResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, display_name, username, role_type, field, bio, mentor_available, avatar_url")
           .in("id", Array.from(relatedProfileIds))
           .is("deleted_at", null)
-          .order("display_name", {
-            ascending: true,
-          });
+          .order("display_name", { ascending: true }),
+        acceptedProfileIds.length
+          ? supabase
+            .from("skills")
+            .select("profile_id, name")
+            .in("profile_id", acceptedProfileIds)
+            .eq("is_published", true)
+            .is("deleted_at", null)
+          : Promise.resolve({ data: [] as Skill[], error: null }),
+      ]);
 
-        if (relatedProfilesError) {
-          throw relatedProfilesError;
+      if (relatedProfilesResult.error) throw relatedProfilesResult.error;
+      if (relatedSkillsResult.error) throw relatedSkillsResult.error;
+
+      let profilesData = (relatedProfilesResult.data ?? []) as Profile[];
+      const skillsData = (relatedSkillsResult.data ?? []) as Skill[];
+
+      // Preserve the restricted identity fallback for private contacts.
+      // The RPC provides only discovery-permitted fields, not private data.
+      const visibleIds = new Set(profilesData.map((profile) => profile.id));
+      const missingIds = Array.from(relatedProfileIds)
+        .filter((id) => !visibleIds.has(id));
+      if (missingIds.length > 0) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < missingIds.length; i += 100) {
+          chunks.push(missingIds.slice(i, i + 100));
         }
-
-        profilesData =
-          (relatedProfilesData ?? []) as Profile[];
-
-        // Resolve minimal identities for private members involved in requests.
-        const missingIds = Array.from(relatedProfileIds).filter(
-          (id) => !profilesData.some((profile) => profile.id === id)
-        );
-        for (let index = 0; index < missingIds.length; index += 100) {
-          const { data: privateCards, error: cardsError } = await supabase.rpc(
-            "get_discoverable_member_cards",
-            { target_ids: missingIds.slice(index, index + 100) }
+        const batches = await Promise.all(chunks.map(async (ids) => {
+          const { data, error } = await supabase.rpc(
+            "get_discoverable_member_cards", { target_ids: ids }
           );
-          if (cardsError) throw cardsError;
-          profilesData = [...profilesData, ...((privateCards ?? []) as Profile[])];
-        }
+          if (error) throw error;
+          return (data ?? []) as Profile[];
+        }));
+        profilesData = [...profilesData, ...batches.flat()];
       }
 
-      const acceptedProfileIds =
-        Array.from(
-          new Set(
-            connectionRows
-              .filter(
-                (connection) =>
-                  connection.status === "accepted"
-              )
-              .map((connection) =>
-                connection.requester_id === userId
-                  ? connection.recipient_id
-                  : connection.requester_id
-              )
-          )
-        );
-
-      let skillsData: Skill[] = [];
-
-      if (acceptedProfileIds.length > 0) {
-        const {
-          data: relatedSkillsData,
-          error: relatedSkillsError,
-        } = await supabase
-          .from("skills")
-          .select("profile_id, name")
-          .in("profile_id", acceptedProfileIds)
-          .eq("is_published", true)
-          .is("deleted_at", null);
-
-        if (relatedSkillsError) {
-          throw relatedSkillsError;
-        }
-
-        skillsData =
-          (relatedSkillsData ?? []) as Skill[];
-      }
+      cachedConnectionPage = {
+        userId,
+        timestamp: Date.now(),
+        profiles: profilesData,
+        connections: connectionRows,
+        mentorshipRequests: mentorshipRequestRows,
+        mentorships: mentorshipRows,
+        paymentOrders: paymentOrderRows,
+        skills: skillsData,
+      };
 
       setProfiles(profilesData);
       setConnections(connectionRows);
