@@ -163,8 +163,8 @@ type PeopleSearchCriteria = {
   mentor: string;
 };
 
-const PUBLIC_PAID_MENTORSHIPS_ENABLED =
-  process.env.NEXT_PUBLIC_FC_PAID_MENTORSHIPS_ENABLED === "true";
+// Paid checkout is disabled after the Paystack demo, irrespective of env flags.
+const PUBLIC_PAID_MENTORSHIPS_ENABLED = false;
 
 const PEOPLE_SEARCH_PAGE_SIZE = 20;
 
@@ -1020,6 +1020,11 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
       targetRequest.proposed_payment_mode
         ? targetRequest.proposed_payment_mode
         : targetRequest?.requested_payment_mode;
+
+    if (action === "accept" && effectivePaymentMode === "paid") {
+      setMessage("Paid mentorship is temporarily unavailable. You can decline this request or continue with free mentorship.");
+      return;
+    }
 
     setIsWorking(true);
     setMessage(null);
