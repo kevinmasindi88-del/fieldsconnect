@@ -49,6 +49,18 @@ type LibraryDocument = {
 
 type RecencyFilter = "all" | "7" | "30" | "90";
 
+// A recently visited Library can show its latest known permitted items
+// immediately while authenticated queries revalidate the page. Nothing
+// is persisted to localStorage, and each snapshot is tied to one account.
+type LibrarySnapshot = {
+  userId: string;
+  loadedAt: number;
+  profiles: Profile[];
+  documents: LibraryDocument[];
+};
+let librarySnapshot: LibrarySnapshot | null = null;
+const LIBRARY_CACHE_TTL_MS = 60_000;
+
 export function LibraryWorkflow() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -192,6 +204,15 @@ export function LibraryWorkflow() {
 
       setCurrentUserId(userId);
 
+      if (
+        librarySnapshot?.userId === userId &&
+        Date.now() - librarySnapshot.loadedAt < LIBRARY_CACHE_TTL_MS
+      ) {
+        setProfiles(librarySnapshot.profiles);
+        setDocuments(librarySnapshot.documents);
+        setIsLoading(false);
+      }
+
       const [
         { data: profileData, error: profileError },
         { data: documentData, error: documentError },
@@ -212,8 +233,16 @@ export function LibraryWorkflow() {
       if (profileError) throw profileError;
       if (documentError) throw documentError;
 
-      setProfiles((profileData ?? []) as Profile[]);
-      setDocuments((documentData ?? []) as LibraryDocument[]);
+      const loadedProfiles = (profileData ?? []) as Profile[];
+      const loadedDocuments = (documentData ?? []) as LibraryDocument[];
+      librarySnapshot = {
+        userId,
+        loadedAt: Date.now(),
+        profiles: loadedProfiles,
+        documents: loadedDocuments,
+      };
+      setProfiles(loadedProfiles);
+      setDocuments(loadedDocuments);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to load library.");
     } finally {
