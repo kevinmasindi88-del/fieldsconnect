@@ -494,17 +494,11 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
         : null;
     }
 
-    if (
-      offer.payment_mode === "free" ||
-      offer.price_amount_minor === 0
-    ) {
-      return "Free";
-    }
+    // Public paid offers are paused after the Paystack test/demo.
+    // Do not present a paid programme as free or allow new requests for it.
+    if (offer.payment_mode === "paid") return null;
 
-    return new Intl.NumberFormat("en-ZA", {
-      style: "currency",
-      currency: offer.currency,
-    }).format(offer.price_amount_minor / 100);
+    return "Free";
   }
 
   function getAcceptedDurations() {
