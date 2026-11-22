@@ -5,15 +5,15 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 export type PostReactionType = "like" | "love" | "thanks" | "applause";
 
-const HOLD_DURATION_MS = 800;
+const HOLD_DURATION_MS = 700;
 const MOVE_TOLERANCE_PX = 12;
 
-// Native emoji glyphs are multicolour images, so "color: blue" does not
-// recolour them. These filters retain emoji shading while tinting both
-// hand reactions into distinct blue shades. The red heart stays untouched.
+// Collapse each native multicolour hand emoji to a single colour first,
+// then apply a strong blue tint. brightness(0) ensures no original skin,
+// pink or lilac pixels survive; the red heart is left entirely untouched.
 const reactionEmojiFilters: Partial<Record<PostReactionType, string>> = {
-  thanks: "grayscale(1) sepia(1) saturate(4) hue-rotate(170deg) brightness(1.16)",
-  applause: "grayscale(1) sepia(1) saturate(5) hue-rotate(187deg) brightness(0.92)",
+  thanks: "brightness(0) saturate(100%) invert(30%) sepia(89%) saturate(3181%) hue-rotate(207deg) brightness(103%) contrast(102%)",
+  applause: "brightness(0) saturate(100%) invert(23%) sepia(89%) saturate(4007%) hue-rotate(218deg) brightness(93%) contrast(106%)",
 };
 
 const additionalReactions: Array<{ type: PostReactionType; emoji: string; label: string }> = [
@@ -172,7 +172,7 @@ export function PostReactionControl({
         onPointerLeave={finishHold}
         onPointerMove={moveHold}
         onPointerUp={finishHold}
-        title="Tap to like · Hold 0.8 seconds for ❤️ 🙏 👏 · Arrow Down for reactions"
+        title="Tap to like · Hold 0.7 seconds for ❤️ 🙏 👏 · Arrow Down for reactions"
         type="button"
       >
         {selected ? (
