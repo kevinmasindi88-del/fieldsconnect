@@ -315,7 +315,7 @@ export function DevicePushNotifications() {
 
   return (
     <div className="rounded-xl border p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-end gap-3">
         <p className="text-sm font-semibold">Device notifications</p>
         {pushState === "enabled" ? (
           <button
