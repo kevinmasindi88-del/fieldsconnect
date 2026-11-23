@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ReportMenu } from "@/components/moderation/ReportMenu";
 
@@ -1456,13 +1456,6 @@ export function LibraryWorkflow() {
                             {owner?.field ? ` - ${owner.field}` : ""}
                             {owner?.role_type ? ` - ${formatRole(owner.role_type)}` : ""}
                           </span>
-                          <span className="mt-1 block max-w-full text-xs text-gray-500 [overflow-wrap:anywhere]">
-                            {document.file_name ?? "Uploaded file"} -{" "}
-                            {document.file_size_bytes !== null
-                              ? formatBytes(document.file_size_bytes)
-                              : "Unknown size"}{" "}
-                            - {formatDate(document.created_at)}
-                          </span>
                         </button>
                       );
                     })
@@ -1522,6 +1515,9 @@ function DocumentCard({
   onOpen: () => void;
   children?: React.ReactNode;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsId = useId();
+
   return (
     <article
       className={`flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center ${
@@ -1529,11 +1525,10 @@ function DocumentCard({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold leading-snug sm:text-base">
-            {document.title}
-          </h3>
-
+        <h3 className="text-sm font-semibold leading-snug sm:text-base [overflow-wrap:anywhere]">
+          {document.title}
+        </h3>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {document.resource_type === "external_link"
               ? "Online link"
@@ -1564,35 +1559,53 @@ function DocumentCard({
           </p>
         )}
 
-        {document.resource_type === "external_link" ? (
-          <div className="mt-2 space-y-1 text-xs text-gray-500">
-            <p>
-              Online resource
-              {document.source_publisher
-                ? ` - ${document.source_publisher}`
-                : ""}
-            </p>
-
-            {document.source_title && (
-              <p>{document.source_title}</p>
-            )}
-
-            <p>
-              Access recorded{" "}
-              {document.source_accessed_on
-                ? formatDate(document.source_accessed_on)
-                : formatDate(document.created_at)}
-            </p>
-          </div>
-        ) : (
-          <p className="mt-2 max-w-full text-xs text-gray-500 [overflow-wrap:anywhere]">
-            {document.file_name ?? "Uploaded file"} -{" "}
-            {document.file_size_bytes !== null
-              ? formatBytes(document.file_size_bytes)
-              : "Unknown size"}{" "}
-            - {formatDate(document.created_at)}
-          </p>
-        )}
+        <button
+          aria-controls={detailsId}
+          aria-expanded={detailsOpen}
+          className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          onClick={() => setDetailsOpen((open) => !open)}
+          type="button"
+        >
+          {detailsOpen ? "Less" : "More"}
+          <svg
+            aria-hidden="true"
+            className={`h-4 w-4 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <div
+          id={detailsId}
+          hidden={!detailsOpen}
+          className="mt-2 space-y-1 text-xs leading-relaxed text-gray-600 [overflow-wrap:anywhere]"
+        >
+          {document.resource_type === "external_link" ? (
+            <>
+              <p>Type: Online resource</p>
+              {document.source_publisher && <p>Publisher: {document.source_publisher}</p>}
+              {document.source_title && <p>Source title: {document.source_title}</p>}
+              <p>
+                Access recorded: {document.source_accessed_on
+                  ? formatDate(document.source_accessed_on)
+                  : formatDate(document.created_at)}
+              </p>
+            </>
+          ) : (
+            <>
+              <p>File name: {document.file_name ?? "Uploaded file"}</p>
+              <p>
+                Size: {document.file_size_bytes !== null
+                  ? formatBytes(document.file_size_bytes)
+                  : "Unknown size"}
+              </p>
+              <p>Added: {formatDate(document.created_at)}</p>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
