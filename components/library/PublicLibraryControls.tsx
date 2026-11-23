@@ -19,46 +19,6 @@ export function PublicLibraryControls() {
         heading.textContent = "Public Library";
       }
 
-      const searchInput = Array.from(section.querySelectorAll<HTMLInputElement>("input")).find((input) =>
-        input.placeholder?.toLowerCase().includes("search sop")
-      );
-
-      if (searchInput && !section.querySelector("[data-public-library-search-button='true']")) {
-        const label = searchInput.closest("label");
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.publicLibrarySearchButton = "true";
-        button.className = "mt-2 w-full rounded-lg bg-black px-4 py-2 text-sm font-medium text-white sm:w-fit";
-        button.textContent = "Search";
-
-        const runSearch = () => {
-          const viewButton = Array.from(section.querySelectorAll<HTMLButtonElement>("button")).find((candidate) =>
-            candidate.textContent?.trim().startsWith("View resource list") ||
-            candidate.textContent?.trim().startsWith("Hide resource list")
-          );
-
-          if (viewButton && !viewButton.disabled && viewButton.textContent?.trim().startsWith("View resource list")) {
-            viewButton.click();
-          }
-
-          section.scrollIntoView({ behavior: "smooth", block: "start" });
-        };
-
-        button.addEventListener("click", runSearch);
-        searchInput.addEventListener("keydown", (event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            runSearch();
-          }
-        });
-
-        if (label) {
-          label.appendChild(button);
-        } else {
-          searchInput.insertAdjacentElement("afterend", button);
-        }
-      }
-
       const recencySelect = Array.from(section.querySelectorAll<HTMLSelectElement>("select")).find((select) =>
         Array.from(select.options).some((option) =>
           ["Last 90 days", "90 days or longer"].includes(option.textContent?.trim() ?? "")
