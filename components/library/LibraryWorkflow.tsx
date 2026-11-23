@@ -1320,28 +1320,61 @@ export function LibraryWorkflow() {
                   onOpen={() => openDocument(document)}
                 >
                   <button
-                    className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    aria-label={document.is_published ? "Unpublish resource" : "Publish resource"}
+                    aria-pressed={document.is_published}
+                    className={document.is_published
+                      ? "inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-800 bg-gray-100 text-gray-950 transition hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
+                      : "inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-white text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"}
                     disabled={isWorking}
                     onClick={() => togglePublished(document)}
+                    title={document.is_published ? "Unpublish" : "Publish"}
                     type="button"
                   >
-                    {document.is_published ? "Unpublish" : "Publish"}
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10l-7-7Z" />
+                      <path d="M13 3v7h7" />
+                      {document.is_published
+                        ? <path d="M12 12v7m-3-3 3 3 3-3" />
+                        : <path d="M12 19v-7m-3 3 3-3 3 3" />}
+                    </svg>
                   </button>
                   <button
-                    className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    aria-label={document.visibility === "public"
+                      ? "Visibility: Public. Change to connections only"
+                      : "Visibility: Connections only. Change to public"}
+                    aria-pressed={document.visibility === "public"}
+                    className={document.visibility === "public"
+                      ? "inline-flex h-11 w-11 items-center justify-center rounded-xl border border-blue-300 bg-blue-50 text-blue-700 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
+                      : "inline-flex h-11 w-11 items-center justify-center rounded-xl border bg-white text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"}
                     disabled={isWorking}
                     onClick={() => toggleVisibility(document)}
+                    title={document.visibility === "public" ? "Public — switch to connections only" : "Connections only — switch to public"}
                     type="button"
                   >
-                    Make {document.visibility === "public" ? "connections only" : "public"}
+                    {document.visibility === "public" ? (
+                      <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M3 12h18M12 3c-5 4.6-5 13.4 0 18M12 3c5 4.6 5 13.4 0 18" />
+                      </svg>
+                    ) : (
+                      <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                        <path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-5A4.5 4.5 0 0 0 2 18.5V20" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M17 4.3a4 4 0 0 1 0 7.4M22 20v-1.5a4.5 4.5 0 0 0-3-4.3" />
+                      </svg>
+                    )}
                   </button>
                   <button
-                    className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    aria-label="Delete resource"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-red-200 bg-white text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                     disabled={isWorking}
                     onClick={() => deleteDocument(document)}
+                    title="Delete"
                     type="button"
                   >
-                    Delete
+                    <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M3 6h18M8 6V4h8v2M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+                    </svg>
                   </button>
                 </DocumentCard>
               ))
@@ -1520,14 +1553,30 @@ function DocumentCard({
 
   return (
     <article
-      className={`flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 md:flex-row md:items-center ${
+      className={`flex min-w-0 flex-col justify-between gap-4 rounded-xl border bg-white p-4 ${
         isSelected ? "border-black" : ""
       }`}
     >
       <div className="min-w-0 flex-1">
-        <h3 className="text-sm font-semibold leading-snug sm:text-base [overflow-wrap:anywhere]">
-          {document.title}
-        </h3>
+        <div className="flex min-w-0 items-end justify-between gap-2">
+          <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug sm:text-base [overflow-wrap:anywhere]">
+            {document.title}
+          </h3>
+          <button
+            aria-controls={detailsId}
+            aria-expanded={detailsOpen}
+            aria-label={detailsOpen ? "Hide resource details" : "Show resource details"}
+            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            onClick={() => setDetailsOpen((open) => !open)}
+            title={detailsOpen ? "Hide file details" : "Show file details"}
+            type="button"
+          >
+            {detailsOpen ? "Less" : "More"}
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              {detailsOpen ? <path d="m6 15 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /> : <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />}
+            </svg>
+          </button>
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             {document.resource_type === "external_link"
@@ -1559,25 +1608,6 @@ function DocumentCard({
           </p>
         )}
 
-        <button
-          aria-controls={detailsId}
-          aria-expanded={detailsOpen}
-          className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-          onClick={() => setDetailsOpen((open) => !open)}
-          type="button"
-        >
-          {detailsOpen ? "Less" : "More"}
-          <svg
-            aria-hidden="true"
-            className={`h-4 w-4 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-          >
-            <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
         <div
           id={detailsId}
           hidden={!detailsOpen}
@@ -1610,12 +1640,18 @@ function DocumentCard({
 
       <div className="flex flex-wrap gap-2">
         <button
-          className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
+          aria-label="Open resource"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-950 bg-gray-950 text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
           disabled={isWorking}
           onClick={onOpen}
+          title="Open"
           type="button"
         >
-          Open
+          <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M12 7c-3-2-6-3-10-2v14c4-1 7-.5 10 2" />
+            <path d="M12 7c3-2 6-3 10-2v14c-4-1-7-.5-10 2" />
+            <path d="M12 7v14" />
+          </svg>
         </button>
         {children}
       </div>
