@@ -912,31 +912,33 @@ export function LibraryWorkflow() {
       <form onSubmit={uploadDocument} className="flex flex-col gap-4 rounded-xl border bg-white p-4">
         <h2 className="text-xl font-semibold">Add Library resource</h2>
 
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          Title
-          <input
-            className="rounded-lg border px-3 py-2"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Example: CV template, bursary guide, study notes"
-            minLength={LIBRARY_TITLE_MIN_LENGTH}
-            maxLength={LIBRARY_TITLE_MAX_LENGTH}
-            required
-          />
-          <span className="text-right text-xs font-normal text-gray-500">
-            {title.length}/{LIBRARY_TITLE_MAX_LENGTH}
-          </span>
-        </label>
+        <div className="flex flex-col gap-1">
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Title
+            <input
+              className="rounded-lg border px-3 py-2"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Example: CV template, bursary guide, study notes"
+              minLength={LIBRARY_TITLE_MIN_LENGTH}
+              maxLength={LIBRARY_TITLE_MAX_LENGTH}
+              required
+            />
+            <span className="text-right text-xs font-normal text-gray-500">
+              {title.length}/{LIBRARY_TITLE_MAX_LENGTH}
+            </span>
+          </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          Description
-          <textarea
-            className="min-h-24 rounded-lg border px-3 py-2"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Briefly describe what this resource is for."
-          />
-        </label>
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Description
+            <textarea
+              className="min-h-24 rounded-lg border px-3 py-2"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Briefly describe what this resource is for."
+            />
+          </label>
+        </div>
         <fieldset className="grid gap-3">
           <legend className="text-sm font-medium">
             Resource type
