@@ -112,6 +112,7 @@ export function LibraryWorkflow() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [recencyFilter, setRecencyFilter] = useState<RecencyFilter>("all");
   const [isResultListOpen, setIsResultListOpen] = useState(false);
+  const [hasSearchedLibrary, setHasSearchedLibrary] = useState(false);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,6 +149,12 @@ export function LibraryWorkflow() {
     return Array.from(roles).sort((left, right) => left.localeCompare(right));
   }, [profileById, publishedDocuments]);
 
+  const hasLibrarySearchCriteria =
+    librarySearch.trim().length > 0 ||
+    fieldFilter !== "all" ||
+    roleFilter !== "all" ||
+    recencyFilter !== "all";
+
   const filteredPublishedDocuments = useMemo(() => {
     const searchTerm = librarySearch.trim().toLowerCase();
     const now = Date.now();
@@ -176,8 +183,11 @@ export function LibraryWorkflow() {
     });
   }, [fieldFilter, librarySearch, profileById, publishedDocuments, recencyFilter, roleFilter]);
 
+  const visibleLibraryResults = hasSearchedLibrary ? filteredPublishedDocuments : [];
   const selectedResult =
-    filteredPublishedDocuments.find((document) => document.id === selectedResultId) ?? filteredPublishedDocuments[0] ?? null;
+    hasSearchedLibrary && selectedResultId
+      ? visibleLibraryResults.find((document) => document.id === selectedResultId) ?? null
+      : null;
 
   async function loadData() {
     setMessage(null);
@@ -869,13 +879,25 @@ export function LibraryWorkflow() {
     }
   }
 
+  function resetLibrarySearchResults() {
+    setHasSearchedLibrary(false);
+    setSelectedResultId(null);
+    setIsResultListOpen(false);
+  }
+
+  function searchLibrary() {
+    if (!hasLibrarySearchCriteria) return;
+    setHasSearchedLibrary(true);
+    setSelectedResultId(null);
+    setIsResultListOpen(true);
+  }
+
   function clearLibraryFilters() {
     setLibrarySearch("");
     setFieldFilter("all");
     setRoleFilter("all");
     setRecencyFilter("all");
-    setSelectedResultId(null);
-    setIsResultListOpen(false);
+    resetLibrarySearchResults();
   }
 
   function selectLibraryResult(documentId: string) {
@@ -1384,28 +1406,47 @@ export function LibraryWorkflow() {
             <div className="flex flex-col gap-4 rounded-xl border bg-white p-4">
               <div>
                 <h3 className="font-semibold">Find resources</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Search specific resources, then open the results list and select the item you want to view.
-                </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-4">
-                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                  Search
-                  <input
-                    className="rounded-lg border px-3 py-2"
-                    value={librarySearch}
-                    onChange={(event) => setLibrarySearch(event.target.value)}
-                    placeholder="Search SOP templates, bursary guide, CV..."
-                  />
-                </label>
+              <form
+                className="grid gap-3 md:grid-cols-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  searchLibrary();
+                }}
+              >
+                <div className="flex min-w-0 flex-col gap-3 md:col-span-2">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
+                    Search
+                    <input
+                      className="rounded-lg border px-3 py-2"
+                      value={librarySearch}
+                      onChange={(event) => {
+                        setLibrarySearch(event.target.value);
+                        resetLibrarySearchResults();
+                      }}
+                      placeholder="Search SOP templates, bursary guide, CV..."
+                      type="search"
+                    />
+                  </label>
+                  <button
+                    className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!hasLibrarySearchCriteria}
+                    type="submit"
+                  >
+                    Search
+                  </button>
+                </div>
 
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Field
                   <select
                     className="rounded-lg border px-3 py-2"
                     value={fieldFilter}
-                    onChange={(event) => setFieldFilter(event.target.value)}
+                    onChange={(event) => {
+                      setFieldFilter(event.target.value);
+                      resetLibrarySearchResults();
+                    }}
                   >
                     <option value="all">All fields</option>
                     {availableFields.map((field) => (
@@ -1421,7 +1462,10 @@ export function LibraryWorkflow() {
                   <select
                     className="rounded-lg border px-3 py-2"
                     value={roleFilter}
-                    onChange={(event) => setRoleFilter(event.target.value)}
+                    onChange={(event) => {
+                      setRoleFilter(event.target.value);
+                      resetLibrarySearchResults();
+                    }}
                   >
                     <option value="all">All roles</option>
                     {availableRoles.map((role) => (
@@ -1437,7 +1481,10 @@ export function LibraryWorkflow() {
                   <select
                     className="rounded-lg border px-3 py-2"
                     value={recencyFilter}
-                    onChange={(event) => setRecencyFilter(event.target.value as RecencyFilter)}
+                    onChange={(event) => {
+                      setRecencyFilter(event.target.value as RecencyFilter);
+                      resetLibrarySearchResults();
+                    }}
                   >
                     <option value="all">Any time</option>
                     <option value="7">Last 7 days</option>
@@ -1445,31 +1492,35 @@ export function LibraryWorkflow() {
                     <option value="90">Last 90 days</option>
                   </select>
                 </label>
-              </div>
+              </form>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50"
-                  disabled={filteredPublishedDocuments.length === 0}
-                  onClick={() => setIsResultListOpen((current) => !current)}
-                  type="button"
-                >
-                  {isResultListOpen ? "Hide resource list" : "View resource list"} ({filteredPublishedDocuments.length})
-                </button>
+                {hasSearchedLibrary && visibleLibraryResults.length > 0 && (
+                  <button
+                    className="min-h-10 rounded-xl bg-gray-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                    onClick={() => setIsResultListOpen((current) => !current)}
+                    type="button"
+                  >
+                    {isResultListOpen ? "Hide resource list" : "View resource list"} ({visibleLibraryResults.length})
+                  </button>
+                )}
                 <button className="rounded-lg border px-4 py-2 text-sm font-medium" onClick={clearLibraryFilters} type="button">
                   Clear filters
                 </button>
-                <span className="text-sm text-gray-600">
-                  {filteredPublishedDocuments.length} resource{filteredPublishedDocuments.length === 1 ? "" : "s"} found
-                </span>
+                {hasSearchedLibrary && (
+                  <span className="text-sm text-gray-600" role="status">
+                    {visibleLibraryResults.length} resource{visibleLibraryResults.length === 1 ? "" : "s"} found
+                  </span>
+                )}
               </div>
 
-              {isResultListOpen && (
+              {hasSearchedLibrary && visibleLibraryResults.length === 0 && (
+                <EmptyState text="No resources match this search." />
+              )}
+
+              {hasSearchedLibrary && isResultListOpen && visibleLibraryResults.length > 0 && (
                 <div className="grid gap-2 rounded-xl border bg-gray-50 p-3">
-                  {filteredPublishedDocuments.length === 0 ? (
-                    <EmptyState text="No resources match this search yet." />
-                  ) : (
-                    filteredPublishedDocuments.map((document) => {
+                  {visibleLibraryResults.map((document) => {
                       const owner = profileById.get(document.owner_id);
                       const isSelected = selectedResult?.id === document.id;
 
@@ -1490,12 +1541,11 @@ export function LibraryWorkflow() {
                           </span>
                         </button>
                       );
-                    })
-                  )}
+                    })}
                 </div>
               )}
 
-              {selectedResult && (
+              {hasSearchedLibrary && selectedResult && (
                 <DocumentCard
                   document={selectedResult}
                   owner={profileById.get(selectedResult.owner_id)}
