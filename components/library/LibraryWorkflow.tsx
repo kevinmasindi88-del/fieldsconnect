@@ -1496,24 +1496,22 @@ export function LibraryWorkflow() {
               )}
 
               {selectedResult && (
-                <div className="rounded-xl border border-black p-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Selected resource</p>
-                  <DocumentCard
-                    document={selectedResult}
-                    owner={profileById.get(selectedResult.owner_id)}
-                    isWorking={isWorking}
-                    isSelected
-                    onOpen={() => openDocument(selectedResult)}
-                  >
-                    <ReportMenu
-                      targetType="library_document"
-                      targetId={selectedResult.id}
-                      reportedUserId={selectedResult.owner_id}
-                      label="resource"
-                      disabled={isWorking}
-                    />
-                  </DocumentCard>
-                </div>
+                <DocumentCard
+                  document={selectedResult}
+                  owner={profileById.get(selectedResult.owner_id)}
+                  isWorking={isWorking}
+                  isSelected={false}
+                  showOwnerMetadata={false}
+                  onOpen={() => openDocument(selectedResult)}
+                >
+                  <ReportMenu
+                    targetType="library_document"
+                    targetId={selectedResult.id}
+                    reportedUserId={selectedResult.owner_id}
+                    label="resource"
+                    disabled={isWorking}
+                  />
+                </DocumentCard>
               )}
             </div>
           </DocumentSection>
@@ -1537,6 +1535,7 @@ function DocumentCard({
   owner,
   isWorking,
   isSelected,
+  showOwnerMetadata = true,
   onOpen,
   children,
 }: {
@@ -1544,6 +1543,7 @@ function DocumentCard({
   owner?: Profile;
   isWorking: boolean;
   isSelected: boolean;
+  showOwnerMetadata?: boolean;
   onOpen: () => void;
   children?: React.ReactNode;
 }) {
@@ -1561,40 +1561,44 @@ function DocumentCard({
           <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug sm:text-base [overflow-wrap:anywhere]">
             {document.title}
           </h3>
-          <button
-            aria-controls={detailsId}
-            aria-expanded={detailsOpen}
-            aria-label={detailsOpen ? "Hide resource details" : "Show resource details"}
-            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-            onClick={() => setDetailsOpen((open) => !open)}
-            title={detailsOpen ? "Hide file details" : "Show file details"}
-            type="button"
-          >
-            {detailsOpen ? "Less" : "More"}
-            <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              {detailsOpen ? <path d="m6 15 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /> : <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />}
-            </svg>
-          </button>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-            {document.resource_type === "external_link"
-              ? "Online link"
-              : "File"}
-          </span>
-
-          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-            {document.is_published ? "Published" : "Unpublished"}
-          </span>
-          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-            {document.visibility === "public" ? "Public" : "Connections"}
-          </span>
-          {owner?.role_type && (
-            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-              {formatRole(owner.role_type)}
-            </span>
+          {showOwnerMetadata && (
+            <button
+              aria-controls={detailsId}
+              aria-expanded={detailsOpen}
+              aria-label={detailsOpen ? "Hide resource details" : "Show resource details"}
+              className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              onClick={() => setDetailsOpen((open) => !open)}
+              title={detailsOpen ? "Hide file details" : "Show file details"}
+              type="button"
+            >
+              {detailsOpen ? "Less" : "More"}
+              <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                {detailsOpen ? <path d="m6 15 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /> : <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />}
+              </svg>
+            </button>
           )}
         </div>
+        {showOwnerMetadata && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+              {document.resource_type === "external_link"
+                ? "Online link"
+                : "File"}
+            </span>
+  
+            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+              {document.is_published ? "Published" : "Unpublished"}
+            </span>
+            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+              {document.visibility === "public" ? "Public" : "Connections"}
+            </span>
+            {owner?.role_type && (
+              <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+                {formatRole(owner.role_type)}
+              </span>
+            )}
+          </div>
+        )}
 
         <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
           {owner?.display_name ?? "Unknown profile"}
@@ -1607,34 +1611,36 @@ function DocumentCard({
           </p>
         )}
 
-        <div
-          id={detailsId}
-          hidden={!detailsOpen}
-          className="mt-2 space-y-1 text-xs leading-relaxed text-gray-600 [overflow-wrap:anywhere]"
-        >
-          {document.resource_type === "external_link" ? (
-            <>
-              <p>Type: Online resource</p>
-              {document.source_publisher && <p>Publisher: {document.source_publisher}</p>}
-              {document.source_title && <p>Source title: {document.source_title}</p>}
-              <p>
-                Access recorded: {document.source_accessed_on
-                  ? formatDate(document.source_accessed_on)
-                  : formatDate(document.created_at)}
-              </p>
-            </>
-          ) : (
-            <>
-              <p>File name: {document.file_name ?? "Uploaded file"}</p>
-              <p>
-                Size: {document.file_size_bytes !== null
-                  ? formatBytes(document.file_size_bytes)
-                  : "Unknown size"}
-              </p>
-              <p>Added: {formatDate(document.created_at)}</p>
-            </>
-          )}
-        </div>
+        {showOwnerMetadata && (
+          <div
+            id={detailsId}
+            hidden={!detailsOpen}
+            className="mt-2 space-y-1 text-xs leading-relaxed text-gray-600 [overflow-wrap:anywhere]"
+          >
+            {document.resource_type === "external_link" ? (
+              <>
+                <p>Type: Online resource</p>
+                {document.source_publisher && <p>Publisher: {document.source_publisher}</p>}
+                {document.source_title && <p>Source title: {document.source_title}</p>}
+                <p>
+                  Access recorded: {document.source_accessed_on
+                    ? formatDate(document.source_accessed_on)
+                    : formatDate(document.created_at)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p>File name: {document.file_name ?? "Uploaded file"}</p>
+                <p>
+                  Size: {document.file_size_bytes !== null
+                    ? formatBytes(document.file_size_bytes)
+                    : "Unknown size"}
+                </p>
+                <p>Added: {formatDate(document.created_at)}</p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
