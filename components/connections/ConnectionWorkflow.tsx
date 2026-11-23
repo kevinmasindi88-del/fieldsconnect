@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Children, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/browser";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { MentorRating, type MentorRatingSummary } from "@/components/mentorship/MentorRating";
@@ -2510,10 +2510,22 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             {outgoingRequests.length === 0 ? (
               <EmptyState text="No outgoing requests pending." />
             ) : (
-              <OutgoingRequestPager
-                requests={outgoingRequests}
-                profileById={profileById}
-              />
+              <MeasuredCardScroller
+                ariaLabel="Outgoing connection requests"
+                visibleCards={1.5}
+                measureKey={outgoingRequests.map((connection) => connection.id).join("|")}
+              >
+                {outgoingRequests.map((connection) => (
+                  <ConnectionCard
+                    key={connection.id}
+                    profile={profileById.get(connection.recipient_id)}
+                    showBio={false}
+                    showMentorAvailability={false}
+                  >
+                    <span className="text-sm font-medium text-gray-700">Pending</span>
+                  </ConnectionCard>
+                ))}
+              </MeasuredCardScroller>
             )}
           </ConnectionSection>
 
@@ -2566,7 +2578,11 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                 {visibleAcceptedConnections.length === 0 ? (
                   <EmptyState text="No connections match your search." />
                 ) : (
-                  <div className="max-h-48 space-y-3 overflow-y-auto pr-1">
+                  <MeasuredCardScroller
+                    ariaLabel="Your connections"
+                    visibleCards={3}
+                    measureKey={visibleAcceptedConnections.map((connection) => connection.id).join("|")}
+                  >
                     {visibleAcceptedConnections.map((connection) => {
                       const profile = getOtherProfile(connection);
                       const profileSkills = profile
@@ -2625,7 +2641,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
                         </ConnectionCard>
                       );
                     })}
-                  </div>
+                  </MeasuredCardScroller>
                 )}
               </>
             )}
@@ -2640,82 +2656,66 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   );
 }
 
-function OutgoingRequestPager({
-  requests,
-  profileById,
+function MeasuredCardScroller({
+  ariaLabel,
+  visibleCards,
+  measureKey,
+  children,
 }: {
-  requests: Connection[];
-  profileById: Map<string, Profile>;
+  ariaLabel: string;
+  visibleCards: 1.5 | 3;
+  measureKey: string;
+  children: React.ReactNode;
 }) {
-  const [requestedIndex, setRequestedIndex] = useState(0);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const index = Math.min(requestedIndex, requests.length - 1);
-  const current = requests[index];
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [visibleHeight, setVisibleHeight] = useState<number | null>(null);
+  const canScroll = Children.count(children) > visibleCards;
 
-  // Only one request is rendered at a time. Vertical scrolling stays with the page.
-  function move(direction: number) {
-    setRequestedIndex(Math.max(0, Math.min(requests.length - 1, index + direction)));
-  }
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !canScroll) return;
+
+    function measure() {
+      if (!list) return;
+      const cards = Array.from(list.children) as HTMLElement[];
+      const first = cards[0];
+      const last = cards[Math.ceil(visibleCards) - 1];
+      if (!first || !last) return;
+
+      // Account for card heights and gaps, including half of the second
+      // card for outgoing requests. Preserve natural card heights on mobile.
+      const fraction = visibleCards % 1 || 1;
+      const nextHeight = Math.ceil(
+        last.offsetTop - first.offsetTop + last.offsetHeight * fraction
+      );
+      setVisibleHeight((previous) => previous === nextHeight ? previous : nextHeight);
+    }
+
+    measure();
+    const observer = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(measure)
+      : null;
+    Array.from(list.children).forEach((card) => observer?.observe(card));
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [canScroll, visibleCards, measureKey]);
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div
-        aria-label="Outgoing connection requests"
-        aria-roledescription="carousel"
-        role="region"
-        aria-live="polite"
-        onTouchStart={(event) => {
-          const touch = event.touches[0];
-          if (touch) touchStart.current = { x: touch.clientX, y: touch.clientY };
-        }}
-        onTouchEnd={(event) => {
-          const start = touchStart.current;
-          touchStart.current = null;
-          const touch = event.changedTouches[0];
-          if (!start || !touch) return;
-          const dx = start.x - touch.clientX;
-          const dy = start.y - touch.clientY;
-          // Ignore vertical gestures so the whole page can scroll normally.
-          if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return;
-          move(dx > 0 ? 1 : -1);
-        }}
-      >
-        <ConnectionCard
-          key={current.id}
-          profile={profileById.get(current.recipient_id)}
-          showBio={false}
-          showMentorAvailability={false}
-        >
-          <span className="text-sm font-medium text-gray-700">Pending</span>
-        </ConnectionCard>
-      </div>
-      {requests.length > 1 && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-gray-500">
-            {index + 1} of {requests.length} requests
-          </span>
-          <div className="flex gap-2">
-            <button
-              aria-label="Previous outgoing request"
-              className="min-h-10 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={index === 0}
-              onClick={() => move(-1)}
-              type="button"
-            >
-              Previous
-            </button>
-            <button
-              aria-label="Next outgoing request"
-              className="min-h-10 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={index === requests.length - 1}
-              onClick={() => move(1)}
-              type="button"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+    <div
+      ref={listRef}
+      aria-label={ariaLabel}
+      className={`relative flex min-w-0 flex-col gap-3 ${canScroll
+        ? "overflow-y-auto overscroll-y-auto pr-2"
+        : ""}`}
+      role="region"
+      style={canScroll && visibleHeight !== null ? { maxHeight: visibleHeight } : undefined}
+      tabIndex={canScroll ? 0 : undefined}
+    >
+      {children}
     </div>
   );
 }
