@@ -216,6 +216,7 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
     useState<string | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [connectionSearch, setConnectionSearch] = useState("");
+  const [connectionSearchOpen, setConnectionSearchOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -2509,52 +2510,51 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
             {outgoingRequests.length === 0 ? (
               <EmptyState text="No outgoing requests pending." />
             ) : (
-              <div
-                aria-label="Outgoing connection requests"
-                className={`grid gap-3 ${
-                  outgoingRequests.length > 3
-                    ? "max-h-[23rem] overflow-y-auto overscroll-y-auto pr-2 md:max-h-[18rem]"
-                    : ""
-                }`}
-                tabIndex={outgoingRequests.length > 3 ? 0 : undefined}
-              >
-                {outgoingRequests.map((connection) => (
-                  <ConnectionCard
-                    key={connection.id}
-                    profile={profileById.get(connection.recipient_id)}
-                    showBio={false}
-                    showMentorAvailability={false}
-                  >
-                    <span className="text-sm font-medium text-gray-700">Pending</span>
-                  </ConnectionCard>
-                ))}
-              </div>
+              <OutgoingRequestPager
+                requests={outgoingRequests}
+                profileById={profileById}
+              />
             )}
           </ConnectionSection>
 
           <ConnectionSection
             title={`Your connections · ${acceptedConnections.length}`}
+            headerAction={
+              <button
+                aria-label={connectionSearchOpen ? "Close connection search" : "Search connections"}
+                aria-expanded={connectionSearchOpen}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                onClick={() => {
+                  setConnectionSearchOpen((open) => !open);
+                  setConnectionSearch("");
+                }}
+                title="Search connections by name, field or skill"
+                type="button"
+              >
+                <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="h-5 w-5" stroke="currentColor" strokeWidth="1.8">
+                  <circle cx="10.8" cy="10.8" r="6.5" />
+                  <path strokeLinecap="round" d="m16 16 5 5" />
+                </svg>
+              </button>
+            }
           >
+            {connectionSearchOpen && (
+              <div className="mb-3">
+                <input
+                  aria-label="Search connections by name, field or skill"
+                  autoFocus
+                  className="w-full min-w-0 rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  onChange={(event) => setConnectionSearch(event.target.value)}
+                  placeholder="Search by name, field or skill..."
+                  type="search"
+                  value={connectionSearch}
+                />
+              </div>
+            )}
             {acceptedConnections.length === 0 ? (
               <EmptyState text="No connections yet." />
             ) : (
               <>
-                <div className="grid gap-3">
-                  <label className="flex flex-col gap-2 text-sm font-medium">
-                    Search
-                    <input
-                      className="rounded-lg border px-3 py-2 font-normal"
-                      onChange={(event) =>
-                        setConnectionSearch(event.target.value)
-                      }
-                      placeholder="Name, field, or skill"
-                      type="search"
-                      value={connectionSearch}
-                    />
-                  </label>
-
-                </div>
-
                 <p className="text-xs text-gray-500">
                   {visibleAcceptedConnections.length}{" "}
                   {visibleAcceptedConnections.length === 1
@@ -2640,13 +2640,95 @@ export function ConnectionWorkflow({ view = "connections" }: { view?: "connectio
   );
 }
 
+function OutgoingRequestPager({
+  requests,
+  profileById,
+}: {
+  requests: Connection[];
+  profileById: Map<string, Profile>;
+}) {
+  const [requestedIndex, setRequestedIndex] = useState(0);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const index = Math.min(requestedIndex, requests.length - 1);
+  const current = requests[index];
+
+  // Only one request is rendered at a time. Vertical scrolling stays with the page.
+  function move(direction: number) {
+    setRequestedIndex(Math.max(0, Math.min(requests.length - 1, index + direction)));
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div
+        aria-label="Outgoing connection requests"
+        aria-roledescription="carousel"
+        role="region"
+        aria-live="polite"
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          if (touch) touchStart.current = { x: touch.clientX, y: touch.clientY };
+        }}
+        onTouchEnd={(event) => {
+          const start = touchStart.current;
+          touchStart.current = null;
+          const touch = event.changedTouches[0];
+          if (!start || !touch) return;
+          const dx = start.x - touch.clientX;
+          const dy = start.y - touch.clientY;
+          // Ignore vertical gestures so the whole page can scroll normally.
+          if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return;
+          move(dx > 0 ? 1 : -1);
+        }}
+      >
+        <ConnectionCard
+          key={current.id}
+          profile={profileById.get(current.recipient_id)}
+          showBio={false}
+          showMentorAvailability={false}
+        >
+          <span className="text-sm font-medium text-gray-700">Pending</span>
+        </ConnectionCard>
+      </div>
+      {requests.length > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-gray-500">
+            {index + 1} of {requests.length} requests
+          </span>
+          <div className="flex gap-2">
+            <button
+              aria-label="Previous outgoing request"
+              className="min-h-10 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={index === 0}
+              onClick={() => move(-1)}
+              type="button"
+            >
+              Previous
+            </button>
+            <button
+              aria-label="Next outgoing request"
+              className="min-h-10 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={index === requests.length - 1}
+              onClick={() => move(1)}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConnectionSection({
   title,
   children,
+  headerAction,
   collapsible = false,
 }: {
   title: string;
   children: React.ReactNode;
+  headerAction?: React.ReactNode;
   collapsible?: boolean;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(collapsible);
@@ -2677,6 +2759,11 @@ function ConnectionSection({
             </svg>
           </button>
         </h2>
+      ) : headerAction ? (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
+          {headerAction}
+        </div>
       ) : (
         <h2 className="text-lg font-semibold sm:text-xl">{title}</h2>
       )}
