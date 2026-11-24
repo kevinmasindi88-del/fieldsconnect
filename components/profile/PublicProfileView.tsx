@@ -1248,7 +1248,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           <div className="mt-3 grid gap-3">
             {skills.map((skill) => (
               <article key={skill.id} className="rounded-xl border p-4">
-                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <h3 className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">{skill.name}</h3>
                     <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
