@@ -528,6 +528,7 @@ export function SkillsWorkflow() {
                   key={skill.id}
                   skill={skill}
                   profile={profileById.get(skill.profile_id)}
+                  compactPublished
                 />
               ))
             )}
@@ -640,11 +641,15 @@ function SkillCard({
   skill,
   profile,
   children,
+  compactPublished = false,
 }: {
   skill: Skill;
   profile?: Profile;
   children?: React.ReactNode;
+  compactPublished?: boolean;
 }) {
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
   return (
     <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-start">
       <div className="min-w-0">
@@ -657,11 +662,13 @@ function SkillCard({
             Proficiency: {skill.rating ?? "Not rated"}
           </span>
 
-          <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-            {skill.is_published
-              ? "Published"
-              : "Unpublished"}
-          </span>
+          {!compactPublished && (
+            <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+              {skill.is_published
+                ? "Published"
+                : "Unpublished"}
+            </span>
+          )}
         </div>
 
         <p className="mt-2 text-xs leading-snug text-gray-600 sm:text-sm">
@@ -669,12 +676,23 @@ function SkillCard({
           {profile?.field ? ` - ${profile.field}` : ""}
         </p>
 
-        {skill.description && (
-          <p className="mt-2 max-w-2xl break-words text-sm leading-snug text-gray-700">
+        {skill.description && (!compactPublished || isDescriptionExpanded) && (
+          <p className="mt-2 max-w-2xl whitespace-pre-wrap break-words text-sm leading-snug text-gray-700">
             {skill.description}
           </p>
         )}
       </div>
+
+      {compactPublished && skill.description && (
+        <button
+          aria-expanded={isDescriptionExpanded}
+          className="w-fit shrink-0 self-start text-xs font-semibold text-gray-700 underline-offset-4 hover:underline sm:text-sm"
+          onClick={() => setIsDescriptionExpanded((current) => !current)}
+          type="button"
+        >
+          {isDescriptionExpanded ? "Less" : "More"}
+        </button>
+      )}
 
       {children && (
         <div className="shrink-0">{children}</div>
