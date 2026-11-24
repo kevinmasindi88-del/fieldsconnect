@@ -134,6 +134,8 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       initialMentorshipRequestForm
     );
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [expandedSkillDescriptions, setExpandedSkillDescriptions] =
+    useState<Record<string, boolean>>({});
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -912,7 +914,7 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
       {profile.mentor_available && mentorProfile && (
         <section id="mentorship-request" className="scroll-mt-24 flex flex-col gap-4 rounded-xl border p-4 sm:gap-5 sm:p-5">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col items-start gap-2">
               <h2 className="text-lg font-semibold sm:text-xl">
                 Mentorship
               </h2>
@@ -1246,13 +1248,34 @@ export function PublicProfileView({ profileId }: PublicProfileViewProps) {
           <div className="mt-3 grid gap-3">
             {skills.map((skill) => (
               <article key={skill.id} className="rounded-xl border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold leading-snug sm:text-base">{skill.name}</h3>
-                  <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-                    Rating: {skill.rating ?? "Not rated"}
-                  </span>
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h3 className="min-w-0 break-words text-sm font-semibold leading-snug sm:text-base">{skill.name}</h3>
+                    <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
+                      Rating: {skill.rating ?? "Not rated"}
+                    </span>
+                  </div>
+                  {skill.description && (
+                    <button
+                      aria-expanded={Boolean(expandedSkillDescriptions[skill.id])}
+                      className="shrink-0 text-xs font-semibold text-gray-700 underline-offset-4 hover:underline sm:text-sm"
+                      onClick={() =>
+                        setExpandedSkillDescriptions((current) => ({
+                          ...current,
+                          [skill.id]: !current[skill.id],
+                        }))
+                      }
+                      type="button"
+                    >
+                      {expandedSkillDescriptions[skill.id] ? "Less" : "More"}
+                    </button>
+                  )}
                 </div>
-                {skill.description && <p className="mt-2 text-sm leading-snug text-gray-700">{skill.description}</p>}
+                {skill.description && expandedSkillDescriptions[skill.id] && (
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-snug text-gray-700">
+                    {skill.description}
+                  </p>
+                )}
               </article>
             ))}
           </div>
