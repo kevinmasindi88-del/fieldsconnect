@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PencilIcon, TrashIcon } from "@/components/timeline/ActionIcons";
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -445,34 +446,46 @@ export function SkillsWorkflow() {
                   >
                     <div className="flex flex-wrap gap-2">
                       <button
-                        className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                        aria-label={`Edit skill: ${skill.name}`}
+                        title="Edit skill"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => beginEdit(skill)}
                         type="button"
                       >
-                        Edit
+                        <PencilIcon className="h-5 w-5" />
                       </button>
 
                       <button
-                        className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                        aria-label={`${skill.is_published ? "Unpublish" : "Publish"} skill: ${skill.name}`}
+                        title={skill.is_published ? "Unpublish skill" : "Publish skill"}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => togglePublished(skill)}
                         type="button"
                       >
-                        {skill.is_published
-                          ? "Unpublish"
-                          : "Publish"}
+                        {skill.is_published ? (
+                          <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                            <path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c5.1 0 8.7 5 9 7a11.6 11.6 0 0 1-3.1 4.8M6.3 6.3A11.7 11.7 0 0 0 3 12c.3 2 3.9 7 9 7 1.8 0 3.5-.6 4.9-1.6" />
+                            <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+                          </svg>
+                        ) : (
+                          <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                            <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
                       </button>
 
                       <button
-                        className="rounded-lg border px-3 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                        aria-label={`Delete skill: ${skill.name}`}
+                        title="Delete skill"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                         disabled={isWorking}
-                        onClick={() =>
-                          setDeleteConfirmSkillId(skill.id)
-                        }
+                        onClick={() => setDeleteConfirmSkillId(skill.id)}
                         type="button"
                       >
-                        Delete
+                        <TrashIcon className="h-5 w-5" />
                       </button>
                     </div>
 
