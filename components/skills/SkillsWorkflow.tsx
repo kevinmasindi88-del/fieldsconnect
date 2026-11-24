@@ -396,12 +396,11 @@ export function SkillsWorkflow() {
                     }
                     className="flex flex-col gap-4 rounded-xl border p-4"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
                       <h3 className="text-base font-semibold">
                         Edit skill
                       </h3>
-
-                      <span className="rounded-full border px-2 py-1 text-xs">
+                      <span className="mt-2 inline-flex rounded-full border px-2 py-1 text-xs">
                         {skill.is_published
                           ? "Currently published"
                           : "Currently unpublished"}
@@ -448,7 +447,7 @@ export function SkillsWorkflow() {
                       <button
                         aria-label={`Edit skill: ${skill.name}`}
                         title="Edit skill"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => beginEdit(skill)}
                         type="button"
@@ -459,28 +458,23 @@ export function SkillsWorkflow() {
                       <button
                         aria-label={`${skill.is_published ? "Unpublish" : "Publish"} skill: ${skill.name}`}
                         title={skill.is_published ? "Unpublish skill" : "Publish skill"}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => togglePublished(skill)}
                         type="button"
                       >
-                        {skill.is_published ? (
-                          <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                            <path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c5.1 0 8.7 5 9 7a11.6 11.6 0 0 1-3.1 4.8M6.3 6.3A11.7 11.7 0 0 0 3 12c.3 2 3.9 7 9 7 1.8 0 3.5-.6 4.9-1.6" />
-                            <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
-                          </svg>
-                        ) : (
-                          <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                            <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
+                        <svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M15 3h6v6" />
+                          <path d="m12 12 9-9" />
+                          <path d="M7 10h3M7 14h7M7 18h10" />
+                        </svg>
                       </button>
 
                       <button
                         aria-label={`Delete skill: ${skill.name}`}
                         title="Delete skill"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50"
                         disabled={isWorking}
                         onClick={() => setDeleteConfirmSkillId(skill.id)}
                         type="button"
@@ -666,20 +660,16 @@ function SkillCard({
   return (
     <article className="flex flex-col justify-between gap-4 rounded-xl border p-4 md:flex-row md:items-start">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="break-words text-sm font-semibold leading-snug sm:text-base">
-            {skill.name}
-          </h3>
-
+        <h3 className="break-words text-sm font-semibold leading-snug sm:text-base">
+          {skill.name}
+        </h3>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
             Proficiency: {skill.rating ?? "Not rated"}
           </span>
-
           {!compactPublished && (
             <span className="rounded-full border px-2 py-0.5 text-[11px] sm:py-1 sm:text-xs">
-              {skill.is_published
-                ? "Published"
-                : "Unpublished"}
+              {skill.is_published ? "Published" : "Unpublished"}
             </span>
           )}
         </div>
