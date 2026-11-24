@@ -91,6 +91,12 @@ type TimelineSnapshot = {
 };
 let timelineSnapshot: TimelineSnapshot | null = null;
 const TIMELINE_CACHE_TTL_MS = 60_000;
+const EMPTY_POST_REACTION_COUNTS: Record<PostReactionType, number> = {
+  like: 0,
+  love: 0,
+  thanks: 0,
+  applause: 0,
+};
 
 // Keep the separate video-link composer action restricted to known providers
 // and supported media URL shapes; don't accept profiles or arbitrary pages.
@@ -226,6 +232,21 @@ export function TimelineWorkflow() {
   const profileById = useMemo(() => {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }, [profiles]);
+
+  const reactionCountsByPost = useMemo(() => {
+    const countsByPost = new Map<string, Record<PostReactionType, number>>();
+    for (const item of reactions) {
+      const type = item.reaction_type as PostReactionType;
+      if (!Object.prototype.hasOwnProperty.call(EMPTY_POST_REACTION_COUNTS, type)) continue;
+      let postCounts = countsByPost.get(item.post_id);
+      if (!postCounts) {
+        postCounts = { ...EMPTY_POST_REACTION_COUNTS };
+        countsByPost.set(item.post_id, postCounts);
+      }
+      postCounts[type] += 1;
+    }
+    return countsByPost;
+  }, [reactions]);
 
   const fcNewsPublicationByPostId = useMemo(() => {
     return new Map(
@@ -1042,10 +1063,6 @@ export function TimelineWorkflow() {
       .filter((profile): profile is Profile => Boolean(profile));
   }
 
-  function getPostLikeCount(postId: string) {
-    return reactions.filter((reaction) => reaction.post_id === postId).length;
-  }
-
   function getCommentLikeCount(commentId: string) {
     return commentReactions.filter((reaction) => reaction.comment_id === commentId).length;
   }
@@ -1438,9 +1455,9 @@ export function TimelineWorkflow() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <PostReactionControl
-                  count={getPostLikeCount(post.id)}
+                  counts={reactionCountsByPost.get(post.id) ?? EMPTY_POST_REACTION_COUNTS}
                   disabled={reactingPostId === post.id}
                   reaction={selectedPostReaction}
                   onReact={(choice) => void setPostReaction(post.id, choice)}
