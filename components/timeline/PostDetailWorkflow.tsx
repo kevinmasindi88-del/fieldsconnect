@@ -60,6 +60,8 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   const [fcNewsPublication, setFcNewsPublication] =
     useState<FcNewsPublication | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [reactionCount, setReactionCount] = useState(0);
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [postMentions, setPostMentions] = useState<PostMention[]>([]);
   const [commentMentions, setCommentMentions] = useState<CommentMention[]>([]);
@@ -93,6 +95,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
         const [
           { data: postData, error: postError },
           { data: commentData, error: commentError },
+          { count: fetchedReactionCount, error: reactionError },
           { data: profileData, error: profileError },
           { data: postMentionData, error: postMentionError },
         ] = await Promise.all([
@@ -109,6 +112,10 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
             .is("deleted_at", null)
             .order("created_at", { ascending: true }),
           supabase
+            .from("reactions")
+            .select("id", { count: "exact", head: true })
+            .eq("post_id", postId),
+          supabase
             .from("profiles")
             .select("id, display_name, role_type, field, avatar_url")
             .is("deleted_at", null),
@@ -120,6 +127,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
         if (postError) throw postError;
         if (commentError) throw commentError;
+        if (reactionError) throw reactionError;
         if (profileError) throw profileError;
         if (postMentionError) throw postMentionError;
 
@@ -150,6 +158,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
 
         setPost((postData as Post | null) ?? null);
         setComments((commentData ?? []) as Comment[]);
+        setReactionCount(fetchedReactionCount ?? 0);
         const authorProfiles = await resolveTimelineAuthorProfiles(
           (profileData ?? []) as Profile[],
           [
@@ -172,10 +181,14 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
   }, [postId]);
 
   useEffect(() => {
-    if (isLoading || !post || !window.location.hash.startsWith("#comment-")) return;
+    setCommentsExpanded(window.location.hash.startsWith("#comment-"));
+  }, [postId]);
+
+  useEffect(() => {
+    if (isLoading || !post || !commentsExpanded || !window.location.hash.startsWith("#comment-")) return;
     const anchor = decodeURIComponent(window.location.hash.slice(1));
     window.requestAnimationFrame(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  }, [isLoading, post, comments.length]);
+  }, [isLoading, post, comments.length, commentsExpanded]);
 
   async function deleteOwnComment(commentId: string) {
     if (!currentUserId || isDeletingCommentId || !isSupabaseConfigured()) return;
@@ -282,8 +295,34 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
           {!fcNewsPublication && post.edited_at && <p className="mt-1 text-xs text-gray-500">Edited</p>}
         </div>
 
-        <div className="flex flex-col gap-3 border-t pt-4">
-          <p className="text-sm font-medium">{comments.length} comments</p>
+        <div className="flex items-center gap-3 border-t pt-3">
+          <div
+            aria-label={`${reactionCount} likes and reactions`}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-600"
+          >
+            <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+              <path d="M7 10v10H4V10h3Zm4.2-7c.8 0 1.5.7 1.5 1.5v3.1h4.8c1.4 0 2.4 1.3 2 2.6l-2.1 7.3c-.3.9-1.1 1.5-2.1 1.5H9V9.7l2-4.7c.1-.3.2-.7.2-1V3Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+            </svg>
+            <span>{reactionCount}</span>
+          </div>
+          <button
+            type="button"
+            aria-label={`${commentsExpanded ? "Hide" : "Show"} comments on post (${comments.length})`}
+            aria-expanded={commentsExpanded}
+            aria-controls="post-detail-comments"
+            title={commentsExpanded ? "Hide comments" : "Show comments"}
+            onClick={() => setCommentsExpanded((expanded) => !expanded)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          >
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.5 11.5a8.5 8.5 0 0 1-8.5 8.5 9.2 9.2 0 0 1-3.8-.8L3 21l1.8-5.2A8.5 8.5 0 1 1 20.5 11.5Z" />
+            </svg>
+            <span>{comments.length}</span>
+          </button>
+        </div>
+
+        {commentsExpanded && (
+        <div id="post-detail-comments" className="flex flex-col gap-3 border-t pt-4">
           {comments.map((comment) => {
             const commenter = profileById.get(comment.author_id);
             return (
@@ -324,6 +363,7 @@ export function PostDetailWorkflow({ postId }: { postId: string }) {
             );
           })}
         </div>
+        )}
       </article>
     </main>
   );
