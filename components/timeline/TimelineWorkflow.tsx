@@ -1455,7 +1455,7 @@ export function TimelineWorkflow() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex flex-wrap items-center gap-3 gap-x-2 gap-y-1">
                 <PostReactionControl
                   counts={reactionCountsByPost.get(post.id) ?? EMPTY_POST_REACTION_COUNTS}
                   disabled={reactingPostId === post.id}
